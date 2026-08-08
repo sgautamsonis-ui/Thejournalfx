@@ -23,9 +23,10 @@ export default function TradeView() {
   const load = () => tradesApi.list().then(setTrades).catch(()=>{});
   useEffect(() => {
     load();
-    ["symbol","strategy","session","htf_poi","entry_tag","mood","mistake","strength"].forEach(k =>
-      prefsApi.list(k).then(list => setPresets(p => ({...p, [k]: list.map(x=>x.value)}))).catch(()=>{})
-    );
+    // One batched request instead of 8 separate ones — same data, one round trip.
+    prefsApi.listMany(["symbol","strategy","session","htf_poi","entry_tag","mood","mistake","strength"])
+      .then(prefData => setPresets(p => ({ ...p, ...Object.fromEntries(Object.entries(prefData).map(([k, v]) => [k, v.map(x => x.value)])) })))
+      .catch(()=>{});
   }, []);
 
   // filters

@@ -32,8 +32,10 @@ export default function BiasCenter() {
   const [keyLevelPresets, setKeyLevelPresets] = useState([]);
 
   useEffect(() => {
-    prefsApi.list("htf_poi").then(l => setHtfPresets(l.map(x=>x.value))).catch(()=>{});
-    prefsApi.list("session").then(l => setSessionPresets(l.map(x=>x.value))).catch(()=>{});
+    prefsApi.listMany(["htf_poi","session"]).then(prefData => {
+      setHtfPresets((prefData.htf_poi || []).map(x=>x.value));
+      setSessionPresets((prefData.session || []).map(x=>x.value));
+    }).catch(()=>{});
   }, []);
 
   // Pull the right key-level presets based on active tab

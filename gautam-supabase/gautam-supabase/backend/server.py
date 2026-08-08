@@ -1,7 +1,7 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Request, Depends, Body
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
-import os, logging, uuid
+import os, logging, uuid, asyncio
 from pathlib import Path
 from pydantic import BaseModel, Field
 from typing import List, Optional, Any, Dict
@@ -326,30 +326,55 @@ DEFAULT_PREFS = {
 }
 VALID_KINDS = set(DEFAULT_PREFS.keys())
 
-async def ensure_prefs_seeded(user_id: str, kind: str):
+# In-process memory of which (user_id, kind) pairs are already known to be
+# seeded. Seeding only ever needs to happen once per user per kind, so after
+# the first successful check we skip the extra existence-check query on every
+# later request. This is safe to lose on a backend restart (worst case it just
+# re-checks once), and it removes ~half of the DB round trips preferences
+# calls were making.
+_SEEDED_CACHE: set = set()
+
+def _ensure_prefs_seeded_sync(user_id: str, kind: str):
+    cache_key = (user_id, kind)
+    if cache_key in _SEEDED_CACHE:
+        return
     existing = sb.table("preferences").select("id").eq("user_id", user_id).eq("kind", kind).execute()
     if not existing.data:
         rows = [{"id": str(uuid.uuid4()), "user_id": user_id, "kind": kind, "value": v, "order": i}
                 for i, v in enumerate(DEFAULT_PREFS.get(kind, []))]
         if rows:
             sb.table("preferences").insert(rows).execute()
+    _SEEDED_CACHE.add(cache_key)
+
+async def ensure_prefs_seeded(user_id: str, kind: str):
+    # The Supabase client here is synchronous, so run it off the event loop
+    # thread to avoid blocking other requests while this one waits on the DB.
+    await asyncio.to_thread(_ensure_prefs_seeded_sync, user_id, kind)
+
+def _fetch_pref_kind_sync(user_id: str, kind: str):
+    if kind not in VALID_KINDS:
+        return kind, []
+    _ensure_prefs_seeded_sync(user_id, kind)
+    r = sb.table("preferences").select("*").eq("user_id", user_id).eq("kind", kind).order("order").execute()
+    return kind, [{k: v for k, v in d.items() if k != "user_id"} for d in r.data]
+
+async def _fetch_pref_kind(user_id: str, kind: str):
+    # Each kind's DB round trip runs in its own thread, so N kinds cost
+    # roughly one round trip's worth of wall-clock time instead of N.
+    return await asyncio.to_thread(_fetch_pref_kind_sync, user_id, kind)
 
 @api_router.get("/preferences/batch")
 async def list_prefs_batch(kinds: str, user=Depends(get_current_user)):
-    """Fetch multiple preference kinds in a single request (used by Add Trade's
-    batched/cached preference load). `kinds` is a comma-separated list.
-    Unknown kinds are returned as an empty list instead of erroring out, so one
+    """Fetch multiple preference kinds in a single request (used by the
+    batched/cached preference loads on Add Trade, Trade View, Bias Center,
+    Psychology, and Records). `kinds` is a comma-separated list.
+    All kinds are fetched concurrently instead of one-by-one, so a page that
+    needs 10 kinds pays for one round trip's worth of latency, not ten.
+    Unknown kinds come back as an empty list instead of erroring out, so one
     bad/renamed kind can't break the whole batch."""
     kind_list = [k.strip() for k in kinds.split(",") if k.strip()]
-    result: Dict[str, Any] = {}
-    for kind in kind_list:
-        if kind not in VALID_KINDS:
-            result[kind] = []
-            continue
-        await ensure_prefs_seeded(user["user_id"], kind)
-        r = sb.table("preferences").select("*").eq("user_id", user["user_id"]).eq("kind", kind).order("order").execute()
-        result[kind] = [{k: v for k, v in d.items() if k != "user_id"} for d in r.data]
-    return result
+    pairs = await asyncio.gather(*[_fetch_pref_kind(user["user_id"], kind) for kind in kind_list])
+    return dict(pairs)
 
 @api_router.get("/preferences/{kind}")
 async def list_prefs(kind: str, user=Depends(get_current_user)):

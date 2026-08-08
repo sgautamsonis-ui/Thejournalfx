@@ -17,9 +17,9 @@ export default function Psychology() {
   const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
-    ["symbol","strategy","session","mood"].forEach(k =>
-      prefsApi.list(k).then(l => setPresets(p => ({...p, [k]: l.map(x=>x.value)}))).catch(()=>{})
-    );
+    prefsApi.listMany(["symbol","strategy","session","mood"])
+      .then(prefData => setPresets(p => ({ ...p, ...Object.fromEntries(Object.entries(prefData).map(([k, v]) => [k, v.map(x => x.value)])) })))
+      .catch(()=>{});
     tradesApi.list().then(setTrades).catch(()=>{});
     aiApi.ruleAdherence().then(setRule).catch(()=>{});
   }, []);
