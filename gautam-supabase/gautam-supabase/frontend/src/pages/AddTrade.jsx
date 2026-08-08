@@ -3,7 +3,7 @@ import { tradesApi, tagsApi, aiApi, notebookApi, prefsApi, accountsApi } from "@
 import { computePnl } from "@/lib/pnlCalc";
 import { useAccount } from "@/context/AccountContext";import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
-import { Sparkles, Save, X, Upload, Star, CheckCircle2, Circle, ClipboardList, Clipboard } from "lucide-react";
+import { Sparkles, Save, X, Upload, Star, CheckCircle2, Circle, ClipboardList, Clipboard, Calculator } from "lucide-react";
 
 const MAX_IMAGES = 15;
 const Chip = ({ label, active, onClick, testid }) => (
@@ -77,6 +77,38 @@ export default function AddTrade() {
     const rMultiple = r.risk ? Math.round((r.pnl / r.risk) * 100) / 100 : 0;
     return { pnl: r.pnl, r: rMultiple, risk: r.risk, cls: r.cls, pipValue: r.pipValuePerLot };
   }, [t]);
+
+  // ---- Lot Size Calculator (LSC) ----
+  // Account balance follows the account selected for this trade (falls back to active account).
+  const lscBalance = useMemo(() => {
+    const acc = accounts.find(a => a.id === t.account_id) || active;
+    return parseFloat(acc?.balance) || 0;
+  }, [accounts, active, t.account_id]);
+
+  const [autoLot, setAutoLot] = useState(true);
+
+  const lsc = useMemo(() => {
+    const entry = parseFloat(t.entry_price) || 0;
+    const sl = parseFloat(t.stop_loss) || 0;
+    if (!entry || !sl || entry === sl) return { riskPerLot: 0, dollarRisk: 0, recommendedLot: 0, slPips: 0 };
+    // Risk in USD for exactly 1.00 lot at this entry/SL
+    const perLot = computePnl({
+      symbol: t.symbol, direction: t.direction,
+      entry: t.entry_price, exit: t.entry_price, lot: 1, stop_loss: t.stop_loss,
+    });
+    const riskPerLot = perLot.risk;
+    const dollarRisk = lscBalance * ((parseFloat(t.risk_percent) || 0) / 100);
+    const recommendedLot = riskPerLot > 0 ? Math.max(0.01, Math.round((dollarRisk / riskPerLot) * 100) / 100) : 0;
+    return { riskPerLot, dollarRisk: Math.round(dollarRisk * 100) / 100, recommendedLot };
+  }, [t.entry_price, t.stop_loss, t.symbol, t.direction, t.risk_percent, lscBalance]);
+
+  // When auto mode is on, keep lot_size synced to the recommended size
+  useEffect(() => {
+    if (autoLot && lsc.recommendedLot > 0) {
+      setT(prev => (parseFloat(prev.lot_size) === lsc.recommendedLot ? prev : { ...prev, lot_size: lsc.recommendedLot }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoLot, lsc.recommendedLot]);
 
   const toggle = (key, val) => setT(p => ({ ...p, [key]: p[key].includes(val) ? p[key].filter(x=>x!==val) : [...p[key], val] }));
 
@@ -213,10 +245,12 @@ export default function AddTrade() {
               </Field>
               <Field label="Entry Price"><input data-testid="entry-input" value={t.entry_price} onChange={e=>setT({...t,entry_price:e.target.value})} type="number" step="any" className={inp}/></Field>
               <Field label="Exit Price"><input value={t.exit_price} onChange={e=>setT({...t,exit_price:e.target.value})} type="number" step="any" className={inp}/></Field>
+              <Field label="Risk %"><input value={t.risk_percent} onChange={e=>setT({...t,risk_percent:e.target.value})} type="number" step="any" className={inp}/></Field>
               <Field label="Stop Loss"><input value={t.stop_loss} onChange={e=>setT({...t,stop_loss:e.target.value})} type="number" step="any" className={inp}/></Field>
               <Field label="Take Profit"><input value={t.take_profit} onChange={e=>setT({...t,take_profit:e.target.value})} type="number" step="any" className={inp}/></Field>
-              <Field label="Lot Size"><input value={t.lot_size} onChange={e=>setT({...t,lot_size:e.target.value})} type="number" step="any" className={inp}/></Field>
-              <Field label="Risk %"><input value={t.risk_percent} onChange={e=>setT({...t,risk_percent:e.target.value})} type="number" step="any" className={inp}/></Field>
+              <Field label={<span className="flex items-center justify-between">Lot Size {autoLot && <span className="text-[9px] font-semibold text-[#7C3AED] bg-[#7C3AED]/10 px-1.5 py-0.5 rounded-full">AUTO</span>}</span>}>
+                <input value={t.lot_size} disabled={autoLot} onChange={e=>setT({...t,lot_size:e.target.value})} type="number" step="any" className={`${inp} ${autoLot?"opacity-70 cursor-not-allowed":""}`}/>
+              </Field>
               <Field label="Commission"><input value={t.commission} onChange={e=>setT({...t,commission:e.target.value})} type="number" step="any" className={inp}/></Field>
               <Field label="Swap"><input value={t.swap} onChange={e=>setT({...t,swap:e.target.value})} type="number" step="any" className={inp}/></Field>
               <Field label="Date"><input value={t.date} onChange={e=>setT({...t,date:e.target.value})} type="date" className={inp}/></Field>
@@ -231,7 +265,38 @@ export default function AddTrade() {
               </Field>
             </div>
 
-            <div className="mt-5 grid grid-cols-4 gap-4 p-4 rounded-2xl bg-[#F6F6FB]">
+            <div className="mt-5 p-4 rounded-2xl bg-gradient-to-br from-[#7C3AED]/[0.06] to-[#7C3AED]/[0.02] border border-[#7C3AED]/15">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-1.5 text-[13px] font-semibold text-[#1E1E2E]">
+                  <Calculator className="w-3.5 h-3.5 text-[#7C3AED]" /> Lot Size Calculator
+                </div>
+                <label className="flex items-center gap-1.5 text-[11px] text-[#6D6D82] cursor-pointer select-none">
+                  Auto-calc from Risk %
+                  <button type="button" role="switch" aria-checked={autoLot} onClick={()=>setAutoLot(v=>!v)}
+                    className={`w-8 h-4.5 rounded-full transition-colors relative ${autoLot?"bg-[#7C3AED]":"bg-[#E8E8F1]"}`} style={{height:"18px"}}>
+                    <span className={`absolute top-0.5 w-3.5 h-3.5 rounded-full bg-white transition-transform ${autoLot?"translate-x-4":"translate-x-0.5"}`}/>
+                  </button>
+                </label>
+              </div>
+              <div className="grid grid-cols-4 gap-4">
+                <div><div className="text-[11px] text-[#6D6D82]">Account Balance</div><div className="tjfx-mono text-sm font-semibold">${lscBalance.toFixed(2)}</div></div>
+                <div><div className="text-[11px] text-[#6D6D82]">$ Risk ({t.risk_percent || 0}%)</div><div className="tjfx-mono text-sm font-semibold">${lsc.dollarRisk}</div></div>
+                <div><div className="text-[11px] text-[#6D6D82]">Risk / 1.00 Lot</div><div className="tjfx-mono text-sm font-semibold">${lsc.riskPerLot}</div></div>
+                <div>
+                  <div className="text-[11px] text-[#6D6D82]">Recommended Lot</div>
+                  <div className="flex items-center gap-2">
+                    <div data-testid="lsc-recommended-lot" className="tjfx-mono text-lg font-bold text-[#7C3AED]">{lsc.recommendedLot || "—"}</div>
+                    {!autoLot && lsc.recommendedLot>0 && (
+                      <button type="button" onClick={()=>setT(p=>({...p,lot_size:lsc.recommendedLot}))}
+                        className="text-[10px] px-2 py-0.5 rounded-full border border-[#7C3AED]/30 text-[#7C3AED] hover:bg-[#7C3AED]/10">Use</button>
+                    )}
+                  </div>
+                </div>
+              </div>
+              {!t.stop_loss && <div className="text-[11px] text-amber-600 mt-2">Enter Stop Loss to calculate recommended lot size.</div>}
+            </div>
+
+            <div className="mt-4 grid grid-cols-4 gap-4 p-4 rounded-2xl bg-[#F6F6FB]">
               <div><div className="text-[11px] text-[#6D6D82]">Net P&L</div><div data-testid="calc-pnl" className={`tjfx-mono text-xl font-semibold ${computed.pnl>=0?"text-emerald-600":"text-red-500"}`}>{computed.pnl>=0?"+":""}${computed.pnl}</div></div>
               <div><div className="text-[11px] text-[#6D6D82]">R Multiple</div><div data-testid="calc-r" className="tjfx-mono text-xl font-semibold">{computed.r}R</div></div>
               <div><div className="text-[11px] text-[#6D6D82]">Risk</div><div data-testid="calc-risk" className="tjfx-mono text-xl font-semibold">${computed.risk}</div></div>
