@@ -1,15 +1,23 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { accountsApi } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 
 const AccountCtx = createContext(null);
 const KEY = "tjfx.activeAccount";
 
 export function AccountProvider({ children }) {
+  const { user, loading: authLoading } = useAuth();
   const [accounts, setAccounts] = useState([]);
   const [activeId, setActiveId] = useState(() => localStorage.getItem(KEY) || "all");
   const [loading, setLoading] = useState(true);
 
   const reload = useCallback(async () => {
+    // Avoid an unnecessary API call before Supabase has restored the session.
+    if (!user) {
+      setAccounts([]);
+      setLoading(false);
+      return;
+    }
     try {
       const list = await accountsApi.list();
       setAccounts(list);
@@ -19,9 +27,11 @@ export function AccountProvider({ children }) {
       }
     } catch { setAccounts([]); }
     finally { setLoading(false); }
-  }, [activeId]);
+  }, [activeId, user]);
 
-  useEffect(() => { reload(); /* eslint-disable-next-line */ }, []);
+  useEffect(() => {
+    if (!authLoading) reload();
+  }, [authLoading, reload]);
 
   const setActive = (id) => { setActiveId(id); localStorage.setItem(KEY, id); };
   const active = accounts.find(a => a.id === activeId) || null;

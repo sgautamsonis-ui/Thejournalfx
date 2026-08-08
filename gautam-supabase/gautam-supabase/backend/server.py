@@ -1,7 +1,7 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Request, Depends, Body
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
-import os, logging, uuid
+import os, logging, uuid, asyncio
 from pathlib import Path
 from pydantic import BaseModel, Field
 from typing import List, Optional, Any, Dict
@@ -180,7 +180,10 @@ class Trade(BaseModel):
 
 @api_router.get("/trades")
 async def list_trades(account_id: Optional[str] = None, user=Depends(get_current_user)):
-    q = sb.table("trades").select("*").eq("user_id", user["user_id"])
+    # Base64 screenshots can be very large. The list page has no need to fetch
+    # them for every trade; the detail endpoint returns them on demand.
+    list_columns = "id,account_id,symbol,direction,order_type,entry_price,exit_price,stop_loss,take_profit,lot_size,risk_percent,commission,swap,net_pnl,r_multiple,session,strategy,status,date,entry_time,exit_time,htf_poi,entry_tags,setup_tags,mood_before,mood_after,mistakes,strengths,rating,notes"
+    q = sb.table("trades").select(list_columns).eq("user_id", user["user_id"])
     if account_id and account_id != "all":
         q = q.eq("account_id", account_id)
     r = q.order("date", desc=True).execute()
@@ -414,7 +417,9 @@ async def call_ai(prompt: str, system: str = "You are an expert ICT/SMC trading 
         return "AI unavailable: GEMINI_API_KEY is not configured on the server."
     try:
         model = genai.GenerativeModel("gemini-3.6-flash", system_instruction=system)
-        resp = model.generate_content(prompt)
+        # Gemini's SDK is synchronous; move it off FastAPI's event loop so an
+        # AI request does not stall regular API requests for other users.
+        resp = await asyncio.to_thread(model.generate_content, prompt)
         return (resp.text or "").strip()
     except Exception as e:
         logger.exception("AI error")
@@ -695,7 +700,10 @@ Keep it under 120 words, punchy, motivational, no bullet numbering fluff."""
 # ---------- Dashboard stats ----------
 @api_router.get("/stats/dashboard")
 async def dashboard_stats(account_id: Optional[str] = None, user=Depends(get_current_user)):
-    q = sb.table("trades").select("*").eq("user_id", user["user_id"])
+    # Only fetch fields used by the dashboard calculation, never screenshots
+    # or notes. This sharply reduces database transfer for large journals.
+    dashboard_columns = "id,date,status,net_pnl,session,symbol,direction,r_multiple"
+    q = sb.table("trades").select(dashboard_columns).eq("user_id", user["user_id"])
     if account_id and account_id != "all":
         q = q.eq("account_id", account_id)
     r = q.order("date").execute()

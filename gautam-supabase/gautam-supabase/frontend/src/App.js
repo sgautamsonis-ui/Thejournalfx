@@ -1,4 +1,4 @@
-import React from "react";
+import React, { lazy, Suspense } from "react";
 import "@/App.css";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
@@ -6,16 +6,19 @@ import { AccountProvider } from "@/context/AccountContext";
 import Login from "@/pages/Login";
 import AuthCallback from "@/pages/AuthCallback";
 import Layout from "@/components/Layout";
-import Dashboard from "@/pages/Dashboard";
-import AddTrade from "@/pages/AddTrade";
-import TradeView from "@/pages/TradeView";
-import BiasCenter from "@/pages/BiasCenter";
-import Psychology from "@/pages/Psychology";
-import Settings from "@/pages/Settings";
-import Records from "@/pages/Records";
-import Reports from "@/pages/Reports";
-import Notebook from "@/pages/Notebook";
 import { Loader2 } from "lucide-react";
+
+// Load each authenticated screen only when it is opened. This keeps report,
+// chart, export and AI-only dependencies out of the first page bundle.
+const Dashboard = lazy(() => import("@/pages/Dashboard"));
+const AddTrade = lazy(() => import("@/pages/AddTrade"));
+const TradeView = lazy(() => import("@/pages/TradeView"));
+const BiasCenter = lazy(() => import("@/pages/BiasCenter"));
+const Psychology = lazy(() => import("@/pages/Psychology"));
+const Settings = lazy(() => import("@/pages/Settings"));
+const Records = lazy(() => import("@/pages/Records"));
+const Reports = lazy(() => import("@/pages/Reports"));
+const Notebook = lazy(() => import("@/pages/Notebook"));
 
 function Protected({ children }) {
   const { user, loading } = useAuth();
@@ -37,6 +40,7 @@ function FullLoader() {
 
 function AppRouter() {
   return (
+    <Suspense fallback={<FullLoader/>}>
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
@@ -54,6 +58,7 @@ function AppRouter() {
       <Route path="/" element={<Navigate to="/dashboard" replace/>} />
       <Route path="*" element={<Navigate to="/dashboard" replace/>} />
     </Routes>
+    </Suspense>
   );
 }
 

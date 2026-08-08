@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { tradesApi, tagsApi, aiApi, notebookApi, prefsApi, accountsApi } from "@/lib/api";
 import { computePnl } from "@/lib/pnlCalc";
+import { setPendingTrade, clearPendingTrade, notifyTradeSync } from "@/lib/pendingTrade";
 import { useAccount } from "@/context/AccountContext";import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { Sparkles, Save, X, Upload, Star, CheckCircle2, Circle, ClipboardList, Clipboard } from "lucide-react";
@@ -130,8 +131,10 @@ export default function AddTrade() {
       const followedRules = rules.filter(r => ruleChecks[r.id]).map(r => r.title);
       const followedItems = [];
       checklists.forEach(cl => (cl.items||[]).forEach((it, idx) => { if (itemChecks[`${cl.id}-${idx}`]) followedItems.push(`${cl.title}: ${it.text}`); }));
-      await tradesApi.create({
+      const trade = {
         ...t,
+        // Supplying the id lets the optimistic row reconcile with its saved row.
+        id: globalThis.crypto?.randomUUID?.() || `trade_${Date.now()}_${Math.random().toString(36).slice(2)}`,
         entry_price: parseFloat(t.entry_price)||0,
         exit_price: t.exit_price? parseFloat(t.exit_price): null,
         stop_loss: t.stop_loss? parseFloat(t.stop_loss): null,
@@ -142,11 +145,20 @@ export default function AddTrade() {
         swap: parseFloat(t.swap)||0,
         net_pnl: computed.pnl, r_multiple: computed.r,
         strengths: [...(t.strengths||[]), ...followedRules, ...followedItems].filter((v,i,a)=>a.indexOf(v)===i),
-      });
-      toast.success("Trade saved");
-      reloadAccounts?.();
+      };
+      setPendingTrade(trade);
       nav("/trades");
-    } catch (e) { toast.error("Save failed"); } finally { setSaving(false); }
+      tradesApi.create(trade).then((saved) => {
+        clearPendingTrade();
+        notifyTradeSync({ trade: saved });
+        reloadAccounts?.();
+        toast.success("Trade saved");
+      }).catch(() => {
+        clearPendingTrade();
+        notifyTradeSync({ error: true, id: trade.id });
+        toast.error("Trade could not be saved. Please try again.");
+      });
+    } catch (e) { toast.error("Save failed"); setSaving(false); }
   };
 
   return (

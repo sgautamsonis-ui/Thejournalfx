@@ -5,10 +5,14 @@ import { Search, Trash2, X, PlusCircle, Filter, Pencil, Save, ChevronDown, Uploa
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { computePnl } from "@/lib/pnlCalc";
+import { getPendingTrade } from "@/lib/pendingTrade";
 
 export default function TradeView() {
   const { reload: reloadAccounts } = useAccount();
-  const [trades, setTrades] = useState([]);
+  const [trades, setTrades] = useState(() => {
+    const pending = getPendingTrade();
+    return pending ? [pending] : [];
+  });
   const [q, setQ] = useState("");
   const [tab, setTab] = useState("all");
   const [sel, setSel] = useState(null);
@@ -20,12 +24,24 @@ export default function TradeView() {
     symbol: [], strategy: [], session: [], htf_poi: [], entry_tag: [], mood: [], mistake: [], strength: [],
   });
 
-  const load = () => tradesApi.list().then(setTrades).catch(()=>{});
+  const load = () => tradesApi.list().then((serverTrades) => {
+    const pending = getPendingTrade();
+    setTrades(pending && !serverTrades.some(t => t.id === pending.id) ? [pending, ...serverTrades] : serverTrades);
+  }).catch(()=>{});
   useEffect(() => {
     load();
     ["symbol","strategy","session","htf_poi","entry_tag","mood","mistake","strength"].forEach(k =>
       prefsApi.list(k).then(list => setPresets(p => ({...p, [k]: list.map(x=>x.value)}))).catch(()=>{})
     );
+  }, []);
+
+  useEffect(() => {
+    const onTradeSync = ({ detail }) => {
+      if (detail?.error) setTrades(current => current.filter(t => t.id !== detail.id));
+      else if (detail?.trade) setTrades(current => [detail.trade, ...current.filter(t => t.id !== detail.trade.id)]);
+    };
+    window.addEventListener("tjfx:trade-sync", onTradeSync);
+    return () => window.removeEventListener("tjfx:trade-sync", onTradeSync);
   }, []);
 
   // filters
@@ -71,7 +87,11 @@ export default function TradeView() {
     return list;
   }, [trades, tab, q, filters]);
 
-  const openTrade = (t) => { setSel(t); setEdit(null); };
+  const openTrade = (t) => {
+    setSel(t); setEdit(null);
+    // Screenshot data is intentionally fetched only for this opened trade.
+    tradesApi.get(t.id).then(setSel).catch(() => {});
+  };
   const startEdit = () => setEdit({ ...sel });
   const cancelEdit = () => setEdit(null);
   const toggleEdit = (key, v) => setEdit(p => ({...p, [key]: (p[key]||[]).includes(v) ? p[key].filter(x=>x!==v) : [...(p[key]||[]), v]}));
