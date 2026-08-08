@@ -153,3 +153,6 @@ h1, h2, h3, h4, h5 { font-family: 'Cabinet Grotesk', sans-serif; letter-spacing:
 .dark .chip { background: #1a1a27; color: var(--tjfx-text); }
 .dark .chip.active { background: #2b1b4d; }
 .dark .tjfx-card-hover:hover { box-shadow: 0 12px 30px rgba(124,58,237,0.18); }
+.dark .tjfx-app-shell { background: var(--tjfx-bg) !important; }
+.dark .tjfx-sidebar { background: #161622 !important; border-color: var(--tjfx-border) !important; }
+.dark .tjfx-topbar { background: rgba(22, 22, 34, 0.94) !important; border-color: var(--tjfx-border) !important; }

@@ -48,18 +48,17 @@ const SIZE_CLASS = { sm: "col-span-12 md:col-span-4", md: "col-span-12 md:col-sp
 const NEXT_SIZE = { auto: "sm", sm: "md", md: "lg", lg: "full", full: "auto" };
 const SIZE_LABEL = { auto: "Auto", sm: "S", md: "M", lg: "L", full: "XL" };
 
-function SortableCard({ id, size, customize, onCycleSize, onDragStart, onDragOver, onDrop, onDragEnd, draggingId, children, testid }) {
+function SortableCard({ id, size, customize, onCycleDragStart, onCycleSize, draggingId, children, testid }) {
   const isDragging = draggingId === id;
   return (
     <div
       className={`${size === "auto" ? AUTO_SIZE_CLASS[id] : SIZE_CLASS[size||"lg"]} relative min-w-0 transition-opacity ${isDragging ? "opacity-40" : ""}`}
       data-testid={testid}
-      onDragOver={(event) => onDragOver(event, id)}
-      onDrop={(event) => onDrop(event, id)}
+      data-dashboard-widget-id={id}
     >
       {customize && (
         <div className="absolute -top-2 -left-2 z-30 flex items-center gap-1">
-          <button draggable onDragStart={(event) => onDragStart(event, id)} onDragEnd={onDragEnd} className="cursor-grab active:cursor-grabbing h-8 w-8 rounded-full bg-[#7C3AED] text-white flex items-center justify-center shadow-lg" title="Drag to move"><GripVertical className="w-4 h-4"/></button>
+          <button type="button" onPointerDown={(event) => onCycleDragStart(event, id)} className="touch-none cursor-grab active:cursor-grabbing h-8 w-8 rounded-full bg-[#7C3AED] text-white flex items-center justify-center shadow-lg" title="Drag to move"><GripVertical className="w-4 h-4"/></button>
           <button onClick={()=>onCycleSize(id)} className="h-8 px-2 rounded-full bg-white border border-[#E8E8F1] text-xs font-bold text-[#7C3AED] shadow" title="Change size">{SIZE_LABEL[size||"lg"]}</button>
         </div>
       )}
@@ -95,6 +94,7 @@ export default function Dashboard() {
   const [customize, setCustomize] = useState(false);
   const [draggingId, setDraggingId] = useState(null);
   const firstSave = useRef(true);
+  const dragTargetRef = useRef(null);
 
   useEffect(() => {
     statsApi.dashboard(activeId).then(setStats).catch(() => setStats(null));
@@ -113,22 +113,7 @@ export default function Dashboard() {
     settingsApi.update({ dashboard_layout: layout }).catch(() => {});
   }, [layout]);
 
-  // Native HTML drag-and-drop keeps this dashboard dependency-free. The saved array
-  // is also the rendered order, so a dropped card cannot be re-packed somewhere else.
-  const onDragStart = (event, id) => {
-    event.dataTransfer.effectAllowed = "move";
-    event.dataTransfer.setData("text/plain", id);
-    setDraggingId(id);
-  };
-  const onDragOver = (event, id) => {
-    if (draggingId && draggingId !== id) event.preventDefault();
-  };
-  const onDrop = (event, targetId) => {
-    event.preventDefault();
-    const sourceId = event.dataTransfer.getData("text/plain") || draggingId;
-    if (!sourceId || sourceId === targetId) { setDraggingId(null); return; }
-    const rect = event.currentTarget.getBoundingClientRect();
-    const insertAfter = event.clientY > rect.top + rect.height / 2;
+  const moveWidget = (sourceId, targetId) => {
     setLayout(current => {
       const sourceIndex = current.findIndex(item => item.id === sourceId);
       const targetIndex = current.findIndex(item => item.id === targetId);
@@ -136,10 +121,39 @@ export default function Dashboard() {
       const next = [...current];
       const [moved] = next.splice(sourceIndex, 1);
       const adjustedTarget = next.findIndex(item => item.id === targetId);
-      next.splice(adjustedTarget + (insertAfter ? 1 : 0), 0, moved);
+      next.splice(adjustedTarget, 0, moved);
       return next;
     });
-    setDraggingId(null);
+  };
+  // Pointer events work consistently on mouse and touch devices; native HTML drag
+  // does not reliably start from a small button on touch screens.
+  const onCycleDragStart = (event, id) => {
+    if (event.button !== undefined && event.button !== 0) return;
+    event.preventDefault();
+    const start = { x: event.clientX, y: event.clientY };
+    let moved = false;
+    dragTargetRef.current = null;
+    setDraggingId(id);
+    const onMove = (pointerEvent) => {
+      if (!moved && Math.hypot(pointerEvent.clientX - start.x, pointerEvent.clientY - start.y) < 6) return;
+      moved = true;
+      const target = document.elementFromPoint(pointerEvent.clientX, pointerEvent.clientY)?.closest("[data-dashboard-widget-id]");
+      const targetId = target?.dataset.dashboardWidgetId;
+      if (targetId && targetId !== id && targetId !== dragTargetRef.current) {
+        dragTargetRef.current = targetId;
+        moveWidget(id, targetId);
+      }
+    };
+    const onUp = () => {
+      setDraggingId(null);
+      dragTargetRef.current = null;
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
   };
   const cycleSize = (id) => setLayout(l => l.map(x => x.id===id? {...x, size: NEXT_SIZE[x.size||"auto"]}: x));
   const toggleVisible = (id) => setLayout(l => l.map(x => x.id===id? {...x, visible: !x.visible}: x));
@@ -300,7 +314,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-12 gap-5">
         {layout.filter(x => x.visible).map(it => (
           <SortableCard key={it.id} id={it.id} size={it.size||"auto"} customize={customize} onCycleSize={cycleSize}
-            onDragStart={onDragStart} onDragOver={onDragOver} onDrop={onDrop} onDragEnd={() => setDraggingId(null)} draggingId={draggingId} testid={`widget-${it.id}`}>
+            onCycleDragStart={onCycleDragStart} draggingId={draggingId} testid={`widget-${it.id}`}>
             {R[it.id]}
           </SortableCard>
         ))}

@@ -23,8 +23,8 @@ export default function Layout() {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen flex bg-[#F6F6FB]">
-      <aside className="w-[260px] shrink-0 bg-white border-r border-[#E8E8F1] flex flex-col sticky top-0 h-screen" data-testid="sidebar">
+    <div className="tjfx-app-shell min-h-screen flex bg-[#F6F6FB]">
+      <aside className="tjfx-sidebar w-[260px] shrink-0 bg-white border-r border-[#E8E8F1] flex flex-col sticky top-0 h-screen" data-testid="sidebar">
         <div className="px-6 py-6 flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-[#7C3AED] flex items-center justify-center shadow-[0_8px_24px_rgba(124,58,237,0.35)]">
             <TrendingUp className="w-5 h-5 text-white" />
@@ -66,7 +66,7 @@ export default function Layout() {
       </aside>
 
       <main className="flex-1 min-w-0">
-        <div className="sticky top-0 z-30 bg-[#F6F6FB]/85 backdrop-blur border-b border-[#E8E8F1] px-8 py-3 flex items-center justify-between gap-4">
+        <div className="tjfx-topbar sticky top-0 z-30 bg-[#F6F6FB]/85 backdrop-blur border-b border-[#E8E8F1] px-8 py-3 flex items-center justify-between gap-4">
           <AccountSwitcher compact/>
           <div className="hidden md:block font-display text-[15px] font-bold text-center flex-1" data-testid="header-greeting">
             {(() => {
