@@ -7,9 +7,6 @@ import { TrendingUp, Target, Activity, Wallet, Sparkles, Settings2, Eye, EyeOff,
 import { Link } from "react-router-dom";
 import DisciplineStreak from "@/components/DisciplineStreak";
 import { PerformanceOverview, TradingStats, PnlByPeriod, SessionBreakdown, MonthlyCalendar, ActiveTimes, TradesBreakdown, TopPairs, OpenPositions } from "@/components/DashboardProWidgets";
-import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
-import { SortableContext, useSortable, rectSortingStrategy, arrayMove } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 
 const WIDGETS = [
   { id: "kpis",       label: "Quick Stats", size: "auto" },
@@ -51,19 +48,18 @@ const SIZE_CLASS = { sm: "col-span-12 md:col-span-4", md: "col-span-12 md:col-sp
 const NEXT_SIZE = { auto: "sm", sm: "md", md: "lg", lg: "full", full: "auto" };
 const SIZE_LABEL = { auto: "Auto", sm: "S", md: "M", lg: "L", full: "XL" };
 
-function SortableCard({ id, size, customize, onCycleSize, children, testid }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.6 : 1,
-    zIndex: isDragging ? 40 : "auto",
-  };
+function SortableCard({ id, size, customize, onCycleSize, onDragStart, onDragOver, onDrop, onDragEnd, draggingId, children, testid }) {
+  const isDragging = draggingId === id;
   return (
-    <div ref={setNodeRef} style={style} className={`${size === "auto" ? AUTO_SIZE_CLASS[id] : SIZE_CLASS[size||"lg"]} relative min-w-0`} data-testid={testid}>
+    <div
+      className={`${size === "auto" ? AUTO_SIZE_CLASS[id] : SIZE_CLASS[size||"lg"]} relative min-w-0 transition-opacity ${isDragging ? "opacity-40" : ""}`}
+      data-testid={testid}
+      onDragOver={(event) => onDragOver(event, id)}
+      onDrop={(event) => onDrop(event, id)}
+    >
       {customize && (
         <div className="absolute -top-2 -left-2 z-30 flex items-center gap-1">
-          <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing h-8 w-8 rounded-full bg-[#7C3AED] text-white flex items-center justify-center shadow-lg" title="Drag to move"><GripVertical className="w-4 h-4"/></button>
+          <button draggable onDragStart={(event) => onDragStart(event, id)} onDragEnd={onDragEnd} className="cursor-grab active:cursor-grabbing h-8 w-8 rounded-full bg-[#7C3AED] text-white flex items-center justify-center shadow-lg" title="Drag to move"><GripVertical className="w-4 h-4"/></button>
           <button onClick={()=>onCycleSize(id)} className="h-8 px-2 rounded-full bg-white border border-[#E8E8F1] text-xs font-bold text-[#7C3AED] shadow" title="Change size">{SIZE_LABEL[size||"lg"]}</button>
         </div>
       )}
@@ -97,8 +93,8 @@ export default function Dashboard() {
   const [trades, setTrades] = useState([]);
   const [layout, setLayout] = useState(() => loadLayout(user?.settings?.dashboard_layout));
   const [customize, setCustomize] = useState(false);
+  const [draggingId, setDraggingId] = useState(null);
   const firstSave = useRef(true);
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
   useEffect(() => {
     statsApi.dashboard(activeId).then(setStats).catch(() => setStats(null));
@@ -117,13 +113,33 @@ export default function Dashboard() {
     settingsApi.update({ dashboard_layout: layout }).catch(() => {});
   }, [layout]);
 
-  const onDragEnd = (event) => {
-    const { active: a, over: o } = event;
-    if (a && o && a.id !== o.id) {
-      const oi = layout.findIndex(x => x.id===a.id);
-      const ni = layout.findIndex(x => x.id===o.id);
-      setLayout(arrayMove(layout, oi, ni));
-    }
+  // Native HTML drag-and-drop keeps this dashboard dependency-free. The saved array
+  // is also the rendered order, so a dropped card cannot be re-packed somewhere else.
+  const onDragStart = (event, id) => {
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", id);
+    setDraggingId(id);
+  };
+  const onDragOver = (event, id) => {
+    if (draggingId && draggingId !== id) event.preventDefault();
+  };
+  const onDrop = (event, targetId) => {
+    event.preventDefault();
+    const sourceId = event.dataTransfer.getData("text/plain") || draggingId;
+    if (!sourceId || sourceId === targetId) { setDraggingId(null); return; }
+    const rect = event.currentTarget.getBoundingClientRect();
+    const insertAfter = event.clientY > rect.top + rect.height / 2;
+    setLayout(current => {
+      const sourceIndex = current.findIndex(item => item.id === sourceId);
+      const targetIndex = current.findIndex(item => item.id === targetId);
+      if (sourceIndex < 0 || targetIndex < 0) return current;
+      const next = [...current];
+      const [moved] = next.splice(sourceIndex, 1);
+      const adjustedTarget = next.findIndex(item => item.id === targetId);
+      next.splice(adjustedTarget + (insertAfter ? 1 : 0), 0, moved);
+      return next;
+    });
+    setDraggingId(null);
   };
   const cycleSize = (id) => setLayout(l => l.map(x => x.id===id? {...x, size: NEXT_SIZE[x.size||"auto"]}: x));
   const toggleVisible = (id) => setLayout(l => l.map(x => x.id===id? {...x, visible: !x.visible}: x));
@@ -280,18 +296,15 @@ export default function Dashboard() {
         </div>
       )}
 
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-        <SortableContext items={layout.filter(x=>x.visible).map(x=>x.id)} strategy={rectSortingStrategy}>
-          {/* Do not use CSS dense placement here: it can visually re-order mixed-width cards after a drag. */}
-          <div className="grid grid-cols-12 gap-5">
-            {layout.filter(x => x.visible).map(it => (
-              <SortableCard key={it.id} id={it.id} size={it.size||"auto"} customize={customize} onCycleSize={cycleSize} testid={`widget-${it.id}`}>
-                {R[it.id]}
-              </SortableCard>
-            ))}
-          </div>
-        </SortableContext>
-      </DndContext>
+      {/* No dense packing: the DOM order is the exact order that gets saved on drop. */}
+      <div className="grid grid-cols-12 gap-5">
+        {layout.filter(x => x.visible).map(it => (
+          <SortableCard key={it.id} id={it.id} size={it.size||"auto"} customize={customize} onCycleSize={cycleSize}
+            onDragStart={onDragStart} onDragOver={onDragOver} onDrop={onDrop} onDragEnd={() => setDraggingId(null)} draggingId={draggingId} testid={`widget-${it.id}`}>
+            {R[it.id]}
+          </SortableCard>
+        ))}
+      </div>
     </div>
   );
 }
