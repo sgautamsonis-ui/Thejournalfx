@@ -1,11 +1,12 @@
-import React, { useEffect, useRef, useState } from "react";
-import { statsApi, biasApi, settingsApi } from "@/lib/api";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { statsApi, biasApi, settingsApi, tradesApi } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useAccount } from "@/context/AccountContext";
 import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
 import { TrendingUp, Target, Activity, Wallet, Sparkles, Settings2, Eye, EyeOff, ArrowUp, ArrowDown, Trophy, Calendar, Flame, PiggyBank, GripVertical } from "lucide-react";
 import { Link } from "react-router-dom";
 import DisciplineStreak from "@/components/DisciplineStreak";
+import { PerformanceOverview, TradingStats, PnlByPeriod, SessionBreakdown, MonthlyCalendar, ActiveTimes, TradesBreakdown, TopPairs, OpenPositions } from "@/components/DashboardProWidgets";
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, useSortable, rectSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -19,6 +20,16 @@ const WIDGETS = [
   { id: "recent",     label: "Recent Trades", size: "auto" },
   { id: "ai",         label: "AI Insight", size: "auto" },
   { id: "discipline", label: "Discipline Streak", size: "auto" },
+  { id: "performance", label: "Performance Overview", size: "auto" },
+  { id: "tradingStats", label: "Trading Stats", size: "auto" },
+  { id: "dailyPnl", label: "P&L by Day", size: "auto" },
+  { id: "weeklyPnl", label: "P&L by Week", size: "auto" },
+  { id: "sessionBreakdown", label: "P&L by Session", size: "auto" },
+  { id: "calendar", label: "Monthly Calendar", size: "auto" },
+  { id: "activeTimes", label: "Most Active Times", size: "auto" },
+  { id: "breakdown", label: "Trades Breakdown", size: "auto" },
+  { id: "pairs", label: "Top Performing Pairs", size: "auto" },
+  { id: "positions", label: "Open Positions", size: "auto" },
 ];
 const DEFAULT_LAYOUT = WIDGETS.map(w => ({ id: w.id, visible: true, size: w.size }));
 const KEY = "tjfx.dashboard.layout.v2";
@@ -35,7 +46,7 @@ function loadLayout(savedLayout) {
 }
 function saveLayout(l) { localStorage.setItem(KEY, JSON.stringify(l)); }
 
-const AUTO_SIZE_CLASS = { kpis: "col-span-12", equity: "col-span-12 md:col-span-8", plan: "col-span-12 md:col-span-4", extras: "col-span-12", sessions: "col-span-12 md:col-span-6", recent: "col-span-12 md:col-span-8", ai: "col-span-12 md:col-span-4", discipline: "col-span-12 md:col-span-6" };
+const AUTO_SIZE_CLASS = { kpis: "col-span-12", equity: "col-span-12 md:col-span-8", plan: "col-span-12 md:col-span-4", extras: "col-span-12", sessions: "col-span-12 md:col-span-6", recent: "col-span-12 md:col-span-6", ai: "col-span-12 md:col-span-6", discipline: "col-span-12 md:col-span-6", performance: "col-span-12 md:col-span-6", tradingStats: "col-span-12 md:col-span-6", dailyPnl: "col-span-12 md:col-span-4", weeklyPnl: "col-span-12 md:col-span-4", sessionBreakdown: "col-span-12 md:col-span-4", calendar: "col-span-12 md:col-span-6", activeTimes: "col-span-12 md:col-span-6", breakdown: "col-span-12 md:col-span-4", pairs: "col-span-12 md:col-span-4", positions: "col-span-12 md:col-span-4" };
 const SIZE_CLASS = { sm: "col-span-12 md:col-span-4", md: "col-span-12 md:col-span-6", lg: "col-span-12 md:col-span-8", full: "col-span-12" };
 const NEXT_SIZE = { auto: "sm", sm: "md", md: "lg", lg: "full", full: "auto" };
 const SIZE_LABEL = { auto: "Auto", sm: "S", md: "M", lg: "L", full: "XL" };
@@ -83,6 +94,7 @@ export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [dailyBias, setDailyBias] = useState(null);
   const [weeklyBias, setWeeklyBias] = useState(null);
+  const [trades, setTrades] = useState([]);
   const [layout, setLayout] = useState(() => loadLayout(user?.settings?.dashboard_layout));
   const [customize, setCustomize] = useState(false);
   const firstSave = useRef(true);
@@ -92,7 +104,10 @@ export default function Dashboard() {
     statsApi.dashboard(activeId).then(setStats).catch(() => setStats(null));
     biasApi.latest("daily").then(setDailyBias).catch(() => {});
     biasApi.latest("weekly").then(setWeeklyBias).catch(() => {});
+    tradesApi.list(activeId).then(setTrades).catch(() => setTrades([]));
   }, [activeId]);
+
+  const tradeAnalytics = useMemo(() => makeTradeAnalytics(trades), [trades]);
 
   useEffect(() => { saveLayout(layout); }, [layout]);
 
@@ -216,6 +231,16 @@ export default function Dashboard() {
       </Card>
     ),
     discipline: <DisciplineStreak/>,
+    performance: <PerformanceOverview analytics={tradeAnalytics}/>,
+    tradingStats: <TradingStats analytics={tradeAnalytics}/>,
+    dailyPnl: <PnlByPeriod title="P&L by Day" data={tradeAnalytics.daily}/>,
+    weeklyPnl: <PnlByPeriod title="P&L by Week" data={tradeAnalytics.weekly}/>,
+    sessionBreakdown: <SessionBreakdown data={tradeAnalytics.sessions}/>,
+    calendar: <MonthlyCalendar data={tradeAnalytics.daily}/>,
+    activeTimes: <ActiveTimes data={tradeAnalytics.hours}/>,
+    breakdown: <TradesBreakdown data={tradeAnalytics.strategies}/>,
+    pairs: <TopPairs data={tradeAnalytics.pairs}/>,
+    positions: <OpenPositions data={tradeAnalytics.open}/>,
   };
 
   return (
@@ -257,7 +282,8 @@ export default function Dashboard() {
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
         <SortableContext items={layout.filter(x=>x.visible).map(x=>x.id)} strategy={rectSortingStrategy}>
-          <div className="grid grid-cols-12 grid-flow-dense gap-5">
+          {/* Do not use CSS dense placement here: it can visually re-order mixed-width cards after a drag. */}
+          <div className="grid grid-cols-12 gap-5">
             {layout.filter(x => x.visible).map(it => (
               <SortableCard key={it.id} id={it.id} size={it.size||"auto"} customize={customize} onCycleSize={cycleSize} testid={`widget-${it.id}`}>
                 {R[it.id]}
@@ -286,3 +312,26 @@ const EmptyChart = ({ msg }) => (
     </div>
   </div>
 );
+
+function makeTradeAnalytics(trades) {
+  const closed = trades.filter(t => t.status === "closed").sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  const group = (key) => {
+    const map = new Map();
+    closed.forEach(t => { const name = key(t) || "Other"; map.set(name, (map.get(name) || 0) + Number(t.net_pnl || 0)); });
+    return [...map].map(([name, pnl]) => ({ name, pnl: Number(pnl.toFixed(2)) }));
+  };
+  const daily = group(t => t.date).slice(-31);
+  const weekly = group(t => {
+    const d = new Date(`${t.date}T00:00:00`); const day = d.getDay() || 7;
+    d.setDate(d.getDate() - day + 1); return d.toISOString().slice(0, 10);
+  }).slice(-8);
+  const sessions = group(t => t.session || "Other").sort((a, b) => b.pnl - a.pnl);
+  const strategies = group(t => t.strategy || "Uncategorised").sort((a, b) => b.pnl - a.pnl);
+  const pairs = group(t => t.symbol || "Unknown").sort((a, b) => b.pnl - a.pnl).slice(0, 6);
+  const hours = Array.from({ length: 6 }, (_, i) => ({ label: `${i * 4}:00`, count: 0 }));
+  closed.forEach(t => { const hour = Number(String(t.entry_time || "").slice(0, 2)); if (Number.isFinite(hour)) hours[Math.min(5, Math.floor(hour / 4))].count += 1; });
+  let wins = 0, losses = 0, maxWins = 0, maxLosses = 0;
+  closed.forEach(t => { if (Number(t.net_pnl || 0) > 0) { wins += 1; losses = 0; maxWins = Math.max(maxWins, wins); } else if (Number(t.net_pnl || 0) < 0) { losses += 1; wins = 0; maxLosses = Math.max(maxLosses, losses); } });
+  const pnl = closed.reduce((sum, t) => sum + Number(t.net_pnl || 0), 0);
+  return { daily, weekly, sessions, strategies, pairs, hours, open: trades.filter(t => t.status === "open"), total: closed.length, pnl, expectancy: closed.length ? pnl / closed.length : 0, maxWins, maxLosses };
+}
