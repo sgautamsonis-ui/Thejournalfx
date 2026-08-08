@@ -1,0 +1,182 @@
+{
+  "project_name": "TheJournalFX",
+  "app_type": "saas_app",
+  "theme_preference": "light",
+  "design_philosophy": "Premium Fintech SaaS. Functional beauty meets high-end minimalism. Pure white surfaces, deep tinted typography, and controlled, dense grids. The interface must inspire trust and absolute clarity, avoiding decorative clutter while using refined micro-interactions and soft shadows for depth.",
+  "typography": {
+    "headings": {
+      "font_family": "Cabinet Grotesk",
+      "weights": ["500", "700", "800"],
+      "usage": "Use for Page Titles, Section Headers, and large KPI numbers.",
+      "letter_spacing": "tracking-tight"
+    },
+    "body": {
+      "font_family": "Satoshi",
+      "weights": ["400", "500", "600"],
+      "usage": "Use for all standard text, labels, and UI elements."
+    },
+    "data_numbers": {
+      "font_family": "JetBrains Mono",
+      "weights": ["400", "500"],
+      "usage": "MANDATORY for all financial metrics, prices, P&L, Win Rate, and tables. Mono fonts ensure decimal points and numbers align perfectly."
+    },
+    "installation_instructions": "Load Cabinet Grotesk and Satoshi via Fontshare API. Load JetBrains Mono via Google Fonts."
+  },
+  "colors": {
+    "background": {
+      "page": "#F6F6FB",
+      "card": "#FFFFFF",
+      "input_bg": "#F9F9FC"
+    },
+    "primary": {
+      "base": "#7C3AED",
+      "hover": "#6D28D9",
+      "light": "#F3E8FF",
+      "glow": "rgba(124, 58, 237, 0.15)"
+    },
+    "text": {
+      "primary": "#16151F",
+      "secondary": "#6D6D82",
+      "muted": "#A1A1AA",
+      "inverse": "#FFFFFF"
+    },
+    "border": {
+      "default": "#E8E8F1",
+      "focus": "#7C3AED"
+    },
+    "status": {
+      "profit": "#10B981",
+      "profit_bg": "#ECFDF5",
+      "loss": "#EF4444",
+      "loss_bg": "#FEF2F2",
+      "warning": "#F59E0B"
+    }
+  },
+  "visual_enhancers": {
+    "border_radius": {
+      "card": "24px",
+      "button": "12px",
+      "input": "12px",
+      "chip": "9999px"
+    },
+    "shadows": {
+      "card_default": "0px 4px 20px rgba(22, 21, 31, 0.03)",
+      "card_hover": "0px 12px 30px rgba(124, 58, 237, 0.08)",
+      "dropdown": "0px 10px 40px rgba(22, 21, 31, 0.08)",
+      "glow": "0px 0px 20px rgba(124, 58, 237, 0.2)"
+    },
+    "surfaces": {
+      "glass": "backdrop-blur-xl bg-white/70 border border-white/40",
+      "solid": "bg-white border border-[#E8E8F1]"
+    }
+  },
+  "layouts": {
+    "sidebar_navigation": {
+      "width": "260px",
+      "style": "Fixed left, pure white background, 1px right border (#E8E8F1). Active state for links should have a subtle #F3E8FF background with #7C3AED text and a 3px left border indicator."
+    },
+    "dashboard_grid": {
+      "type": "Bento Grid",
+      "spacing": "gap-6",
+      "structure": "Top left dominating metric (Equity Curve: col-span-8), Quick Stats row below or alongside, smaller cards (col-span-4) for Trade Calendar, Recent Trades, and AI Insights. Dense but breathable."
+    },
+    "page_container": {
+      "padding": "p-8",
+      "max_width": "max-w-7xl mx-auto"
+    }
+  },
+  "page_specific_instructions": {
+    "login_page": {
+      "layout": "Centered Glassmorphism Card (max-w-md) on top of a highly visual background.",
+      "background_animation": "Use `react-tsparticles` for floating subtle particles and Framer Motion to draw abstract candlestick/line chart SVG patterns in the background. Incorporate soft glowing radial gradients using `#7C3AED` with low opacity behind the card.",
+      "card_design": "Pure white, 24px radius, soft drop shadow. Include Google Auth button with modern styling (icon left, centered text, 1px border)."
+    },
+    "dashboard": {
+      "components_needed": ["Welcome Card", "Quick Stats (P&L, Win Rate, Profit Factor)", "Equity Curve Chart", "Trade Calendar", "Open Positions Table", "Recent Trades", "AI Insight Card", "Market Ideas", "Today's Plan"],
+      "chart_style": "Use Recharts or Shadcn Charts. Line charts for Equity Curve must use the primary purple `#7C3AED` with a gradient fill under the line (`from-[#7C3AED]/20 to-transparent`)."
+    },
+    "add_trade": {
+      "layout": "Multi-section form using a clean layout. Sections: Trade Details, Entry Confirmation, Strategy/Psychology Tags, Image Upload.",
+      "components_needed": ["Date/Time Picker", "Select (Pair, Direction)", "Number Inputs (Entry, SL, TP)", "Multi-Select/Chips (HTF POI, Psychology)", "Drag & Drop Upload Zone (dashed border, #F6F6FB bg)"]
+    },
+    "bias_center": {
+      "layout": "Tabs for 'Weekly Bias' and 'Daily Bias'.",
+      "features": ["Direction Selection (Bullish/Bearish chips)", "Confidence Slider (1-10)", "Rich Text Narrative Editor", "Key Levels Inputs", "Chart Gallery", "Bias Records History Table"]
+    },
+    "psychology_ai": {
+      "features": ["Mood analysis bars", "Mistake Tracker", "Best Conditions matrix", "AI Coach insight cards (use light purple bg for AI tips)"]
+    },
+    "trade_view": {
+      "layout": "Master-Detail view or full Data Table with a slide-out side panel for individual trade details. Use compact table cells, align numbers to the right, and use `JetBrains Mono` for all price data."
+    }
+  },
+  "components": {
+    "buttons": {
+      "primary": "bg-[#7C3AED] hover:bg-[#6D28D9] text-white rounded-xl px-4 py-2 font-medium transition-all shadow-[0_4px_12px_rgba(124,58,237,0.2)]",
+      "secondary": "bg-white border border-[#E8E8F1] hover:bg-[#F6F6FB] text-[#16151F] rounded-xl px-4 py-2 font-medium transition-all",
+      "ghost": "hover:bg-[#F3E8FF] text-[#6D6D82] hover:text-[#7C3AED] rounded-xl px-4 py-2 transition-all"
+    },
+    "cards": {
+      "base_classes": "bg-white rounded-[24px] border border-[#E8E8F1] shadow-[0_4px_20px_rgba(22,21,31,0.03)] p-6"
+    },
+    "chips_tags": {
+      "style": "px-3 py-1 rounded-full text-sm font-medium border",
+      "bullish": "bg-emerald-50 text-emerald-700 border-emerald-200",
+      "bearish": "bg-red-50 text-red-700 border-red-200",
+      "neutral": "bg-gray-50 text-gray-700 border-gray-200",
+      "purple": "bg-[#F3E8FF] text-[#7C3AED] border-[#7C3AED]/20"
+    }
+  },
+  "motion": {
+    "transitions": "Use `transition-all duration-200 ease-in-out` for interactive elements.",
+    "page_load": "Use `framer-motion` for subtle page load stagger effects (fade in, translate-y-4).",
+    "hover": "Cards should have a slight `-translate-y-[2px]` and shadow increase on hover."
+  },
+  "media": {
+    "image_urls": [
+      {
+        "url": "https://images.unsplash.com/photo-1634270874854-3c7492905b74",
+        "description": "Abstract purple wave lines",
+        "category": "login_background",
+        "usage": "Use as a very subtle, low-opacity base behind the login glassmorphism card."
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1560250097-0b93528c311a",
+        "description": "Professional trader portrait",
+        "category": "avatar",
+        "usage": "Use as the user profile avatar in the sidebar or header."
+      }
+    ]
+  },
+  "libraries": {
+    "icons": "lucide-react",
+    "charts": "recharts",
+    "motion": "framer-motion",
+    "particles": "react-tsparticles",
+    "components": "shadcn/ui"
+  },
+  "accessibility": {
+    "contrast": "Ensure text over primary buttons meets WCAG AA standards.",
+    "focus": "All interactive elements must have `focus:ring-2 focus:ring-[#7C3AED]/50 focus:outline-none`.",
+    "testing": "All interactive and key informational elements MUST include a `data-testid` attribute (e.g., `data-testid=\"login-button\"`)."
+  },
+  "instructions_to_main_agent": [
+    "Strictly follow the color hex codes provided. DO NOT use generic Tailwind blues or grays. Use the tinted background #F6F6FB.",
+    "Use Shadcn UI components but override their default borders and border-radiuses. Change Shadcn's default rounded-md to rounded-2xl or rounded-[24px] for cards to match the premium SaaS feel.",
+    "For the Login Page, create a custom component using `react-tsparticles` for the background, layered under a centered glass card. Add a Google Sign In button.",
+    "Ensure all monetary values and percentages use the JetBrains Mono font class.",
+    "Never use `transparent` backgrounds for dropdowns or modals. They must have a solid white background and a high z-index.",
+    "Implement the Layout component with a fixed Sidebar on the left and a scrollable main content area on the right.",
+    "Use modern pill-shaped or rounded-xl buttons, not harsh square buttons.",
+    "For charts, use Recharts. Make the lines smooth (type='monotone') and use the primary purple color with gradient fills."
+  ],
+  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": [
+    "You tend to converge toward generic, 'on distribution' outputs. Avoid the 'AI slop' aesthetic by applying the custom fonts, generous spacing (p-6, p-8), and exact color tokens specified.",
+    "Create depth through layered design elements with z-index hierarchy and soft custom shadows instead of harsh default Tailwind shadows.",
+    "You MUST NOT apply universal transition (`transition: all` globally). Add transitions for specific interactive elements only.",
+    "You MUST NOT center align the app container in CSS. Respect natural reading flows.",
+    "NEVER use placeholder text (via.placeholder.com). Use the provided image_urls.",
+    "Every interaction needs micro-animations - hover states, active states, and entrance animations.",
+    "Use sonner for toast notifications."
+  ]
+}

@@ -1,0 +1,122 @@
+@import url('https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@500,700,800&f[]=satoshi@400,500,600,700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --tjfx-bg: #F6F6FB;
+  --tjfx-card: #FFFFFF;
+  --tjfx-primary: #7C3AED;
+  --tjfx-primary-hover: #6D28D9;
+  --tjfx-primary-light: #F3E8FF;
+  --tjfx-text: #16151F;
+  --tjfx-text-2: #6D6D82;
+  --tjfx-border: #E8E8F1;
+  --tjfx-profit: #10B981;
+  --tjfx-loss: #EF4444;
+
+  --background: 0 0% 100%;
+  --foreground: 240 10% 10%;
+  --card: 0 0% 100%;
+  --card-foreground: 240 10% 10%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 240 10% 10%;
+  --primary: 262 83% 58%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 240 5% 96%;
+  --secondary-foreground: 240 10% 10%;
+  --muted: 240 5% 96%;
+  --muted-foreground: 240 4% 46%;
+  --accent: 262 90% 96%;
+  --accent-foreground: 262 83% 58%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 240 12% 92%;
+  --input: 240 12% 92%;
+  --ring: 262 83% 58%;
+  --radius: 0.75rem;
+}
+
+* { border-color: hsl(var(--border)); }
+
+body {
+  margin: 0;
+  font-family: 'Satoshi', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--tjfx-bg);
+  color: var(--tjfx-text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5 { font-family: 'Cabinet Grotesk', sans-serif; letter-spacing: -0.02em; }
+
+.font-mono, .tjfx-mono { font-family: 'JetBrains Mono', monospace; }
+.font-display { font-family: 'Cabinet Grotesk', sans-serif; letter-spacing: -0.02em; }
+
+.tjfx-card {
+  background: #fff;
+  border: 1px solid var(--tjfx-border);
+  border-radius: 24px;
+  box-shadow: 0 4px 20px rgba(22,21,31,0.03);
+}
+
+.tjfx-card-hover {
+  transition: transform 200ms ease, box-shadow 200ms ease;
+}
+.tjfx-card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 30px rgba(124,58,237,0.08);
+}
+
+/* login page background */
+.login-bg {
+  background:
+    radial-gradient(1200px 600px at 10% 10%, rgba(124,58,237,0.10), transparent 60%),
+    radial-gradient(900px 500px at 90% 80%, rgba(124,58,237,0.08), transparent 60%),
+    radial-gradient(700px 400px at 50% 50%, rgba(124,58,237,0.05), transparent 60%),
+    #FFFFFF;
+  position: relative;
+  overflow: hidden;
+}
+.login-grid {
+  position: absolute; inset: 0;
+  background-image:
+    linear-gradient(rgba(124,58,237,0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(124,58,237,0.06) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse at center, black 20%, transparent 70%);
+  pointer-events: none;
+}
+.candle-line {
+  position: absolute; inset: 0; pointer-events: none;
+  opacity: 0.35;
+}
+.floaty {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(60px);
+  animation: floatMove 14s ease-in-out infinite;
+}
+@keyframes floatMove {
+  0%, 100% { transform: translate(0,0) scale(1); }
+  50% { transform: translate(30px, -20px) scale(1.08); }
+}
+
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border-radius: 9999px; font-size: 13px; font-weight: 500;
+  border: 1px solid var(--tjfx-border); background: #fff; color: var(--tjfx-text);
+  cursor: pointer; transition: all 150ms ease;
+}
+.chip:hover { border-color: var(--tjfx-primary); color: var(--tjfx-primary); }
+.chip.active { background: var(--tjfx-primary-light); border-color: rgba(124,58,237,0.3); color: var(--tjfx-primary); }
+.chip.bullish.active { background: #ECFDF5; border-color: #A7F3D0; color: #047857; }
+.chip.bearish.active { background: #FEF2F2; border-color: #FECACA; color: #B91C1C; }
+
+.scroll-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+.scroll-thin::-webkit-scrollbar-thumb { background: #E8E8F1; border-radius: 3px; }
+
+.animate-in { animation: aIn 300ms ease-out both; }
+@keyframes aIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
