@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { tradesApi, aiApi, notebookApi, prefsApi, accountsApi } from "@/lib/api";
+import { tradesApi, aiApi, notebookApi, prefsApi, accountsApi, biasApi } from "@/lib/api";
 import { computePnl } from "@/lib/pnlCalc";
 import { setPendingTrade, clearPendingTrade, notifyTradeSync } from "@/lib/pendingTrade";
 import { useAccount } from "@/context/AccountContext";import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { Sparkles, Save, X, Upload, Star, CheckCircle2, Circle, ClipboardList, Clipboard } from "lucide-react";
+import { AttachmentPanel, LinkedBiasCard } from "@/components/TradePanels";
 
 const MAX_IMAGES = 15;
 const BUILDER_DEFAULTS = {
@@ -56,11 +57,18 @@ export default function AddTrade() {
   const [entryDraft, setEntryDraft] = useState({ timeframe: "", type: "" });
 
   useEffect(() => {
-    notebookApi.list("rule").then(setRules).catch(()=>{});
-    notebookApi.list("checklist").then(setChecklists).catch(()=>{});
-    ["symbol","strategy","session","mood","mistake","strength","setup_tag","htf_poi_type","htf_timeframe","entry_confirmation_type","entry_timeframe"].forEach(k =>
-      prefsApi.list(k).then(list => setPresets(p => ({...p, [k]: list.map(x=>x.value)}))).catch(()=>{})
-    );
+    const kinds = ["symbol","strategy","session","mood","mistake","strength","setup_tag","htf_poi_type","htf_timeframe","entry_confirmation_type","entry_timeframe"];
+    const cacheKey = "tjfx-preference-cache-v1";
+    try {
+      const cached = JSON.parse(localStorage.getItem(cacheKey) || "null");
+      if (cached?.data) setPresets(p => ({ ...p, ...Object.fromEntries(Object.entries(cached.data).map(([k, v]) => [k, v.map(x => x.value)])) }));
+    } catch { /* a stale cache must never block the form */ }
+    Promise.all([notebookApi.list("rule"), notebookApi.list("checklist"), prefsApi.listMany(kinds)])
+      .then(([ruleList, checklistList, prefData]) => {
+        setRules(ruleList); setChecklists(checklistList);
+        setPresets(p => ({ ...p, ...Object.fromEntries(Object.entries(prefData).map(([k, v]) => [k, v.map(x => x.value)])) }));
+        try { localStorage.setItem(cacheKey, JSON.stringify({ savedAt: Date.now(), data: prefData })); } catch {}
+      }).catch(()=>{});
   }, []);
 
   // Sync default account_id whenever context changes
@@ -475,15 +483,11 @@ function AddTradeWorkspace({ t, setT, presets, accounts, computed, recommendedLo
     <div className="add-trade-page p-4 sm:p-6 lg:p-8 max-w-[1500px] mx-auto space-y-5" data-testid="add-trade-page">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div><h1 className="font-display text-3xl font-bold">Add New Trade</h1><p className="text-sm text-[#6D6D82] mt-1">Document your trade and build your edge.</p></div>
-        <div className="flex items-center gap-3">
-          <div className="hidden sm:block rounded-xl border border-[#E8E8F1] px-4 py-2 bg-white min-w-[180px]"><div className="text-[10px] text-[#6D6D82]">Trading Account</div><div className="text-sm font-semibold text-emerald-600">${Number(accounts.find(a=>a.id===t.account_id)?.balance || 0).toFixed(2)}</div></div>
-          <button onClick={save} disabled={saving} className="h-11 px-5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-sm font-semibold disabled:opacity-60">{saving ? "Saving..." : "Save Trade"}</button>
-        </div>
+        <button onClick={save} disabled={saving} className="h-11 px-5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-sm font-semibold disabled:opacity-60">{saving ? "Saving..." : "Save Trade"}</button>
       </header>
 
-      <div className="grid grid-cols-12 gap-5">
-        <div className="col-span-12 xl:col-span-8 space-y-5">
-          <div className="tjfx-card p-5 sm:p-6">
+      <React.Fragment>
+          <section className="tjfx-card p-5 sm:p-6">
             <SectionHeading number="1" title="Trade Details" subtitle="Execution, risk and account information" />
             {accounts.length > 0 && <Field label="Trading Account"><select value={t.account_id||""} onChange={e=>setT({...t,account_id:e.target.value})} className={inp}>{accounts.map(a=><option key={a.id} value={a.id}>{a.name} · {a.broker} · ${Number(a.balance||0).toFixed(2)}</option>)}</select></Field>}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
@@ -500,31 +504,19 @@ function AddTradeWorkspace({ t, setT, presets, accounts, computed, recommendedLo
               <Field label="Date & Time"><input value={t.date} onChange={e=>setT({...t,date:e.target.value})} type="date" className={inp}/></Field>
               <Field label="Commission"><input value={t.commission} onChange={e=>setT({...t,commission:e.target.value})} type="number" step="any" className={inp}/></Field>
             </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            <div className="tjfx-card p-5"><SectionHeading number="2" title="Strategy" subtitle="Choose or add your trading model" /><select value={t.strategy} onChange={e=>chooseStrategy(e.target.value)} className={inp}><option value="">Select strategy...</option>{presets.strategy.map(x=><option key={x}>{x}</option>)}</select><div className="flex flex-wrap gap-2 mt-4">{presets.strategy.slice(0,6).map(x=><Chip key={x} label={x} active={t.strategy===x} onClick={()=>chooseStrategy(x)}/>)}</div></div>
-            <LotCalculator recommendedLot={recommendedLot} computed={computed} onUse={()=>recommendedLot.lot!==null&&setT({...t,lot_size:recommendedLot.lot})}/>
-          </div>
+            <div className="mt-5"><LotCalculator recommendedLot={recommendedLot} computed={computed} onUse={()=>recommendedLot.lot!==null&&setT({...t,lot_size:recommendedLot.lot})}/></div>
+          </section>
+          <section className="tjfx-card p-5"><SectionHeading number="2" title="Strategy" subtitle="Choose or add your trading model" /><select value={t.strategy} onChange={e=>chooseStrategy(e.target.value)} className={inp}><option value="">Select strategy...</option>{presets.strategy.map(x=><option key={x}>{x}</option>)}</select><div className="flex flex-wrap gap-2 mt-4">{presets.strategy.slice(0,6).map(x=><Chip key={x} label={x} active={t.strategy===x} onClick={()=>chooseStrategy(x)}/>)}</div></section>
           <PairedPresetBuilder number="3" title="HTF Points of Interest" description="Select a timeframe and POI type, then add it to this trade." timeframeLabel="HTF Timeframe" typeLabel="POI Type" timeframes={presets.htf_timeframe} types={presets.htf_poi_type} draft={htfDraft} onDraftChange={setHtfDraft} items={t.htf_poi} onAdd={()=>addPairedPreset("htf_poi",htfDraft,setHtfDraft,"HTF POI")} onRemove={value=>removePairedPreset("htf_poi",value)} testid="htf-poi"/>
-        </div>
-
-        <div className="col-span-12 xl:col-span-4 space-y-5">
-          <BiasCard />
-          <PairedPresetBuilder number="4" title="Entry Confirmations" description="Log the confirmation that triggered the entry." timeframeLabel="Entry Timeframe" typeLabel="Confirmation Type" timeframes={presets.entry_timeframe} types={presets.entry_confirmation_type} draft={entryDraft} onDraftChange={setEntryDraft} items={t.entry_tags} onAdd={()=>addPairedPreset("entry_tags",entryDraft,setEntryDraft,"entry confirmation")} onRemove={value=>removePairedPreset("entry_tags",value)} testid="entry-confirmation"/>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <div className="tjfx-card p-6"><SectionHeading number="5" title="Psychology & Mood" subtitle="Record your state before and after the trade" /><ChipRow label="Mood Before" items={presets.mood} selected={t.mood_before} onToggle={x=>toggle("mood_before",x)}/><div className="mt-4"><ChipRow label="Setup Tags" items={presets.setup_tag} selected={t.setup_tags} onToggle={x=>toggle("setup_tags",x)}/></div><textarea value={t.notes} onChange={e=>setT({...t,notes:e.target.value})} rows={4} className="w-full mt-5 p-3 rounded-xl border border-[#E8E8F1] focus:border-[#7C3AED] outline-none text-sm" placeholder="Notes (pre-trade mindset, execution and lessons)"/></div>
-        <div className="tjfx-card p-6"><h3 className="font-display text-lg font-bold">Attachments</h3><p className="text-xs text-[#6D6D82] mt-1 mb-4">Upload chart screenshots for this setup.</p><label className="block border-2 border-dashed border-[#E8E8F1] rounded-2xl p-8 text-center hover:border-[#7C3AED] cursor-pointer"><Upload className="w-7 h-7 mx-auto text-[#7C3AED] mb-2"/><div className="text-sm text-[#6D6D82]">Drag and drop or click to upload</div><input type="file" multiple accept="image/*" onChange={onFile} className="hidden"/></label><div className="grid grid-cols-4 gap-2 mt-3">{t.screenshots.map((image,i)=><img key={i} src={image} alt="Trade chart" className="w-full h-16 object-cover rounded-lg border border-[#E8E8F1]"/>)}</div></div>
-      </div>
-
-      <div className="tjfx-card p-5"><SectionHeading number="6" title="Review & Save" subtitle="Check your execution details before saving." /><div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3 text-sm"><Review label="Symbol" value={t.symbol}/><Review label="Direction" value={t.direction}/><Review label="Entry" value={t.entry_price||"--"}/><Review label="SL" value={t.stop_loss||"--"}/><Review label="TP" value={t.take_profit||"--"}/><Review label="Risk" value={`${t.risk_percent}%`}/><Review label="Lot" value={t.lot_size}/><Review label="R:R" value={`${computed.r}R`}/></div><button onClick={save} disabled={saving} className="mt-5 h-11 min-w-[220px] rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-sm font-semibold disabled:opacity-60">{saving?"Saving trade...":"Save Trade"}</button></div>
+          <LinkedBiasCard />
+          <PairedPresetBuilder number="5" title="Entry Confirmations" description="Log the confirmation that triggered the entry." timeframeLabel="Entry Timeframe" typeLabel="Confirmation Type" timeframes={presets.entry_timeframe} types={presets.entry_confirmation_type} draft={entryDraft} onDraftChange={setEntryDraft} items={t.entry_tags} onAdd={()=>addPairedPreset("entry_tags",entryDraft,setEntryDraft,"entry confirmation")} onRemove={value=>removePairedPreset("entry_tags",value)} testid="entry-confirmation"/>
+          <section className="grid grid-cols-1 lg:grid-cols-2 gap-5"><div className="tjfx-card p-6"><SectionHeading number="6" title="Psychology & Mood" subtitle="Record your state before and after the trade" /><ChipRow label="Mood Before" items={presets.mood} selected={t.mood_before} onToggle={x=>toggle("mood_before",x)}/><div className="mt-4"><ChipRow label="Setup Tags" items={presets.setup_tag} selected={t.setup_tags} onToggle={x=>toggle("setup_tags",x)}/></div><textarea value={t.notes} onChange={e=>setT({...t,notes:e.target.value})} rows={5} className="w-full mt-5 p-3 rounded-xl border border-[#E8E8F1] focus:border-[#7C3AED] outline-none text-sm" placeholder="Notes (pre-trade mindset, execution and lessons)"/></div><AttachmentPanel images={t.screenshots} onFile={onFile}/></section>
+          <section className="tjfx-card p-5"><SectionHeading number="7" title="Review & Save" subtitle="Check your execution details before saving." /><div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3 text-sm"><Review label="Symbol" value={t.symbol}/><Review label="Direction" value={t.direction}/><Review label="Entry" value={t.entry_price||"--"}/><Review label="SL" value={t.stop_loss||"--"}/><Review label="TP" value={t.take_profit||"--"}/><Review label="Risk" value={`${t.risk_percent}%`}/><Review label="Lot" value={t.lot_size}/><Review label="R:R" value={`${computed.r}R`}/></div><button onClick={save} disabled={saving} className="mt-5 h-11 min-w-[220px] rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-sm font-semibold disabled:opacity-60">{saving?"Saving trade...":"Save Trade"}</button></section>
+      </React.Fragment>
     </div>
   );
 }
 
-function LotCalculator({ recommendedLot, computed, onUse }) { return <div className="tjfx-card p-5" data-testid="lot-size-calculator"><h3 className="font-display text-lg font-bold text-[#7C3AED]">Lot Size Calculator (LSC)</h3><p className="text-xs text-[#6D6D82] mt-1">Auto-calculated from balance, risk and stop loss.</p><div className="grid grid-cols-2 gap-3 mt-4"><Review label="Risk Amount" value={`$${recommendedLot.riskAmount.toFixed(2)}`} green/><Review label="Recommended Lot" value={recommendedLot.lot===null?"--":recommendedLot.lot.toFixed(2)} green/><Review label="TP Estimate" value={recommendedLot.lot===null?"--":`$${recommendedLot.target.toFixed(2)}`}/><Review label="R:R" value={`${computed.r}R`}/></div>{recommendedLot.lot!==null&&<button type="button" onClick={onUse} className="mt-4 text-sm font-semibold text-[#7C3AED]">Use recommended lot size</button>}</div>; }
+function LotCalculator({ recommendedLot, computed, onUse }) { return <div className="rounded-2xl border border-[#DDD6FE] bg-[#F5F3FF] p-5" data-testid="lot-size-calculator"><h3 className="font-display text-lg font-bold text-[#7C3AED]">Lot Size Calculator (LSC)</h3><p className="text-xs text-[#6D6D82] mt-1">Auto-calculated from this account's balance, risk and stop loss.</p><div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4"><Review label="Risk Amount" value={`$${recommendedLot.riskAmount.toFixed(2)}`} green/><Review label="Recommended Lot" value={recommendedLot.lot===null?"--":recommendedLot.lot.toFixed(2)} green/><Review label="TP Estimate" value={recommendedLot.lot===null?"--":`$${recommendedLot.target.toFixed(2)}`}/><Review label="R:R" value={`${computed.r}R`}/></div>{recommendedLot.lot!==null&&<button type="button" onClick={onUse} className="mt-4 text-sm font-semibold text-[#7C3AED]">Use recommended lot size</button>}</div>; }
 function Review({ label, value, green }) { return <div><div className="text-[11px] text-[#6D6D82]">{label}</div><div className={`tjfx-mono font-semibold mt-1 ${green?"text-emerald-500":""}`}>{value}</div></div>; }
 function BiasCard() { return <div className="tjfx-card p-6 min-h-[300px]"><div className="flex items-center justify-between"><h3 className="font-display text-lg font-bold">Daily / Weekly Bias</h3><span className="text-xs text-[#7C3AED]">AI Summary</span></div><div className="inline-flex mt-4 px-3 py-1 rounded-lg bg-emerald-500/15 text-emerald-500 text-sm font-bold">BULLISH</div><div className="mt-5 grid grid-cols-2 gap-4"><div className="h-36 rounded-xl bg-gradient-to-br from-emerald-500/20 via-[#122033] to-[#7C3AED]/20 border border-[#E8E8F1] flex items-end gap-1 p-3">{[35,68,42,85,52,72,46,90,60,78,55,95].map((h,i)=><span key={i} className="flex-1 bg-emerald-500/80 rounded-t" style={{height:`${h}%`}}/>)}</div><div className="text-xs leading-relaxed text-[#6D6D82]"><b className="text-[#7C3AED]">AI Summary</b><br/>Price is holding above the daily demand zone. Wait for confirmation at a key level before entering.<br/><br/><b className="text-emerald-500">Key bullish levels</b><br/>• 2360.00<br/>• 2348.00<br/>• 2400.00</div></div></div>; }

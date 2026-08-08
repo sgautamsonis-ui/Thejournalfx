@@ -146,9 +146,10 @@ function PresetManager({ kind, label, hint }) {
   const add = async () => {
     if (!val.trim()) return;
     try {
-      await prefsApi.create(kind, val.trim());
+      const created = await prefsApi.create(kind, val.trim());
+      setItems(current => [...current, created]);
       setVal("");
-      load();
+      localStorage.removeItem("tjfx-preference-cache-v1");
       toast.success(`${label} added`);
     } catch (error) {
       toast.error(error?.response?.data?.detail || "Could not add this item. Update and restart the backend, then try again.");
@@ -158,13 +159,15 @@ function PresetManager({ kind, label, hint }) {
   const saveEdit = async () => {
     if (!edit.val.trim()) return;
     try {
-      await prefsApi.update(kind, edit.id, edit.val.trim());
-      setEdit({ id: null, val: "" }); load();
+      const updated = await prefsApi.update(kind, edit.id, edit.val.trim());
+      setItems(current => current.map(item => item.id === updated.id ? updated : item));
+      localStorage.removeItem("tjfx-preference-cache-v1");
+      setEdit({ id: null, val: "" });
       toast.success(`${label} updated`);
     } catch (error) { toast.error(error?.response?.data?.detail || "Could not update this item"); }
   };
   const del = async (id) => {
-    try { await prefsApi.delete(kind, id); load(); toast.success(`${label} deleted`); }
+    try { await prefsApi.delete(kind, id); setItems(current => current.filter(item => item.id !== id)); localStorage.removeItem("tjfx-preference-cache-v1"); toast.success(`${label} deleted`); }
     catch (error) { toast.error(error?.response?.data?.detail || "Could not delete this item"); }
   };
 

@@ -148,3 +148,8 @@ h1, h2, h3, h4, h5 { font-family: 'Cabinet Grotesk', sans-serif; letter-spacing:
 .dark .chip { background: #101b28; color: #dbe5ef; border-color: #2b3b4d; }
 .dark .chip.active { background: rgba(109,40,217,.28); border-color: rgba(139,92,246,.55); color: #c4b5fd; }
 .dark .add-trade-page [data-testid="lot-size-calculator"] { background: linear-gradient(135deg, rgba(59,28,129,.48), rgba(12,27,39,.9)) !important; border-color: rgba(139,92,246,.5) !important; }
+.dark body, html.dark body { background: #050b12; color: #eef4fb; }
+.dark .bg-\[\#F6F6FB\], .dark .bg-white { background-color: #09111a !important; }
+.dark .border-\[\#E8E8F1\] { border-color: #293a4d !important; }
+.dark .text-\[\#16151F\], .dark .font-display { color: #eef4fb; }
+.dark select option { background: #09111a; color: #eef4fb; }

@@ -20,7 +20,10 @@ export default function Layout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [theme, setTheme] = useState(() => localStorage.getItem("tjfx-theme") || "light");
-  useEffect(() => { localStorage.setItem("tjfx-theme", theme); }, [theme]);
+  useEffect(() => {
+    localStorage.setItem("tjfx-theme", theme);
+    document.documentElement.classList.toggle("dark", theme === "dark");
+  }, [theme]);
 
   return (
     <div className={`min-h-screen flex bg-[#F6F6FB] ${theme === "dark" ? "dark" : ""}`}>
