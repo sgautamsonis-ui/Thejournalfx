@@ -317,6 +317,12 @@ DEFAULT_PREFS = {
     "symbol": ["XAUUSD","EURUSD","GBPUSD","USDJPY","USDCHF","AUDUSD","NZDUSD","USDCAD","EURJPY","GBPJPY","BTCUSD","ETHUSD","US30","NAS100","SPX500"],
     "key_level_weekly": ["Previous Week High (PWH)","Previous Week Low (PWL)","Weekly Open","Weekly Mid (EQ)","Weekly FVG High","Weekly FVG Low","Weekly OB High","Weekly OB Low","Monthly High","Monthly Low","BSL (Buy-Side Liquidity)","SSL (Sell-Side Liquidity)"],
     "key_level_daily": ["Previous Day High (PDH)","Previous Day Low (PDL)","Daily Open","Asia High","Asia Low","London High","London Low","NY High","NY Low","EQH (Equal High)","EQL (Equal Low)","Daily FVG High","Daily FVG Low","Daily OB High","Daily OB Low"],
+    # Used by the Add Trade HTF POI / Entry Confirmation builders and Settings > Trade Presets.
+    "htf_poi_type": ["Bullish OB","Bearish OB","Bullish FVG","Bearish FVG","Demand","Supply","Liquidity","Breaker","IFVG"],
+    "htf_timeframe": ["Monthly","Weekly","Daily","4H","1H"],
+    "entry_confirmation_type": ["MSS","BOS","CHOCH","FVG","IFVG","SMT","Breaker","Displacement","Order Block","Equal High","Equal Low"],
+    "entry_timeframe": ["4H","1H","15M","5M","1M"],
+    "setup_tag": ["Breakout","Reversal","Continuation","News Play","Scalp"],
 }
 VALID_KINDS = set(DEFAULT_PREFS.keys())
 
@@ -327,6 +333,23 @@ async def ensure_prefs_seeded(user_id: str, kind: str):
                 for i, v in enumerate(DEFAULT_PREFS.get(kind, []))]
         if rows:
             sb.table("preferences").insert(rows).execute()
+
+@api_router.get("/preferences/batch")
+async def list_prefs_batch(kinds: str, user=Depends(get_current_user)):
+    """Fetch multiple preference kinds in a single request (used by Add Trade's
+    batched/cached preference load). `kinds` is a comma-separated list.
+    Unknown kinds are returned as an empty list instead of erroring out, so one
+    bad/renamed kind can't break the whole batch."""
+    kind_list = [k.strip() for k in kinds.split(",") if k.strip()]
+    result: Dict[str, Any] = {}
+    for kind in kind_list:
+        if kind not in VALID_KINDS:
+            result[kind] = []
+            continue
+        await ensure_prefs_seeded(user["user_id"], kind)
+        r = sb.table("preferences").select("*").eq("user_id", user["user_id"]).eq("kind", kind).order("order").execute()
+        result[kind] = [{k: v for k, v in d.items() if k != "user_id"} for d in r.data]
+    return result
 
 @api_router.get("/preferences/{kind}")
 async def list_prefs(kind: str, user=Depends(get_current_user)):

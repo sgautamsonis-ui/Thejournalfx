@@ -66,6 +66,13 @@ export const aiApi = {
 
 export const prefsApi = {
   list: (kind) => api.get(`/preferences/${kind}`).then(r => r.data),
+  // Fetch several preference kinds in one round-trip (used by Add Trade's batched load).
+  // Falls back to individual requests if the batch endpoint is ever unavailable,
+  // so a backend that hasn't been redeployed yet still degrades gracefully instead of crashing the page.
+  listMany: (kinds) => api.get("/preferences/batch", { params: { kinds: kinds.join(",") } })
+    .then(r => r.data)
+    .catch(() => Promise.all(kinds.map(k => api.get(`/preferences/${k}`).then(r => r.data).catch(() => [])))
+      .then(lists => Object.fromEntries(kinds.map((k, i) => [k, lists[i]])))),
   create: (kind, value) => api.post(`/preferences/${kind}`, { value }).then(r => r.data),
   update: (kind, id, value) => api.put(`/preferences/${kind}/${id}`, { value }).then(r => r.data),
   delete: (kind, id) => api.delete(`/preferences/${kind}/${id}`).then(r => r.data),
