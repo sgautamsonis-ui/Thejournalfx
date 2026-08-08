@@ -1,39 +1,31 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { statsApi, biasApi, settingsApi, tradesApi } from "@/lib/api";
+import React, { useEffect, useState } from "react";
+import { statsApi, biasApi } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useAccount } from "@/context/AccountContext";
 import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
 import { TrendingUp, Target, Activity, Wallet, Sparkles, Settings2, Eye, EyeOff, ArrowUp, ArrowDown, Trophy, Calendar, Flame, PiggyBank, GripVertical } from "lucide-react";
 import { Link } from "react-router-dom";
 import DisciplineStreak from "@/components/DisciplineStreak";
-import { PerformanceOverview, TradingStats, PnlByPeriod, SessionBreakdown, MonthlyCalendar, ActiveTimes, TradesBreakdown, TopPairs, OpenPositions } from "@/components/DashboardProWidgets";
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { SortableContext, useSortable, rectSortingStrategy, arrayMove } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 const WIDGETS = [
-  { id: "kpis",       label: "Quick Stats", size: "auto" },
-  { id: "equity",     label: "Equity Curve", size: "auto" },
-  { id: "plan",       label: "Today's Plan", size: "auto" },
-  { id: "extras",     label: "More Stats", size: "auto" },
-  { id: "sessions",   label: "Sessions Performance", size: "auto" },
-  { id: "recent",     label: "Recent Trades", size: "auto" },
-  { id: "ai",         label: "AI Insight", size: "auto" },
-  { id: "discipline", label: "Discipline Streak", size: "auto" },
-  { id: "performance", label: "Performance Overview", size: "auto" },
-  { id: "tradingStats", label: "Trading Stats", size: "auto" },
-  { id: "dailyPnl", label: "P&L by Day", size: "auto" },
-  { id: "weeklyPnl", label: "P&L by Week", size: "auto" },
-  { id: "sessionBreakdown", label: "P&L by Session", size: "auto" },
-  { id: "calendar", label: "Monthly Calendar", size: "auto" },
-  { id: "activeTimes", label: "Most Active Times", size: "auto" },
-  { id: "breakdown", label: "Trades Breakdown", size: "auto" },
-  { id: "pairs", label: "Top Performing Pairs", size: "auto" },
-  { id: "positions", label: "Open Positions", size: "auto" },
+  { id: "kpis",       label: "Quick Stats", size: "lg" },
+  { id: "equity",     label: "Equity Curve", size: "lg" },
+  { id: "plan",       label: "Today's Plan", size: "sm" },
+  { id: "extras",     label: "More Stats", size: "lg" },
+  { id: "sessions",   label: "Sessions Performance", size: "md" },
+  { id: "recent",     label: "Recent Trades", size: "lg" },
+  { id: "ai",         label: "AI Insight", size: "sm" },
+  { id: "discipline", label: "Discipline Streak", size: "md" },
 ];
 const DEFAULT_LAYOUT = WIDGETS.map(w => ({ id: w.id, visible: true, size: w.size }));
 const KEY = "tjfx.dashboard.layout.v2";
 
-function loadLayout(savedLayout) {
+function loadLayout() {
   try {
-    const raw = Array.isArray(savedLayout) ? savedLayout : JSON.parse(localStorage.getItem(KEY) || "null");
+    const raw = JSON.parse(localStorage.getItem(KEY) || "null");
     if (Array.isArray(raw) && raw.every(x => x && x.id)) {
       const known = new Set(raw.map(x => x.id));
       return [...raw, ...DEFAULT_LAYOUT.filter(x => !known.has(x.id))];
@@ -43,22 +35,23 @@ function loadLayout(savedLayout) {
 }
 function saveLayout(l) { localStorage.setItem(KEY, JSON.stringify(l)); }
 
-const AUTO_SIZE_CLASS = { kpis: "col-span-12", equity: "col-span-12 md:col-span-8", plan: "col-span-12 md:col-span-4", extras: "col-span-12", sessions: "col-span-12 md:col-span-6", recent: "col-span-12 md:col-span-6", ai: "col-span-12 md:col-span-6", discipline: "col-span-12 md:col-span-6", performance: "col-span-12 md:col-span-6", tradingStats: "col-span-12 md:col-span-6", dailyPnl: "col-span-12 md:col-span-4", weeklyPnl: "col-span-12 md:col-span-4", sessionBreakdown: "col-span-12 md:col-span-4", calendar: "col-span-12 md:col-span-6", activeTimes: "col-span-12 md:col-span-6", breakdown: "col-span-12 md:col-span-4", pairs: "col-span-12 md:col-span-4", positions: "col-span-12 md:col-span-4" };
 const SIZE_CLASS = { sm: "col-span-12 md:col-span-4", md: "col-span-12 md:col-span-6", lg: "col-span-12 md:col-span-8", full: "col-span-12" };
-const NEXT_SIZE = { auto: "sm", sm: "md", md: "lg", lg: "full", full: "auto" };
-const SIZE_LABEL = { auto: "Auto", sm: "S", md: "M", lg: "L", full: "XL" };
+const NEXT_SIZE = { sm: "md", md: "lg", lg: "full", full: "sm" };
+const SIZE_LABEL = { sm: "S", md: "M", lg: "L", full: "XL" };
 
-function SortableCard({ id, size, customize, onCycleDragStart, onCycleSize, draggingId, children, testid }) {
-  const isDragging = draggingId === id;
+function SortableCard({ id, size, customize, onCycleSize, children, testid }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : 1,
+    zIndex: isDragging ? 40 : "auto",
+  };
   return (
-    <div
-      className={`${size === "auto" ? AUTO_SIZE_CLASS[id] : SIZE_CLASS[size||"lg"]} relative min-w-0 transition-opacity ${isDragging ? "opacity-40" : ""}`}
-      data-testid={testid}
-      data-dashboard-widget-id={id}
-    >
+    <div ref={setNodeRef} style={style} className={`${SIZE_CLASS[size||"lg"]} relative`} data-testid={testid}>
       {customize && (
         <div className="absolute -top-2 -left-2 z-30 flex items-center gap-1">
-          <button type="button" onPointerDown={(event) => onCycleDragStart(event, id)} className="touch-none cursor-grab active:cursor-grabbing h-8 w-8 rounded-full bg-[#7C3AED] text-white flex items-center justify-center shadow-lg" title="Drag to move"><GripVertical className="w-4 h-4"/></button>
+          <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing h-8 w-8 rounded-full bg-[#7C3AED] text-white flex items-center justify-center shadow-lg" title="Drag to move"><GripVertical className="w-4 h-4"/></button>
           <button onClick={()=>onCycleSize(id)} className="h-8 px-2 rounded-full bg-white border border-[#E8E8F1] text-xs font-bold text-[#7C3AED] shadow" title="Change size">{SIZE_LABEL[size||"lg"]}</button>
         </div>
       )}
@@ -89,73 +82,27 @@ export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [dailyBias, setDailyBias] = useState(null);
   const [weeklyBias, setWeeklyBias] = useState(null);
-  const [trades, setTrades] = useState([]);
-  const [layout, setLayout] = useState(() => loadLayout(user?.settings?.dashboard_layout));
+  const [layout, setLayout] = useState(loadLayout);
   const [customize, setCustomize] = useState(false);
-  const [draggingId, setDraggingId] = useState(null);
-  const firstSave = useRef(true);
-  const dragTargetRef = useRef(null);
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
   useEffect(() => {
     statsApi.dashboard(activeId).then(setStats).catch(() => setStats(null));
     biasApi.latest("daily").then(setDailyBias).catch(() => {});
     biasApi.latest("weekly").then(setWeeklyBias).catch(() => {});
-    tradesApi.list(activeId).then(setTrades).catch(() => setTrades([]));
   }, [activeId]);
-
-  const tradeAnalytics = useMemo(() => makeTradeAnalytics(trades), [trades]);
 
   useEffect(() => { saveLayout(layout); }, [layout]);
 
-  useEffect(() => {
-    // Browser storage is only an offline fallback. The profile copy follows the user to every device.
-    if (firstSave.current) { firstSave.current = false; return; }
-    settingsApi.update({ dashboard_layout: layout }).catch(() => {});
-  }, [layout]);
-
-  const moveWidget = (sourceId, targetId) => {
-    setLayout(current => {
-      const sourceIndex = current.findIndex(item => item.id === sourceId);
-      const targetIndex = current.findIndex(item => item.id === targetId);
-      if (sourceIndex < 0 || targetIndex < 0) return current;
-      const next = [...current];
-      const [moved] = next.splice(sourceIndex, 1);
-      const adjustedTarget = next.findIndex(item => item.id === targetId);
-      next.splice(adjustedTarget, 0, moved);
-      return next;
-    });
+  const onDragEnd = (event) => {
+    const { active: a, over: o } = event;
+    if (a && o && a.id !== o.id) {
+      const oi = layout.findIndex(x => x.id===a.id);
+      const ni = layout.findIndex(x => x.id===o.id);
+      setLayout(arrayMove(layout, oi, ni));
+    }
   };
-  // Pointer events work consistently on mouse and touch devices; native HTML drag
-  // does not reliably start from a small button on touch screens.
-  const onCycleDragStart = (event, id) => {
-    if (event.button !== undefined && event.button !== 0) return;
-    event.preventDefault();
-    const start = { x: event.clientX, y: event.clientY };
-    let moved = false;
-    dragTargetRef.current = null;
-    setDraggingId(id);
-    const onMove = (pointerEvent) => {
-      if (!moved && Math.hypot(pointerEvent.clientX - start.x, pointerEvent.clientY - start.y) < 6) return;
-      moved = true;
-      const target = document.elementFromPoint(pointerEvent.clientX, pointerEvent.clientY)?.closest("[data-dashboard-widget-id]");
-      const targetId = target?.dataset.dashboardWidgetId;
-      if (targetId && targetId !== id && targetId !== dragTargetRef.current) {
-        dragTargetRef.current = targetId;
-        moveWidget(id, targetId);
-      }
-    };
-    const onUp = () => {
-      setDraggingId(null);
-      dragTargetRef.current = null;
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-      window.removeEventListener("pointercancel", onUp);
-    };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-    window.addEventListener("pointercancel", onUp);
-  };
-  const cycleSize = (id) => setLayout(l => l.map(x => x.id===id? {...x, size: NEXT_SIZE[x.size||"auto"]}: x));
+  const cycleSize = (id) => setLayout(l => l.map(x => x.id===id? {...x, size: NEXT_SIZE[x.size||"lg"]}: x));
   const toggleVisible = (id) => setLayout(l => l.map(x => x.id===id? {...x, visible: !x.visible}: x));
   const resetLayout = () => setLayout(DEFAULT_LAYOUT);
 
@@ -261,25 +208,16 @@ export default function Dashboard() {
       </Card>
     ),
     discipline: <DisciplineStreak/>,
-    performance: <PerformanceOverview analytics={tradeAnalytics}/>,
-    tradingStats: <TradingStats analytics={tradeAnalytics}/>,
-    dailyPnl: <PnlByPeriod title="P&L by Day" data={tradeAnalytics.daily}/>,
-    weeklyPnl: <PnlByPeriod title="P&L by Week" data={tradeAnalytics.weekly}/>,
-    sessionBreakdown: <SessionBreakdown data={tradeAnalytics.sessions}/>,
-    calendar: <MonthlyCalendar data={tradeAnalytics.daily}/>,
-    activeTimes: <ActiveTimes data={tradeAnalytics.hours}/>,
-    breakdown: <TradesBreakdown data={tradeAnalytics.strategies}/>,
-    pairs: <TopPairs data={tradeAnalytics.pairs}/>,
-    positions: <OpenPositions data={tradeAnalytics.open}/>,
   };
 
   return (
     <div className="p-8 max-w-[1500px] mx-auto space-y-6" data-testid="dashboard-page">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div className="flex-1 min-w-0">
-          <div className="tjfx-card px-5 py-4 bg-gradient-to-r from-[#F3E8FF] to-white" data-testid="motivation-card">
+          <div className="tjfx-card p-5 bg-gradient-to-r from-[#F3E8FF] to-white" data-testid="motivation-card">
             <div className="text-[11px] text-[#7C3AED] font-semibold uppercase tracking-wide mb-1">Today's Motivation</div>
-            <div className="font-display text-base md:text-lg font-bold leading-snug text-[#16151F] line-clamp-2">{user?.settings?.motivation || "Stay disciplined. Follow the plan."}</div>
+            <div className="font-display text-xl md:text-2xl font-bold leading-snug text-[#16151F]">{user?.settings?.motivation || "Discipline is choosing between what you want now and what you want most."}</div>
+            <div className="text-[11px] text-[#6D6D82] mt-2">Edit in Settings → Appearance</div>
           </div>
           <p className="text-[#6D6D82] mt-3 text-sm">
             {activeId==="all" ? `Viewing all ${accounts.length} account${accounts.length!==1?"s":""}` : `Viewing ${active?.name} · $${(active?.balance||0).toFixed(2)}`}
@@ -310,15 +248,17 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* No dense packing: the DOM order is the exact order that gets saved on drop. */}
-      <div className="grid grid-cols-12 gap-5">
-        {layout.filter(x => x.visible).map(it => (
-          <SortableCard key={it.id} id={it.id} size={it.size||"auto"} customize={customize} onCycleSize={cycleSize}
-            onCycleDragStart={onCycleDragStart} draggingId={draggingId} testid={`widget-${it.id}`}>
-            {R[it.id]}
-          </SortableCard>
-        ))}
-      </div>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+        <SortableContext items={layout.filter(x=>x.visible).map(x=>x.id)} strategy={rectSortingStrategy}>
+          <div className="grid grid-cols-12 gap-5">
+            {layout.filter(x => x.visible).map(it => (
+              <SortableCard key={it.id} id={it.id} size={it.size||"lg"} customize={customize} onCycleSize={cycleSize} testid={`widget-${it.id}`}>
+                {R[it.id]}
+              </SortableCard>
+            ))}
+          </div>
+        </SortableContext>
+      </DndContext>
     </div>
   );
 }
@@ -339,26 +279,3 @@ const EmptyChart = ({ msg }) => (
     </div>
   </div>
 );
-
-function makeTradeAnalytics(trades) {
-  const closed = trades.filter(t => t.status === "closed").sort((a, b) => String(a.date).localeCompare(String(b.date)));
-  const group = (key) => {
-    const map = new Map();
-    closed.forEach(t => { const name = key(t) || "Other"; map.set(name, (map.get(name) || 0) + Number(t.net_pnl || 0)); });
-    return [...map].map(([name, pnl]) => ({ name, pnl: Number(pnl.toFixed(2)) }));
-  };
-  const daily = group(t => t.date).slice(-31);
-  const weekly = group(t => {
-    const d = new Date(`${t.date}T00:00:00`); const day = d.getDay() || 7;
-    d.setDate(d.getDate() - day + 1); return d.toISOString().slice(0, 10);
-  }).slice(-8);
-  const sessions = group(t => t.session || "Other").sort((a, b) => b.pnl - a.pnl);
-  const strategies = group(t => t.strategy || "Uncategorised").sort((a, b) => b.pnl - a.pnl);
-  const pairs = group(t => t.symbol || "Unknown").sort((a, b) => b.pnl - a.pnl).slice(0, 6);
-  const hours = Array.from({ length: 6 }, (_, i) => ({ label: `${i * 4}:00`, count: 0 }));
-  closed.forEach(t => { const hour = Number(String(t.entry_time || "").slice(0, 2)); if (Number.isFinite(hour)) hours[Math.min(5, Math.floor(hour / 4))].count += 1; });
-  let wins = 0, losses = 0, maxWins = 0, maxLosses = 0;
-  closed.forEach(t => { if (Number(t.net_pnl || 0) > 0) { wins += 1; losses = 0; maxWins = Math.max(maxWins, wins); } else if (Number(t.net_pnl || 0) < 0) { losses += 1; wins = 0; maxLosses = Math.max(maxLosses, losses); } });
-  const pnl = closed.reduce((sum, t) => sum + Number(t.net_pnl || 0), 0);
-  return { daily, weekly, sessions, strategies, pairs, hours, open: trades.filter(t => t.status === "open"), total: closed.length, pnl, expectancy: closed.length ? pnl / closed.length : 0, maxWins, maxLosses };
-}

@@ -120,39 +120,3 @@ h1, h2, h3, h4, h5 { font-family: 'Cabinet Grotesk', sans-serif; letter-spacing:
 
 .animate-in { animation: aIn 300ms ease-out both; }
 @keyframes aIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-
-/* The app still uses a few fixed Tailwind colours. These shared overrides keep
-   every existing screen readable in dark mode while the purple accent remains. */
-.dark {
-  --tjfx-bg: #11111a;
-  --tjfx-card: #1a1a27;
-  --tjfx-primary-light: #2b1b4d;
-  --tjfx-text: #f5f3ff;
-  --tjfx-text-2: #b6b4c7;
-  --tjfx-border: #303044;
-  --background: 240 20% 8%;
-  --foreground: 250 100% 96%;
-  --card: 240 18% 12%;
-  --card-foreground: 250 100% 96%;
-  --popover: 240 18% 12%;
-  --popover-foreground: 250 100% 96%;
-  --secondary: 240 13% 18%;
-  --secondary-foreground: 250 100% 96%;
-  --muted: 240 13% 18%;
-  --muted-foreground: 245 10% 70%;
-  --border: 240 13% 25%;
-  --input: 240 13% 25%;
-}
-.dark body, .dark .login-bg { background: var(--tjfx-bg); color: var(--tjfx-text); }
-.dark .tjfx-card, .dark [class~="bg-white"] { background-color: var(--tjfx-card) !important; }
-.dark [class~="bg-[#F6F6FB]"], .dark [class~="bg-[#F3E8FF]"] { background-color: #211b31 !important; }
-.dark [class~="text-[#16151F]"] { color: var(--tjfx-text) !important; }
-.dark [class~="text-[#6D6D82]"], .dark [class~="text-[#A1A1AA]"] { color: var(--tjfx-text-2) !important; }
-.dark [class~="border-[#E8E8F1]"] { border-color: var(--tjfx-border) !important; }
-.dark input, .dark textarea, .dark select { background-color: #161622 !important; color: var(--tjfx-text); border-color: var(--tjfx-border) !important; }
-.dark .chip { background: #1a1a27; color: var(--tjfx-text); }
-.dark .chip.active { background: #2b1b4d; }
-.dark .tjfx-card-hover:hover { box-shadow: 0 12px 30px rgba(124,58,237,0.18); }
-.dark .tjfx-app-shell { background: var(--tjfx-bg) !important; }
-.dark .tjfx-sidebar { background: #161622 !important; border-color: var(--tjfx-border) !important; }
-.dark .tjfx-topbar { background: rgba(22, 22, 34, 0.94) !important; border-color: var(--tjfx-border) !important; }

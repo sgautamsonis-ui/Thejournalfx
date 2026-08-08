@@ -3,7 +3,6 @@ import { settingsApi, accountsApi, prefsApi } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
 import { Trash2, Plus, Pencil, Check, X } from "lucide-react";
-import { useTheme } from "@/context/ThemeContext";
 
 const TABS = ["Profile","Accounts","Preferences","Trade Presets","Bias Presets","Appearance"];
 
@@ -233,7 +232,6 @@ const QUOTES = [
 
 function AppearanceTab() {
   const { user, refresh } = useAuth();
-  const { theme, setTheme } = useTheme();
   const [motivation, setMotivation] = React.useState(user?.settings?.motivation || QUOTES[0]);
   const [saving, setSaving] = React.useState(false);
   const save = async () => {
@@ -258,13 +256,7 @@ function AppearanceTab() {
         {saving?"Saving...":"Save Motivation"}
       </button>
       <div className="pt-4 border-t border-[#E8E8F1]">
-        <div className="text-sm font-medium mb-2">Colour mode</div>
-        <div className="flex gap-2">
-          {[["light", "Light"], ["dark", "Dark"]].map(([value, label]) => (
-            <button key={value} onClick={() => setTheme(value)} className={`h-10 px-4 rounded-xl border text-sm font-medium ${theme === value ? "bg-[#F3E8FF] border-[#7C3AED] text-[#7C3AED]" : "border-[#E8E8F1] text-[#6D6D82]"}`}>{label}</button>
-          ))}
-        </div>
-        <p className="text-xs text-[#6D6D82] mt-2">This choice is saved to your account and will apply on every device.</p>
+        <div className="text-sm text-[#6D6D82]">Theme: Light with purple accent. Dark mode coming soon.</div>
       </div>
     </div>
   );

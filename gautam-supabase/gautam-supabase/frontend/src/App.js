@@ -3,7 +3,6 @@ import "@/App.css";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { AccountProvider } from "@/context/AccountContext";
-import { ThemeProvider } from "@/context/ThemeContext";
 import Login from "@/pages/Login";
 import AuthCallback from "@/pages/AuthCallback";
 import Layout from "@/components/Layout";
@@ -61,13 +60,11 @@ function AppRouter() {
 export default function App() {
   return (
     <AuthProvider>
-      <ThemeProvider>
-        <AccountProvider>
-          <BrowserRouter>
-            <AppRouter />
-          </BrowserRouter>
-        </AccountProvider>
-      </ThemeProvider>
+      <AccountProvider>
+        <BrowserRouter>
+          <AppRouter />
+        </BrowserRouter>
+      </AccountProvider>
     </AuthProvider>
   );
 }
