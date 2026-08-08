@@ -413,7 +413,7 @@ async def call_ai(prompt: str, system: str = "You are an expert ICT/SMC trading 
     if not GEMINI_API_KEY:
         return "AI unavailable: GEMINI_API_KEY is not configured on the server."
     try:
-        model = genai.GenerativeModel("gemini-2.5-flash", system_instruction=system)
+        model = genai.GenerativeModel("gemini-3.6-flash", system_instruction=system)
         resp = model.generate_content(prompt)
         return (resp.text or "").strip()
     except Exception as e:
