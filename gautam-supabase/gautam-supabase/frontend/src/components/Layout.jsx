@@ -1,6 +1,6 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { LayoutDashboard, PlusCircle, Target, BookOpen, Brain, Settings, LogOut, TrendingUp, Table2, CalendarDays, FileText, NotebookPen } from "lucide-react";
+import { LayoutDashboard, PlusCircle, Target, BookOpen, Brain, Settings, LogOut, TrendingUp, Table2, CalendarDays, FileText, NotebookPen, Moon, Sun } from "lucide-react";
 import AccountSwitcher from "@/components/AccountSwitcher";
 import { useAuth } from "@/context/AuthContext";
 import { Toaster } from "sonner";
@@ -19,9 +19,11 @@ const nav = [
 export default function Layout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [theme, setTheme] = useState(() => localStorage.getItem("tjfx-theme") || "light");
+  useEffect(() => { localStorage.setItem("tjfx-theme", theme); }, [theme]);
 
   return (
-    <div className="min-h-screen flex bg-[#F6F6FB]">
+    <div className={`min-h-screen flex bg-[#F6F6FB] ${theme === "dark" ? "dark" : ""}`}>
       <aside className="w-[260px] shrink-0 bg-white border-r border-[#E8E8F1] flex flex-col sticky top-0 h-screen" data-testid="sidebar">
         <div className="px-6 py-6 flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-[#7C3AED] flex items-center justify-center shadow-[0_8px_24px_rgba(124,58,237,0.35)]">
@@ -74,7 +76,9 @@ export default function Layout() {
               return <>{g}, {name.split(" ")[0]} <span>👋</span></>;
             })()}
           </div>
-          <div className="text-[11px] text-[#6D6D82] tjfx-mono">TheJournalFX</div>
+          <button type="button" onClick={()=>setTheme(theme === "dark" ? "light" : "dark")} aria-label="Toggle color theme" data-testid="theme-toggle" className="w-9 h-9 rounded-xl border border-[#E8E8F1] flex items-center justify-center text-[#6D6D82] hover:text-[#7C3AED] hover:border-[#7C3AED]">
+            {theme === "dark" ? <Sun className="w-4 h-4"/> : <Moon className="w-4 h-4"/>}
+          </button>
         </div>
         <Outlet />
       </main>

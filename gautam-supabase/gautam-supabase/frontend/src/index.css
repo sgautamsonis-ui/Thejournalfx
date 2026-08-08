@@ -120,3 +120,31 @@ h1, h2, h3, h4, h5 { font-family: 'Cabinet Grotesk', sans-serif; letter-spacing:
 
 .animate-in { animation: aIn 300ms ease-out both; }
 @keyframes aIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* The white interface remains the default.  This theme is used only when the
+   header moon toggle is enabled, matching the dark trading workspace design. */
+.dark {
+  --tjfx-bg: #050b12;
+  --tjfx-card: #0b141e;
+  --tjfx-text: #f4f7fb;
+  --tjfx-text-2: #9caabd;
+  --tjfx-border: #213042;
+  background:
+    radial-gradient(900px 600px at 50% 0%, rgba(92, 45, 190, .13), transparent 55%),
+    #050b12 !important;
+  color: var(--tjfx-text);
+}
+.dark aside { background: #071019 !important; border-color: #1a2938 !important; }
+.dark main > div:first-child { background: rgba(5,11,18,.88) !important; border-color: #1a2938 !important; }
+.dark .tjfx-card { background: linear-gradient(145deg, #0d1722, #09111a) !important; border-color: #213042 !important; box-shadow: 0 14px 40px rgba(0,0,0,.22); }
+.dark .add-trade-page, .dark .add-trade-page h1, .dark .add-trade-page h2, .dark .add-trade-page h3, .dark .add-trade-page h4 { color: #f4f7fb; }
+.dark .add-trade-page input, .dark .add-trade-page select, .dark .add-trade-page textarea,
+.dark .dark-input { background: #09111a !important; border-color: #2a3949 !important; color: #eef4fb !important; }
+.dark .add-trade-page input:focus, .dark .add-trade-page select:focus, .dark .add-trade-page textarea:focus { border-color: #8b5cf6 !important; }
+.dark .add-trade-page .bg-\[\#F6F6FB\], .dark .add-trade-page .bg-\[\#F5F3FF\] { background: #101b28 !important; }
+.dark .add-trade-page .border-\[\#E8E8F1\], .dark .add-trade-page .border-\[\#DDD6FE\] { border-color: #293a4d !important; }
+.dark .add-trade-page .text-\[\#6D6D82\], .dark .text-\[\#6D6D82\] { color: #99a8b8 !important; }
+.dark .add-trade-page .text-\[\#A1A1AA\], .dark .text-\[\#A1A1AA\] { color: #7f91a4 !important; }
+.dark .chip { background: #101b28; color: #dbe5ef; border-color: #2b3b4d; }
+.dark .chip.active { background: rgba(109,40,217,.28); border-color: rgba(139,92,246,.55); color: #c4b5fd; }
+.dark .add-trade-page [data-testid="lot-size-calculator"] { background: linear-gradient(135deg, rgba(59,28,129,.48), rgba(12,27,39,.9)) !important; border-color: rgba(139,92,246,.5) !important; }

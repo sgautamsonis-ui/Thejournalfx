@@ -145,15 +145,28 @@ function PresetManager({ kind, label, hint }) {
 
   const add = async () => {
     if (!val.trim()) return;
-    await prefsApi.create(kind, val.trim());
-    setVal(""); load();
+    try {
+      await prefsApi.create(kind, val.trim());
+      setVal("");
+      load();
+      toast.success(`${label} added`);
+    } catch (error) {
+      toast.error(error?.response?.data?.detail || "Could not add this item. Update and restart the backend, then try again.");
+    }
   };
   const startEdit = (it) => setEdit({ id: it.id, val: it.value });
   const saveEdit = async () => {
-    await prefsApi.update(kind, edit.id, edit.val.trim());
-    setEdit({ id: null, val: "" }); load();
+    if (!edit.val.trim()) return;
+    try {
+      await prefsApi.update(kind, edit.id, edit.val.trim());
+      setEdit({ id: null, val: "" }); load();
+      toast.success(`${label} updated`);
+    } catch (error) { toast.error(error?.response?.data?.detail || "Could not update this item"); }
   };
-  const del = async (id) => { await prefsApi.delete(kind, id); load(); };
+  const del = async (id) => {
+    try { await prefsApi.delete(kind, id); load(); toast.success(`${label} deleted`); }
+    catch (error) { toast.error(error?.response?.data?.detail || "Could not delete this item"); }
+  };
 
   return (
     <div className="tjfx-card p-6" data-testid={`preset-${kind}`}>
