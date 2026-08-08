@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { tradesApi, tagsApi, aiApi, notebookApi, prefsApi, accountsApi } from "@/lib/api";
+import { tradesApi, aiApi, notebookApi, prefsApi, accountsApi } from "@/lib/api";
 import { computePnl } from "@/lib/pnlCalc";
+import { setPendingTrade, clearPendingTrade, notifyTradeSync } from "@/lib/pendingTrade";
 import { useAccount } from "@/context/AccountContext";import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
-import { Sparkles, Save, X, Upload, Star, CheckCircle2, Circle, ClipboardList, Clipboard, Calculator } from "lucide-react";
+import { Sparkles, Save, X, Upload, Star, CheckCircle2, Circle, ClipboardList, Clipboard } from "lucide-react";
 
 const MAX_IMAGES = 15;
 const Chip = ({ label, active, onClick, testid }) => (
@@ -40,13 +41,17 @@ export default function AddTrade() {
   const [itemChecks, setItemChecks] = useState({});
 
   // preferences pulled from Settings
-  const [presets, setPresets] = useState({ symbol:[], strategy:[], session:[], htf_poi:[], entry_tag:[], mood:[], mistake:[], strength:[] });
+  const [presets, setPresets] = useState({
+    symbol: [], strategy: [], session: [], mood: [], mistake: [], strength: [], setup_tag: [],
+    htf_poi_type: [], htf_timeframe: [], entry_confirmation_type: [], entry_timeframe: [],
+  });
+  const [htfDraft, setHtfDraft] = useState({ timeframe: "", type: "" });
+  const [entryDraft, setEntryDraft] = useState({ timeframe: "", type: "" });
 
   useEffect(() => {
-    tagsApi.list().catch(()=>{});
     notebookApi.list("rule").then(setRules).catch(()=>{});
     notebookApi.list("checklist").then(setChecklists).catch(()=>{});
-    ["symbol","strategy","session","htf_poi","entry_tag","mood","mistake","strength"].forEach(k =>
+    ["symbol","strategy","session","mood","mistake","strength","setup_tag","htf_poi_type","htf_timeframe","entry_confirmation_type","entry_timeframe"].forEach(k =>
       prefsApi.list(k).then(list => setPresets(p => ({...p, [k]: list.map(x=>x.value)}))).catch(()=>{})
     );
   }, []);
@@ -78,39 +83,15 @@ export default function AddTrade() {
     return { pnl: r.pnl, r: rMultiple, risk: r.risk, cls: r.cls, pipValue: r.pipValuePerLot };
   }, [t]);
 
-  // ---- Lot Size Calculator (LSC) ----
-  // Account balance follows the account selected for this trade (falls back to active account).
-  const lscBalance = useMemo(() => {
-    const acc = accounts.find(a => a.id === t.account_id) || active;
-    return parseFloat(acc?.balance) || 0;
-  }, [accounts, active, t.account_id]);
-
-  const [autoLot, setAutoLot] = useState(true);
-
-  const lsc = useMemo(() => {
-    const entry = parseFloat(t.entry_price) || 0;
-    const sl = parseFloat(t.stop_loss) || 0;
-    if (!entry || !sl || entry === sl) return { riskPerLot: 0, dollarRisk: 0, recommendedLot: 0, slPips: 0 };
-    // Risk in USD for exactly 1.00 lot at this entry/SL
-    const perLot = computePnl({
-      symbol: t.symbol, direction: t.direction,
-      entry: t.entry_price, exit: t.entry_price, lot: 1, stop_loss: t.stop_loss,
-    });
-    const riskPerLot = perLot.risk;
-    const dollarRisk = lscBalance * ((parseFloat(t.risk_percent) || 0) / 100);
-    const recommendedLot = riskPerLot > 0 ? Math.max(0.01, Math.round((dollarRisk / riskPerLot) * 100) / 100) : 0;
-    return { riskPerLot, dollarRisk: Math.round(dollarRisk * 100) / 100, recommendedLot };
-  }, [t.entry_price, t.stop_loss, t.symbol, t.direction, t.risk_percent, lscBalance]);
-
-  // When auto mode is on, keep lot_size synced to the recommended size
-  useEffect(() => {
-    if (autoLot && lsc.recommendedLot > 0) {
-      setT(prev => (parseFloat(prev.lot_size) === lsc.recommendedLot ? prev : { ...prev, lot_size: lsc.recommendedLot }));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoLot, lsc.recommendedLot]);
-
   const toggle = (key, val) => setT(p => ({ ...p, [key]: p[key].includes(val) ? p[key].filter(x=>x!==val) : [...p[key], val] }));
+  const addPairedPreset = (field, draft, setDraft, label) => {
+    if (!draft.timeframe || !draft.type) { toast.error(`Choose a ${label.toLowerCase()} timeframe and type`); return; }
+    const value = `${draft.timeframe} · ${draft.type}`;
+    if (t[field].includes(value)) { toast.error("This selection has already been added"); return; }
+    setT(p => ({ ...p, [field]: [...p[field], value] }));
+    setDraft({ timeframe: "", type: "" });
+  };
+  const removePairedPreset = (field, value) => setT(p => ({ ...p, [field]: p[field].filter(x => x !== value) }));
 
   const addImage = (dataUrl) => setT(p => {
     if (p.screenshots.length >= MAX_IMAGES) { toast.error(`Max ${MAX_IMAGES} images`); return p; }
@@ -162,8 +143,11 @@ export default function AddTrade() {
       const followedRules = rules.filter(r => ruleChecks[r.id]).map(r => r.title);
       const followedItems = [];
       checklists.forEach(cl => (cl.items||[]).forEach((it, idx) => { if (itemChecks[`${cl.id}-${idx}`]) followedItems.push(`${cl.title}: ${it.text}`); }));
-      await tradesApi.create({
+      const trade = {
         ...t,
+        // The client supplies the id so the optimistic row and persisted row
+        // are the same item, not two visually similar rows.
+        id: globalThis.crypto?.randomUUID?.() || `trade_${Date.now()}_${Math.random().toString(36).slice(2)}`,
         entry_price: parseFloat(t.entry_price)||0,
         exit_price: t.exit_price? parseFloat(t.exit_price): null,
         stop_loss: t.stop_loss? parseFloat(t.stop_loss): null,
@@ -174,21 +158,32 @@ export default function AddTrade() {
         swap: parseFloat(t.swap)||0,
         net_pnl: computed.pnl, r_multiple: computed.r,
         strengths: [...(t.strengths||[]), ...followedRules, ...followedItems].filter((v,i,a)=>a.indexOf(v)===i),
-      });
-      toast.success("Trade saved");
-      reloadAccounts?.();
+      };
+      setPendingTrade(trade);
+      // Navigate immediately. The request continues in the background and the
+      // Trade View reconciles the optimistic row when it completes.
       nav("/trades");
-    } catch (e) { toast.error("Save failed"); } finally { setSaving(false); }
+      tradesApi.create(trade).then((saved) => {
+        clearPendingTrade();
+        notifyTradeSync({ trade: saved });
+        reloadAccounts?.();
+        toast.success("Trade saved");
+      }).catch(() => {
+        clearPendingTrade();
+        notifyTradeSync({ error: true, id: trade.id });
+        toast.error("Trade could not be saved. Please try again.");
+      });
+    } catch (e) { toast.error("Save failed"); setSaving(false); }
   };
 
   return (
-    <div className="p-8 max-w-[1400px] mx-auto space-y-5" data-testid="add-trade-page">
-      <div className="flex items-center justify-between">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-[1400px] mx-auto space-y-5" data-testid="add-trade-page">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="font-display text-3xl font-bold">Add Trade</h1>
           <p className="text-[#6D6D82] mt-1">Log every detail in under 2 minutes. <span className="text-[#7C3AED]">Presets are managed in Settings.</span></p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 w-full sm:w-auto">
           <button onClick={runAI} disabled={aiLoading} data-testid="ai-review-btn" className="h-10 px-4 rounded-xl border border-[#E8E8F1] hover:border-[#7C3AED] hover:text-[#7C3AED] text-sm font-medium flex items-center gap-2">
             <Sparkles className="w-4 h-4"/> {aiLoading? "Thinking...":"AI Review"}
           </button>
@@ -217,7 +212,7 @@ export default function AddTrade() {
                 </div>
               </div>
             )}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
               <Field label="Symbol">
                 <select value={t.symbol} onChange={e=>setT({...t,symbol:e.target.value})} className={inp} data-testid="symbol-select">
                   {(presets.symbol.length?presets.symbol:["XAUUSD"]).map(s => <option key={s}>{s}</option>)}
@@ -245,12 +240,10 @@ export default function AddTrade() {
               </Field>
               <Field label="Entry Price"><input data-testid="entry-input" value={t.entry_price} onChange={e=>setT({...t,entry_price:e.target.value})} type="number" step="any" className={inp}/></Field>
               <Field label="Exit Price"><input value={t.exit_price} onChange={e=>setT({...t,exit_price:e.target.value})} type="number" step="any" className={inp}/></Field>
-              <Field label="Risk %"><input value={t.risk_percent} onChange={e=>setT({...t,risk_percent:e.target.value})} type="number" step="any" className={inp}/></Field>
               <Field label="Stop Loss"><input value={t.stop_loss} onChange={e=>setT({...t,stop_loss:e.target.value})} type="number" step="any" className={inp}/></Field>
               <Field label="Take Profit"><input value={t.take_profit} onChange={e=>setT({...t,take_profit:e.target.value})} type="number" step="any" className={inp}/></Field>
-              <Field label={<span className="flex items-center justify-between">Lot Size {autoLot && <span className="text-[9px] font-semibold text-[#7C3AED] bg-[#7C3AED]/10 px-1.5 py-0.5 rounded-full">AUTO</span>}</span>}>
-                <input value={t.lot_size} disabled={autoLot} onChange={e=>setT({...t,lot_size:e.target.value})} type="number" step="any" className={`${inp} ${autoLot?"opacity-70 cursor-not-allowed":""}`}/>
-              </Field>
+              <Field label="Lot Size"><input value={t.lot_size} onChange={e=>setT({...t,lot_size:e.target.value})} type="number" step="any" className={inp}/></Field>
+              <Field label="Risk %"><input value={t.risk_percent} onChange={e=>setT({...t,risk_percent:e.target.value})} type="number" step="any" className={inp}/></Field>
               <Field label="Commission"><input value={t.commission} onChange={e=>setT({...t,commission:e.target.value})} type="number" step="any" className={inp}/></Field>
               <Field label="Swap"><input value={t.swap} onChange={e=>setT({...t,swap:e.target.value})} type="number" step="any" className={inp}/></Field>
               <Field label="Date"><input value={t.date} onChange={e=>setT({...t,date:e.target.value})} type="date" className={inp}/></Field>
@@ -265,38 +258,7 @@ export default function AddTrade() {
               </Field>
             </div>
 
-            <div className="mt-5 p-4 rounded-2xl bg-gradient-to-br from-[#7C3AED]/[0.06] to-[#7C3AED]/[0.02] border border-[#7C3AED]/15">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-1.5 text-[13px] font-semibold text-[#1E1E2E]">
-                  <Calculator className="w-3.5 h-3.5 text-[#7C3AED]" /> Lot Size Calculator
-                </div>
-                <label className="flex items-center gap-1.5 text-[11px] text-[#6D6D82] cursor-pointer select-none">
-                  Auto-calc from Risk %
-                  <button type="button" role="switch" aria-checked={autoLot} onClick={()=>setAutoLot(v=>!v)}
-                    className={`w-8 h-4.5 rounded-full transition-colors relative ${autoLot?"bg-[#7C3AED]":"bg-[#E8E8F1]"}`} style={{height:"18px"}}>
-                    <span className={`absolute top-0.5 w-3.5 h-3.5 rounded-full bg-white transition-transform ${autoLot?"translate-x-4":"translate-x-0.5"}`}/>
-                  </button>
-                </label>
-              </div>
-              <div className="grid grid-cols-4 gap-4">
-                <div><div className="text-[11px] text-[#6D6D82]">Account Balance</div><div className="tjfx-mono text-sm font-semibold">${lscBalance.toFixed(2)}</div></div>
-                <div><div className="text-[11px] text-[#6D6D82]">$ Risk ({t.risk_percent || 0}%)</div><div className="tjfx-mono text-sm font-semibold">${lsc.dollarRisk}</div></div>
-                <div><div className="text-[11px] text-[#6D6D82]">Risk / 1.00 Lot</div><div className="tjfx-mono text-sm font-semibold">${lsc.riskPerLot}</div></div>
-                <div>
-                  <div className="text-[11px] text-[#6D6D82]">Recommended Lot</div>
-                  <div className="flex items-center gap-2">
-                    <div data-testid="lsc-recommended-lot" className="tjfx-mono text-lg font-bold text-[#7C3AED]">{lsc.recommendedLot || "—"}</div>
-                    {!autoLot && lsc.recommendedLot>0 && (
-                      <button type="button" onClick={()=>setT(p=>({...p,lot_size:lsc.recommendedLot}))}
-                        className="text-[10px] px-2 py-0.5 rounded-full border border-[#7C3AED]/30 text-[#7C3AED] hover:bg-[#7C3AED]/10">Use</button>
-                    )}
-                  </div>
-                </div>
-              </div>
-              {!t.stop_loss && <div className="text-[11px] text-amber-600 mt-2">Enter Stop Loss to calculate recommended lot size.</div>}
-            </div>
-
-            <div className="mt-4 grid grid-cols-4 gap-4 p-4 rounded-2xl bg-[#F6F6FB]">
+            <div className="mt-5 grid grid-cols-4 gap-4 p-4 rounded-2xl bg-[#F6F6FB]">
               <div><div className="text-[11px] text-[#6D6D82]">Net P&L</div><div data-testid="calc-pnl" className={`tjfx-mono text-xl font-semibold ${computed.pnl>=0?"text-emerald-600":"text-red-500"}`}>{computed.pnl>=0?"+":""}${computed.pnl}</div></div>
               <div><div className="text-[11px] text-[#6D6D82]">R Multiple</div><div data-testid="calc-r" className="tjfx-mono text-xl font-semibold">{computed.r}R</div></div>
               <div><div className="text-[11px] text-[#6D6D82]">Risk</div><div data-testid="calc-risk" className="tjfx-mono text-xl font-semibold">${computed.risk}</div></div>
@@ -304,8 +266,24 @@ export default function AddTrade() {
             </div>
           </div>
 
-          <ChipBlock title="HTF Points of Interest" items={presets.htf_poi} selected={t.htf_poi} onToggle={v=>toggle("htf_poi",v)}/>
-          <ChipBlock title="Entry Confirmations" items={presets.entry_tag} selected={t.entry_tags} onToggle={v=>toggle("entry_tags",v)}/>
+          <PairedPresetBuilder
+            title="HTF Points of Interest" description="Choose the higher-timeframe context, then add it to this trade."
+            timeframeLabel="HTF Timeframe" typeLabel="POI Type" timeframes={presets.htf_timeframe} types={presets.htf_poi_type}
+            draft={htfDraft} onDraftChange={setHtfDraft} items={t.htf_poi}
+            onAdd={() => addPairedPreset("htf_poi", htfDraft, setHtfDraft, "HTF POI")} onRemove={value => removePairedPreset("htf_poi", value)}
+            testid="htf-poi"
+          />
+          <PairedPresetBuilder
+            title="Entry Confirmations" description="Record the timeframe and confirmation that triggered your entry."
+            timeframeLabel="Entry Timeframe" typeLabel="Confirmation Type" timeframes={presets.entry_timeframe} types={presets.entry_confirmation_type}
+            draft={entryDraft} onDraftChange={setEntryDraft} items={t.entry_tags}
+            onAdd={() => addPairedPreset("entry_tags", entryDraft, setEntryDraft, "entry confirmation")} onRemove={value => removePairedPreset("entry_tags", value)}
+            testid="entry-confirmation"
+          />
+          <div className="tjfx-card p-6">
+            <h3 className="font-display text-lg font-bold mb-3">Tags</h3>
+            <ChipRow label="Optional setup tags" items={presets.setup_tag} selected={t.setup_tags} onToggle={v=>toggle("setup_tags",v)}/>
+          </div>
 
           <div className="tjfx-card p-6 space-y-4">
             <h3 className="font-display text-lg font-bold">Psychology</h3>
@@ -397,6 +375,23 @@ export default function AddTrade() {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function PairedPresetBuilder({ title, description, timeframeLabel, typeLabel, timeframes, types, draft, onDraftChange, items, onAdd, onRemove, testid }) {
+  return (
+    <div className="tjfx-card p-6">
+      <div className="flex flex-wrap items-baseline justify-between gap-2 mb-4">
+        <div><h3 className="font-display text-lg font-bold">{title}</h3><p className="text-xs text-[#6D6D82] mt-1">{description}</p></div>
+        <span className="text-[11px] text-[#A1A1AA]">Manage options in Settings</span>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-2">
+        <Field label={timeframeLabel}><select value={draft.timeframe} onChange={e=>onDraftChange({...draft,timeframe:e.target.value})} className={inp} data-testid={`${testid}-timeframe`}><option value="">Select timeframe...</option>{timeframes.map(value => <option key={value} value={value}>{value}</option>)}</select></Field>
+        <Field label={typeLabel}><select value={draft.type} onChange={e=>onDraftChange({...draft,type:e.target.value})} className={inp} data-testid={`${testid}-type`}><option value="">Select type...</option>{types.map(value => <option key={value} value={value}>{value}</option>)}</select></Field>
+        <div className="flex items-end"><button type="button" onClick={onAdd} data-testid={`${testid}-add`} className="h-10 w-full sm:w-auto px-4 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-sm font-semibold">+ Add</button></div>
+      </div>
+      {items.length > 0 ? <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-[#F0F0F5]">{items.map(value => <span key={value} className="chip active inline-flex items-center gap-1.5 pr-1">{value}<button type="button" onClick={()=>onRemove(value)} aria-label={`Remove ${value}`} className="w-5 h-5 rounded-full hover:bg-white/60 flex items-center justify-center"><X className="w-3 h-3"/></button></span>)}</div> : <div className="mt-4 pt-4 border-t border-[#F0F0F5] text-sm text-[#6D6D82]">No selections yet. Add the combinations used for this trade.</div>}
     </div>
   );
 }

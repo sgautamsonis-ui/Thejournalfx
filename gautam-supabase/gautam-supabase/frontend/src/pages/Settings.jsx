@@ -8,9 +8,12 @@ const TABS = ["Profile","Accounts","Preferences","Trade Presets","Bias Presets",
 
 const PRESET_KINDS = [
   { kind: "strategy", label: "Strategies", hint: "Dropdown in Add Trade → Strategy" },
-  { kind: "htf_poi", label: "HTF POIs", hint: "Chips in Add Trade + Bias Center" },
-  { kind: "entry_tag", label: "Entry Confirmations", hint: "Chips in Add Trade" },
-  { kind: "mood", label: "Moods", hint: "Psychology chips in Add Trade" },
+  { kind: "htf_poi_type", label: "HTF POI Types", hint: "Second dropdown in the HTF POI builder" },
+  { kind: "htf_timeframe", label: "HTF Timeframes", hint: "First dropdown in the HTF POI builder" },
+  { kind: "entry_confirmation_type", label: "Entry Confirmation Types", hint: "Second dropdown in the Entry Confirmation builder" },
+  { kind: "entry_timeframe", label: "Entry Timeframes", hint: "First dropdown in the Entry Confirmation builder" },
+  { kind: "mood", label: "Psychology Moods", hint: "Mood chips in Add Trade" },
+  { kind: "setup_tag", label: "Tags", hint: "Optional setup tags in Add Trade" },
   { kind: "mistake", label: "Mistakes", hint: "Mistake tracker chips" },
   { kind: "strength", label: "Strengths", hint: "Strengths chips in Add Trade" },
   { kind: "session", label: "Sessions", hint: "Session dropdown" },
@@ -42,7 +45,7 @@ export default function Settings() {
   const delAcc = async (id) => { await accountsApi.delete(id); setAccounts(accounts.filter(a=>a.id!==id)); };
 
   return (
-    <div className="p-8 max-w-[1300px] mx-auto" data-testid="settings-page">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-[1300px] mx-auto" data-testid="settings-page">
       <h1 className="font-display text-3xl font-bold">Settings</h1>
       <p className="text-[#6D6D82] mt-1 mb-6">All your presets and preferences live here. Add once, use everywhere.</p>
 
