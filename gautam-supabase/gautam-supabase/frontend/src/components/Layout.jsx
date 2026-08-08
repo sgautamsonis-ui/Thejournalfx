@@ -1,8 +1,9 @@
 import React from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { LayoutDashboard, PlusCircle, Target, BookOpen, Brain, Settings, LogOut, TrendingUp, Table2, CalendarDays, FileText, NotebookPen } from "lucide-react";
+import { LayoutDashboard, PlusCircle, Target, BookOpen, Brain, Settings, LogOut, TrendingUp, Table2, CalendarDays, FileText, NotebookPen, Moon, Sun } from "lucide-react";
 import AccountSwitcher from "@/components/AccountSwitcher";
 import { useAuth } from "@/context/AuthContext";
+import { useTheme } from "@/context/ThemeContext";
 import { Toaster } from "sonner";
 const nav = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, testid: "nav-dashboard" },
@@ -18,6 +19,7 @@ const nav = [
 
 export default function Layout() {
   const { user, logout } = useAuth();
+  const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
 
   return (
@@ -74,6 +76,9 @@ export default function Layout() {
               return <>{g}, {name.split(" ")[0]} <span>👋</span></>;
             })()}
           </div>
+          <button onClick={() => setTheme(theme === "dark" ? "light" : "dark")} aria-label="Toggle colour mode" title="Toggle light/dark mode" className="h-9 w-9 rounded-xl border border-[#E8E8F1] bg-white text-[#6D6D82] hover:border-[#7C3AED] hover:text-[#7C3AED] flex items-center justify-center">
+            {theme === "dark" ? <Sun className="w-4 h-4"/> : <Moon className="w-4 h-4"/>}
+          </button>
           <div className="text-[11px] text-[#6D6D82] tjfx-mono">TheJournalFX</div>
         </div>
         <Outlet />

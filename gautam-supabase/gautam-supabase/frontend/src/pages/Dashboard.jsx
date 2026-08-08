@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import { statsApi, biasApi } from "@/lib/api";
+import React, { useEffect, useRef, useState } from "react";
+import { statsApi, biasApi, settingsApi } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useAccount } from "@/context/AccountContext";
 import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
@@ -11,21 +11,21 @@ import { SortableContext, useSortable, rectSortingStrategy, arrayMove } from "@d
 import { CSS } from "@dnd-kit/utilities";
 
 const WIDGETS = [
-  { id: "kpis",       label: "Quick Stats", size: "lg" },
-  { id: "equity",     label: "Equity Curve", size: "lg" },
-  { id: "plan",       label: "Today's Plan", size: "sm" },
-  { id: "extras",     label: "More Stats", size: "lg" },
-  { id: "sessions",   label: "Sessions Performance", size: "md" },
-  { id: "recent",     label: "Recent Trades", size: "lg" },
-  { id: "ai",         label: "AI Insight", size: "sm" },
-  { id: "discipline", label: "Discipline Streak", size: "md" },
+  { id: "kpis",       label: "Quick Stats", size: "auto" },
+  { id: "equity",     label: "Equity Curve", size: "auto" },
+  { id: "plan",       label: "Today's Plan", size: "auto" },
+  { id: "extras",     label: "More Stats", size: "auto" },
+  { id: "sessions",   label: "Sessions Performance", size: "auto" },
+  { id: "recent",     label: "Recent Trades", size: "auto" },
+  { id: "ai",         label: "AI Insight", size: "auto" },
+  { id: "discipline", label: "Discipline Streak", size: "auto" },
 ];
 const DEFAULT_LAYOUT = WIDGETS.map(w => ({ id: w.id, visible: true, size: w.size }));
 const KEY = "tjfx.dashboard.layout.v2";
 
-function loadLayout() {
+function loadLayout(savedLayout) {
   try {
-    const raw = JSON.parse(localStorage.getItem(KEY) || "null");
+    const raw = Array.isArray(savedLayout) ? savedLayout : JSON.parse(localStorage.getItem(KEY) || "null");
     if (Array.isArray(raw) && raw.every(x => x && x.id)) {
       const known = new Set(raw.map(x => x.id));
       return [...raw, ...DEFAULT_LAYOUT.filter(x => !known.has(x.id))];
@@ -35,9 +35,10 @@ function loadLayout() {
 }
 function saveLayout(l) { localStorage.setItem(KEY, JSON.stringify(l)); }
 
+const AUTO_SIZE_CLASS = { kpis: "col-span-12", equity: "col-span-12 md:col-span-8", plan: "col-span-12 md:col-span-4", extras: "col-span-12", sessions: "col-span-12 md:col-span-6", recent: "col-span-12 md:col-span-8", ai: "col-span-12 md:col-span-4", discipline: "col-span-12 md:col-span-6" };
 const SIZE_CLASS = { sm: "col-span-12 md:col-span-4", md: "col-span-12 md:col-span-6", lg: "col-span-12 md:col-span-8", full: "col-span-12" };
-const NEXT_SIZE = { sm: "md", md: "lg", lg: "full", full: "sm" };
-const SIZE_LABEL = { sm: "S", md: "M", lg: "L", full: "XL" };
+const NEXT_SIZE = { auto: "sm", sm: "md", md: "lg", lg: "full", full: "auto" };
+const SIZE_LABEL = { auto: "Auto", sm: "S", md: "M", lg: "L", full: "XL" };
 
 function SortableCard({ id, size, customize, onCycleSize, children, testid }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
@@ -48,7 +49,7 @@ function SortableCard({ id, size, customize, onCycleSize, children, testid }) {
     zIndex: isDragging ? 40 : "auto",
   };
   return (
-    <div ref={setNodeRef} style={style} className={`${SIZE_CLASS[size||"lg"]} relative`} data-testid={testid}>
+    <div ref={setNodeRef} style={style} className={`${size === "auto" ? AUTO_SIZE_CLASS[id] : SIZE_CLASS[size||"lg"]} relative min-w-0`} data-testid={testid}>
       {customize && (
         <div className="absolute -top-2 -left-2 z-30 flex items-center gap-1">
           <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing h-8 w-8 rounded-full bg-[#7C3AED] text-white flex items-center justify-center shadow-lg" title="Drag to move"><GripVertical className="w-4 h-4"/></button>
@@ -82,8 +83,9 @@ export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [dailyBias, setDailyBias] = useState(null);
   const [weeklyBias, setWeeklyBias] = useState(null);
-  const [layout, setLayout] = useState(loadLayout);
+  const [layout, setLayout] = useState(() => loadLayout(user?.settings?.dashboard_layout));
   const [customize, setCustomize] = useState(false);
+  const firstSave = useRef(true);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
   useEffect(() => {
@@ -94,6 +96,12 @@ export default function Dashboard() {
 
   useEffect(() => { saveLayout(layout); }, [layout]);
 
+  useEffect(() => {
+    // Browser storage is only an offline fallback. The profile copy follows the user to every device.
+    if (firstSave.current) { firstSave.current = false; return; }
+    settingsApi.update({ dashboard_layout: layout }).catch(() => {});
+  }, [layout]);
+
   const onDragEnd = (event) => {
     const { active: a, over: o } = event;
     if (a && o && a.id !== o.id) {
@@ -102,7 +110,7 @@ export default function Dashboard() {
       setLayout(arrayMove(layout, oi, ni));
     }
   };
-  const cycleSize = (id) => setLayout(l => l.map(x => x.id===id? {...x, size: NEXT_SIZE[x.size||"lg"]}: x));
+  const cycleSize = (id) => setLayout(l => l.map(x => x.id===id? {...x, size: NEXT_SIZE[x.size||"auto"]}: x));
   const toggleVisible = (id) => setLayout(l => l.map(x => x.id===id? {...x, visible: !x.visible}: x));
   const resetLayout = () => setLayout(DEFAULT_LAYOUT);
 
@@ -214,10 +222,9 @@ export default function Dashboard() {
     <div className="p-8 max-w-[1500px] mx-auto space-y-6" data-testid="dashboard-page">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div className="flex-1 min-w-0">
-          <div className="tjfx-card p-5 bg-gradient-to-r from-[#F3E8FF] to-white" data-testid="motivation-card">
+          <div className="tjfx-card px-5 py-4 bg-gradient-to-r from-[#F3E8FF] to-white" data-testid="motivation-card">
             <div className="text-[11px] text-[#7C3AED] font-semibold uppercase tracking-wide mb-1">Today's Motivation</div>
-            <div className="font-display text-xl md:text-2xl font-bold leading-snug text-[#16151F]">{user?.settings?.motivation || "Discipline is choosing between what you want now and what you want most."}</div>
-            <div className="text-[11px] text-[#6D6D82] mt-2">Edit in Settings → Appearance</div>
+            <div className="font-display text-base md:text-lg font-bold leading-snug text-[#16151F] line-clamp-2">{user?.settings?.motivation || "Stay disciplined. Follow the plan."}</div>
           </div>
           <p className="text-[#6D6D82] mt-3 text-sm">
             {activeId==="all" ? `Viewing all ${accounts.length} account${accounts.length!==1?"s":""}` : `Viewing ${active?.name} · $${(active?.balance||0).toFixed(2)}`}
@@ -250,9 +257,9 @@ export default function Dashboard() {
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
         <SortableContext items={layout.filter(x=>x.visible).map(x=>x.id)} strategy={rectSortingStrategy}>
-          <div className="grid grid-cols-12 gap-5">
+          <div className="grid grid-cols-12 grid-flow-dense gap-5">
             {layout.filter(x => x.visible).map(it => (
-              <SortableCard key={it.id} id={it.id} size={it.size||"lg"} customize={customize} onCycleSize={cycleSize} testid={`widget-${it.id}`}>
+              <SortableCard key={it.id} id={it.id} size={it.size||"auto"} customize={customize} onCycleSize={cycleSize} testid={`widget-${it.id}`}>
                 {R[it.id]}
               </SortableCard>
             ))}
