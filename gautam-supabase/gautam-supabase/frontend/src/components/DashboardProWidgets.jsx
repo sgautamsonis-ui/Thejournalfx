@@ -16,10 +16,39 @@ const Card = ({ title, icon: Icon, children, action }) => (
 const Empty = ({ text = "Add closed trades to see this widget." }) => <div className="h-40 flex items-center justify-center text-center text-sm text-[#6D6D82] px-6">{text}</div>;
 
 export function PerformanceOverview({ analytics }) {
-  const pie = analytics.total ? [{ name: "Profitable", value: analytics.pnl >= 0 ? Math.ceil(analytics.total * 0.6) : Math.floor(analytics.total * 0.4) }, { name: "Other", value: Math.max(0, analytics.total - (analytics.pnl >= 0 ? Math.ceil(analytics.total * 0.6) : Math.floor(analytics.total * 0.4))) }] : [];
-  return <Card title="Performance Overview" icon={PieIcon} action={<span className="text-xs text-[#6D6D82]">All time</span>}>
-    {!analytics.total ? <Empty/> : <div className="grid grid-cols-2 gap-3 items-center"><div className="h-40 relative"><ResponsiveContainer><PieChart><Pie data={pie} dataKey="value" innerRadius={45} outerRadius={65} paddingAngle={3}>{pie.map((x, i) => <Cell key={x.name} fill={i ? "#E8E8F1" : "#10B981"}/>)}</Pie><Tooltip/></PieChart></ResponsiveContainer><div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none"><b className="tjfx-mono text-xl">{analytics.total}</b><span className="text-[10px] text-[#6D6D82]">trades</span></div></div><div className="space-y-3 text-sm"><Metric label="Net P&L" value={money(analytics.pnl)} good={analytics.pnl >= 0}/><Metric label="Expectancy" value={money(analytics.expectancy)} good={analytics.expectancy >= 0}/><Metric label="Win streak" value={`${analytics.maxWins}`} good/></div></div>
-  </Card>;
+  const profitable = analytics.pnl >= 0 ? Math.ceil(analytics.total * 0.6) : Math.floor(analytics.total * 0.4);
+  const pie = analytics.total ? [
+    { name: "Profitable", value: profitable },
+    { name: "Other", value: Math.max(0, analytics.total - profitable) },
+  ] : [];
+
+  return (
+    <Card title="Performance Overview" icon={PieIcon} action={<span className="text-xs text-[#6D6D82]">All time</span>}>
+      {!analytics.total ? <Empty /> : (
+        <div className="grid grid-cols-2 gap-3 items-center">
+          <div className="h-40 relative">
+            <ResponsiveContainer>
+              <PieChart>
+                <Pie data={pie} dataKey="value" innerRadius={45} outerRadius={65} paddingAngle={3}>
+                  {pie.map((item, index) => <Cell key={item.name} fill={index ? "#E8E8F1" : "#10B981"} />)}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+              <b className="tjfx-mono text-xl">{analytics.total}</b>
+              <span className="text-[10px] text-[#6D6D82]">trades</span>
+            </div>
+          </div>
+          <div className="space-y-3 text-sm">
+            <Metric label="Net P&L" value={money(analytics.pnl)} good={analytics.pnl >= 0} />
+            <Metric label="Expectancy" value={money(analytics.expectancy)} good={analytics.expectancy >= 0} />
+            <Metric label="Win streak" value={`${analytics.maxWins}`} good />
+          </div>
+        </div>
+      )}
+    </Card>
+  );
 }
 
 export function TradingStats({ analytics }) {
