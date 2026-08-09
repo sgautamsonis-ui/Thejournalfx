@@ -1,11 +1,14 @@
 import React, { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { LayoutDashboard, PlusCircle, Target, BookOpen, Brain, Settings, LogOut, TrendingUp, Table2, CalendarDays, FileText, NotebookPen, Moon, Sun, Wallet, ArrowUp, ArrowDown } from "lucide-react";
+import { LayoutDashboard, PlusCircle, Target, BookOpen, Brain, Settings, LogOut, TrendingUp, Table2, CalendarDays, FileText, NotebookPen, Moon, Sun, Wallet, ArrowUp, ArrowDown, ChevronDown, User } from "lucide-react";
 import AccountSwitcher from "@/components/AccountSwitcher";
 import { useAuth } from "@/context/AuthContext";
 import { useAccount } from "@/context/AccountContext";
 import { statsApi } from "@/lib/api";
 import { Toaster } from "sonner";
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 
 function AccountOverview() {
   const { activeId, active, accounts } = useAccount();
@@ -20,6 +23,8 @@ function AccountOverview() {
     : (active?.balance || 0);
   const todaysPnl = stats?.todays_pnl ?? 0;
   const totalPnl = stats?.total_pnl ?? 0;
+  const dailyDD = stats?.daily_drawdown ?? 0;
+  const weeklyDD = stats?.weekly_drawdown ?? 0;
 
   const Row = ({ label, value, positive }) => (
     <div className="flex items-center justify-between py-1.5">
@@ -42,6 +47,16 @@ function AccountOverview() {
         <Row label="Today's P&L" value={`${todaysPnl >= 0 ? "+" : ""}$${todaysPnl.toFixed(2)}`} positive={todaysPnl >= 0} />
         <Row label="Total P&L" value={`${totalPnl >= 0 ? "+" : ""}$${totalPnl.toFixed(2)}`} positive={totalPnl >= 0} />
         <Row label="Win Rate" value={`${stats?.win_rate ?? 0}%`} />
+        <Row
+          label="Daily Drawdown"
+          value={`${dailyDD === 0 ? "" : "-"}$${Math.abs(dailyDD).toFixed(2)}`}
+          positive={dailyDD >= -0.001 ? undefined : false}
+        />
+        <Row
+          label="Weekly Drawdown"
+          value={`${weeklyDD === 0 ? "" : "-"}$${Math.abs(weeklyDD).toFixed(2)}`}
+          positive={weeklyDD >= -0.001 ? undefined : false}
+        />
       </div>
     </div>
   );
@@ -120,17 +135,52 @@ export default function Layout() {
 
       <main className="flex-1 min-w-0">
         <div className="sticky top-0 z-30 bg-[#F6F6FB]/85 backdrop-blur border-b border-[#E8E8F1] px-8 py-2.5 flex items-center justify-between gap-4">
-          <div className="font-display text-[14px] font-bold" data-testid="header-greeting">
-            {(() => {
-              const h = new Date().getHours();
-              const g = h<12? "Good Morning" : h<17? "Good Afternoon" : "Good Evening";
-              const name = user?.settings?.display_name || user?.name || "Trader";
-              return <>{g}, {name.split(" ")[0]} <span>👋</span></>;
-            })()}
+          <div className="leading-tight min-w-0" data-testid="header-greeting">
+            <div className="font-display text-[14px] font-bold truncate">
+              {(() => {
+                const h = new Date().getHours();
+                const g = h<12? "Good Morning" : h<17? "Good Afternoon" : "Good Evening";
+                const name = user?.settings?.display_name || user?.name || "Trader";
+                return <>{g}, {name.split(" ")[0]} <span>👋</span></>;
+              })()}
+            </div>
+            <div className="text-[11px] text-[#6D6D82] truncate">Discipline today, freedom tomorrow.</div>
           </div>
-          <button type="button" onClick={()=>setTheme(theme === "dark" ? "light" : "dark")} aria-label="Toggle color theme" data-testid="theme-toggle" className="w-8 h-8 rounded-xl border border-[#E8E8F1] flex items-center justify-center text-[#6D6D82] hover:text-[#7C3AED] hover:border-[#7C3AED] shrink-0">
-            {theme === "dark" ? <Sun className="w-4 h-4"/> : <Moon className="w-4 h-4"/>}
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <NavLink to="/settings" data-testid="header-settings-btn" aria-label="Settings" className="w-8 h-8 rounded-xl border border-[#E8E8F1] flex items-center justify-center text-[#6D6D82] hover:text-[#7C3AED] hover:border-[#7C3AED]">
+              <Settings className="w-4 h-4"/>
+            </NavLink>
+            <button type="button" onClick={()=>setTheme(theme === "dark" ? "light" : "dark")} aria-label="Toggle color theme" data-testid="theme-toggle" className="w-8 h-8 rounded-xl border border-[#E8E8F1] flex items-center justify-center text-[#6D6D82] hover:text-[#7C3AED] hover:border-[#7C3AED]">
+              {theme === "dark" ? <Sun className="w-4 h-4"/> : <Moon className="w-4 h-4"/>}
+            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button type="button" data-testid="header-profile-btn" aria-label="Account menu" className="h-8 pl-1 pr-2 rounded-xl border border-[#E8E8F1] flex items-center gap-1.5 text-[#6D6D82] hover:text-[#7C3AED] hover:border-[#7C3AED]">
+                  {user?.picture ? (
+                    <img src={user.picture} alt="" className="w-6 h-6 rounded-full" />
+                  ) : (
+                    <div className="w-6 h-6 rounded-full bg-[#F3E8FF] flex items-center justify-center text-[#7C3AED] font-semibold text-[11px]">
+                      {(user?.name?.[0] || "T").toUpperCase()}
+                    </div>
+                  )}
+                  <ChevronDown className="w-3 h-3" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>
+                  <div className="text-[13px] font-semibold truncate">{user?.settings?.display_name || user?.name}</div>
+                  <div className="text-[11px] font-normal text-[#6D6D82] truncate">{user?.email}</div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => navigate("/settings")} data-testid="header-menu-settings">
+                  <Settings className="w-4 h-4 mr-2" /> Settings
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={logout} data-testid="header-menu-logout" className="text-red-600 focus:text-red-600">
+                  <LogOut className="w-4 h-4 mr-2" /> Logout
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
         <Outlet />
       </main>

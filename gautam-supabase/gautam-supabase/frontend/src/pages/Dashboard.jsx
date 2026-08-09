@@ -3,7 +3,7 @@ import { statsApi, biasApi } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useAccount } from "@/context/AccountContext";
 import { 
-  AreaChart, Area, BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, 
+  BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, 
   ResponsiveContainer, XAxis, YAxis, Tooltip, Legend, CartesianGrid 
 } from "recharts";
 import { 
@@ -11,14 +11,13 @@ import {
   ArrowUp, ArrowDown, Trophy, Calendar, Flame, PiggyBank, GripVertical,
   ChevronDown, ChevronLeft, ChevronRight, AlertCircle, CheckCircle2
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, useSortable, rectSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
 // =============== WIDGET REGISTRY ===============
 const WIDGETS = [
-  { id: "header",         label: "Welcome Header",          category: "header", size: "full" },
   { id: "kpis",           label: "KPI Cards",               category: "overview", size: "full" },
   { id: "performance",    label: "Performance Overview",    category: "main", size: "full" },
   { id: "positions",      label: "Open Positions & Trades", category: "main", size: "full" },
@@ -43,8 +42,10 @@ function loadLayout() {
   try {
     const raw = JSON.parse(localStorage.getItem(LAYOUT_KEY) || "null");
     if (Array.isArray(raw) && raw.every(x => x && x.id)) {
-      const known = new Set(raw.map(x => x.id));
-      return [...raw, ...DEFAULT_LAYOUT.filter(x => !known.has(x.id))];
+      const validIds = new Set(WIDGETS.map(w => w.id));
+      const cleaned = raw.filter(x => validIds.has(x.id));
+      const known = new Set(cleaned.map(x => x.id));
+      return [...cleaned, ...DEFAULT_LAYOUT.filter(x => !known.has(x.id))];
     }
   } catch {}
   return DEFAULT_LAYOUT;
@@ -168,6 +169,7 @@ function EmptyState({ message, icon: Icon = PiggyBank }) {
 export default function Dashboard() {
   const { user } = useAuth();
   const { activeId, active, accounts } = useAccount();
+  const navigate = useNavigate();
   const [stats, setStats] = useState(null);
   const [layout, setLayout] = useState(loadLayout);
   const [customize, setCustomize] = useState(false);
@@ -211,30 +213,6 @@ export default function Dashboard() {
 
   // =============== RENDER WIDGETS ===============
   const widgetComponents = {
-    // Header
-    header: (
-      <div className="flex items-center justify-between gap-4 mb-2">
-        <div className="min-w-0 leading-tight">
-          <div className="text-sm font-semibold text-[#16151F] truncate">
-            Welcome back, {user?.name || "Trader"} 👋
-          </div>
-          <div className="text-xs text-[#6D6D82] truncate">
-            Discipline today, freedom tomorrow.
-          </div>
-        </div>
-        <select 
-          className="h-8 px-2.5 rounded-lg border border-[#E8E8F1] text-xs font-medium bg-white shrink-0"
-          onChange={(e) => setTimeframe(e.target.value)}
-          value={timeframe}
-        >
-          <option value="today">Today</option>
-          <option value="week">This Week</option>
-          <option value="month">This Month</option>
-          <option value="all">All Time</option>
-        </select>
-      </div>
-    ),
-
     // KPI Cards (6 cards)
     kpis: (
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3" data-testid="kpi-cards">
@@ -336,16 +314,10 @@ export default function Dashboard() {
           </>
         ) : (
           <div className="h-[300px] mt-4">
-            {stats?.equity_curve && stats.equity_curve.length > 0 ? (
+            {stats?.daily_pnl && stats.daily_pnl.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={stats.equity_curve} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="perfGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#7C3AED" stopOpacity={0.35}/>
-                      <stop offset="100%" stopColor="#7C3AED" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E8E8F1" />
+                <BarChart data={stats.daily_pnl} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E8E8F1" vertical={false} />
                   <XAxis 
                     dataKey="date" 
                     tick={{ fontSize: 11, fill: "#A1A1AA" }} 
@@ -366,16 +338,14 @@ export default function Dashboard() {
                       const dt = new Date(d);
                       return isNaN(dt) ? d : dt.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
                     }}
-                    formatter={(value) => `$${value.toFixed(2)}`}
+                    formatter={(value) => [`$${value.toFixed(2)}`, "P&L"]}
                   />
-                  <Area 
-                    type="monotone" 
-                    dataKey="equity" 
-                    stroke="#7C3AED" 
-                    strokeWidth={2}
-                    fill="url(#perfGrad)"
-                  />
-                </AreaChart>
+                  <Bar dataKey="pnl" radius={[4, 4, 4, 4]} maxBarSize={36}>
+                    {stats.daily_pnl.map((entry, i) => (
+                      <Cell key={i} fill={entry.pnl >= 0 ? "#10B981" : "#EF4444"} />
+                    ))}
+                  </Bar>
+                </BarChart>
               </ResponsiveContainer>
             ) : (
               <EmptyState message="No performance data yet. Add some trades to see your progress." />
@@ -416,7 +386,7 @@ export default function Dashboard() {
 
         {positionsTab === "open" ? (
           <div className="overflow-x-auto scroll-thin">
-            {stats?.open_positions && stats.open_positions.length > 0 ? (
+            {stats?.open_positions_list && stats.open_positions_list.length > 0 ? (
               <table className="w-full text-sm">
                 <thead className="text-[#6D6D82] border-b border-[#E8E8F1]">
                   <tr className="text-left">
@@ -424,29 +394,23 @@ export default function Dashboard() {
                     <th className="py-2 font-medium">Dir</th>
                     <th className="py-2 font-medium">Size</th>
                     <th className="py-2 font-medium">Entry</th>
-                    <th className="py-2 font-medium">Current</th>
                     <th className="py-2 font-medium">SL</th>
                     <th className="py-2 font-medium">TP</th>
-                    <th className="py-2 font-medium">Float P&L</th>
-                    <th className="py-2 font-medium">R</th>
+                    <th className="py-2 font-medium">Date</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {stats.open_positions.map((pos) => (
-                    <tr key={pos.id} className="border-t border-[#E8E8F1] hover:bg-[#F6F6FB]">
-                      <td className="py-3 font-semibold tjfx-mono">{pos.pair}</td>
+                  {stats.open_positions_list.map((pos) => (
+                    <tr key={pos.id} onClick={() => navigate("/trades")} className="border-t border-[#E8E8F1] hover:bg-[#F3E8FF]/40 cursor-pointer">
+                      <td className="py-3 font-semibold tjfx-mono">{pos.symbol}</td>
                       <td className={pos.direction === "long" ? "text-emerald-600" : "text-red-500"}>
                         {pos.direction === "long" ? "↑ Long" : "↓ Short"}
                       </td>
-                      <td className="py-3 tjfx-mono">{pos.size}</td>
-                      <td className="py-3 tjfx-mono text-sm">{pos.entry.toFixed(2)}</td>
-                      <td className="py-3 tjfx-mono text-sm">{pos.current_price.toFixed(2)}</td>
-                      <td className="py-3 tjfx-mono text-sm text-red-500">{pos.stop_loss.toFixed(2)}</td>
-                      <td className="py-3 tjfx-mono text-sm text-emerald-600">{pos.take_profit.toFixed(2)}</td>
-                      <td className={`py-3 tjfx-mono font-medium ${pos.floating_pnl >= 0 ? "text-emerald-600" : "text-red-500"}`}>
-                        {pos.floating_pnl >= 0 ? "+" : ""}{pos.floating_pnl.toFixed(2)}
-                      </td>
-                      <td className="py-3 tjfx-mono">{pos.floating_r?.toFixed(2)}R</td>
+                      <td className="py-3 tjfx-mono">{pos.lot_size}</td>
+                      <td className="py-3 tjfx-mono text-sm">{(pos.entry_price ?? 0).toFixed(2)}</td>
+                      <td className="py-3 tjfx-mono text-sm text-red-500">{pos.stop_loss != null ? pos.stop_loss.toFixed(2) : "—"}</td>
+                      <td className="py-3 tjfx-mono text-sm text-emerald-600">{pos.take_profit != null ? pos.take_profit.toFixed(2) : "—"}</td>
+                      <td className="py-3 text-[#6D6D82] tjfx-mono text-sm">{pos.date}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -472,15 +436,15 @@ export default function Dashboard() {
                 </thead>
                 <tbody>
                   {stats.recent_trades.map((trade) => (
-                    <tr key={trade.id} className="border-t border-[#E8E8F1] hover:bg-[#F6F6FB]">
-                      <td className="py-3 font-semibold tjfx-mono">{trade.pair}</td>
+                    <tr key={trade.id} onClick={() => navigate("/trades")} className="border-t border-[#E8E8F1] hover:bg-[#F3E8FF]/40 cursor-pointer">
+                      <td className="py-3 font-semibold tjfx-mono">{trade.symbol}</td>
                       <td className={trade.direction === "long" ? "text-emerald-600" : "text-red-500"}>
                         {trade.direction === "long" ? "↑ Long" : "↓ Short"}
                       </td>
-                      <td className="py-3 tjfx-mono text-sm">{trade.entry.toFixed(2)}</td>
-                      <td className="py-3 tjfx-mono text-sm">{trade.exit.toFixed(2)}</td>
-                      <td className={`py-3 tjfx-mono font-medium ${trade.net_pnl >= 0 ? "text-emerald-600" : "text-red-500"}`}>
-                        {trade.net_pnl >= 0 ? "+" : ""}{trade.net_pnl.toFixed(2)}
+                      <td className="py-3 tjfx-mono text-sm">{(trade.entry_price ?? 0).toFixed(2)}</td>
+                      <td className="py-3 tjfx-mono text-sm">{trade.exit_price != null ? trade.exit_price.toFixed(2) : "—"}</td>
+                      <td className={`py-3 tjfx-mono font-medium ${(trade.net_pnl||0) >= 0 ? "text-emerald-600" : "text-red-500"}`}>
+                        {(trade.net_pnl||0) >= 0 ? "+" : ""}{(trade.net_pnl||0).toFixed(2)}
                       </td>
                       <td className="py-3 tjfx-mono">{trade.r_multiple?.toFixed(2) || "—"}R</td>
                       <td className="py-3 text-[#6D6D82] tjfx-mono text-sm">{trade.date}</td>
@@ -506,29 +470,38 @@ export default function Dashboard() {
     calendar: (
       <Card data-testid="calendar-card">
         <h3 className="font-display text-lg font-bold mb-4">Trading Calendar</h3>
-        <div className="grid grid-cols-7 gap-1">
-          {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(day => (
-            <div key={day} className="text-center text-xs font-semibold text-[#6D6D82] py-2">
-              {day}
-            </div>
-          ))}
-          {stats?.calendar && stats.calendar.map((day) => (
-            <button
-              key={day.date}
-              className={`aspect-square rounded-lg text-xs font-medium transition flex flex-col items-center justify-center ${
-                day.pnl > 0
-                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
-                  : day.pnl < 0
-                  ? "bg-red-50 text-red-700 border border-red-200 hover:bg-red-100"
-                  : "bg-[#F6F6FB] text-[#6D6D82] border border-[#E8E8F1] hover:bg-white"
-              }`}
-              title={`${day.date}: ${day.trades} trades`}
-            >
-              <div>{day.date.split("-")[2]}</div>
-              {day.pnl !== 0 && <div className="text-[10px]">${Math.abs(day.pnl).toFixed(0)}</div>}
-            </button>
-          ))}
-        </div>
+        {stats?.calendar && stats.calendar.length > 0 ? (
+          <div className="grid grid-cols-7 gap-1">
+            {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(day => (
+              <div key={day} className="text-center text-xs font-semibold text-[#6D6D82] py-2">
+                {day}
+              </div>
+            ))}
+            {(() => {
+              const first = new Date(stats.calendar[0].date);
+              const leadBlank = (first.getDay() + 6) % 7; // Mon=0 ... Sun=6
+              return Array.from({ length: leadBlank }).map((_, i) => <div key={`blank-${i}`} />);
+            })()}
+            {stats.calendar.map((day) => (
+              <button
+                key={day.date}
+                className={`aspect-square rounded-lg text-xs font-medium transition flex flex-col items-center justify-center ${
+                  day.pnl > 0
+                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
+                    : day.pnl < 0
+                    ? "bg-red-50 text-red-700 border border-red-200 hover:bg-red-100"
+                    : "bg-[#F6F6FB] text-[#6D6D82] border border-[#E8E8F1] hover:bg-white"
+                }`}
+                title={`${day.date}: ${day.trades} trades`}
+              >
+                <div>{day.date.split("-")[2]}</div>
+                {day.pnl !== 0 && <div className="text-[10px]">${Math.abs(day.pnl).toFixed(0)}</div>}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <EmptyState message="Add trades to see your trading calendar." />
+        )}
       </Card>
     ),
 

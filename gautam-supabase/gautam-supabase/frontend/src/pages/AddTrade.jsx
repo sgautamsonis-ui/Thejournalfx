@@ -36,6 +36,7 @@ export default function AddTrade() {
     lot_size: 0.1, risk_percent: 1, commission: 0, swap: 0,
     session: "London", strategy: "", status: "closed",
     date: new Date().toISOString().slice(0,10),
+    entry_time: new Date().toTimeString().slice(0,5),
     htf_poi: [], entry_tags: [], setup_tags: [], mood_before: [], mood_after: [], mistakes: [], strengths: [],
     rating: 4, notes: "", screenshots: [],
   });
@@ -283,6 +284,7 @@ export default function AddTrade() {
               <Field label="Commission"><input value={t.commission} onChange={e=>setT({...t,commission:e.target.value})} type="number" step="any" className={inp}/></Field>
               <Field label="Swap"><input value={t.swap} onChange={e=>setT({...t,swap:e.target.value})} type="number" step="any" className={inp}/></Field>
               <Field label="Date"><input value={t.date} onChange={e=>setT({...t,date:e.target.value})} type="date" className={inp}/></Field>
+              <Field label="Time"><input value={t.entry_time} onChange={e=>setT({...t,entry_time:e.target.value})} type="time" className={inp}/></Field>
               <Field label="Session">
                 <select value={t.session} onChange={e=>setT({...t,session:e.target.value})} className={inp}>{(presets.session.length?presets.session:["London"]).map(s=><option key={s}>{s}</option>)}</select>
               </Field>
@@ -502,7 +504,8 @@ function AddTradeWorkspace({ t, setT, presets, accounts, computed, recommendedLo
               <Field label="Risk %"><input value={t.risk_percent} onChange={e=>setT({...t,risk_percent:e.target.value})} type="number" step="any" className={inp}/></Field>
               <Field label="Lot Size"><input value={t.lot_size} onChange={e=>setT({...t,lot_size:e.target.value})} type="number" step="any" className={inp}/></Field>
               <Field label="Session"><select value={t.session} onChange={e=>setT({...t,session:e.target.value})} className={inp}>{(presets.session.length?presets.session:["London"]).map(x=><option key={x}>{x}</option>)}</select></Field>
-              <Field label="Date & Time"><input value={t.date} onChange={e=>setT({...t,date:e.target.value})} type="date" className={inp}/></Field>
+              <Field label="Date"><input value={t.date} onChange={e=>setT({...t,date:e.target.value})} type="date" className={inp}/></Field>
+              <Field label="Time"><input value={t.entry_time} onChange={e=>setT({...t,entry_time:e.target.value})} type="time" className={inp}/></Field>
               <Field label="Commission"><input value={t.commission} onChange={e=>setT({...t,commission:e.target.value})} type="number" step="any" className={inp}/></Field>
               <Field label="Swap"><input value={t.swap} onChange={e=>setT({...t,swap:e.target.value})} type="number" step="any" className={inp}/></Field>
             </div>

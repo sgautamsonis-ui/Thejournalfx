@@ -1,11 +1,11 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Request, Depends, Body
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
-import os, logging, uuid, asyncio
+import os, logging, uuid, asyncio, calendar
 from pathlib import Path
 from pydantic import BaseModel, Field
 from typing import List, Optional, Any, Dict
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from collections import defaultdict
 
 from supabase import create_client, Client
@@ -764,6 +764,7 @@ async def dashboard_stats(account_id: Optional[str] = None, user=Depends(get_cur
     todays_trades = [t for t in closed if str(t.get("date", "")).startswith(today)]
     todays_pnl = round(sum((t.get("net_pnl") or 0) for t in todays_trades), 2)
     open_positions = sum(1 for t in trades if t.get("status") == "open")
+    open_positions_list = [{k: v for k, v in t.items()} for t in trades if t.get("status") == "open"]
 
     equity = []
     running = 0
@@ -780,6 +781,7 @@ async def dashboard_stats(account_id: Optional[str] = None, user=Depends(get_cur
         by_day[t.get("date", "")] += (t.get("net_pnl") or 0)
     best_day = max(by_day.items(), key=lambda x: x[1]) if by_day else (None, 0)
     worst_day = min(by_day.items(), key=lambda x: x[1]) if by_day else (None, 0)
+    daily_pnl = [{"date": d, "pnl": round(v, 2)} for d, v in sorted(by_day.items()) if d]
 
     by_session = defaultdict(lambda: {"pnl": 0, "wins": 0, "total": 0})
     for t in closed:
@@ -818,15 +820,216 @@ async def dashboard_stats(account_id: Optional[str] = None, user=Depends(get_cur
     ]
     best_hour = max(hourly_performance, key=lambda x: x["pnl"]) if hourly_performance else None
 
+    # Expectancy & average R
+    win_prob = (len(wins) / len(closed)) if closed else 0
+    loss_prob = (len(losses) / len(closed)) if closed else 0
+    expectancy = round((win_prob * avg_win) + (loss_prob * avg_loss), 2)
+    r_values = [t.get("r_multiple") for t in closed if t.get("r_multiple") is not None]
+    avg_rr = round(sum(r_values) / len(r_values), 2) if r_values else 0
+
+    # Daily candles (open/high/low/close of running equity, per day) — used for
+    # the candlestick "Performance Overview" chart on the dashboard.
+    equity_candles = []
+    running_c = 0.0
+    day_order = []
+    day_map = {}
+    for t in closed:
+        d = t.get("date") or ""
+        if d not in day_map:
+            day_map[d] = {"open": running_c, "high": running_c, "low": running_c, "close": running_c, "trades": 0}
+            day_order.append(d)
+        running_c += (t.get("net_pnl") or 0)
+        day_map[d]["close"] = running_c
+        day_map[d]["high"] = max(day_map[d]["high"], running_c)
+        day_map[d]["low"] = min(day_map[d]["low"], running_c)
+        day_map[d]["trades"] += 1
+    for d in day_order:
+        v = day_map[d]
+        equity_candles.append({
+            "date": d, "open": round(v["open"], 2), "high": round(v["high"], 2),
+            "low": round(v["low"], 2), "close": round(v["close"], 2), "trades": v["trades"],
+        })
+
+    # Daily / weekly drawdown (peak-to-trough of running equity, restricted to
+    # today / the last 7 days) — surfaced in the sidebar so overtrading is visible fast.
+    def drawdown_since(cutoff_date):
+        pts = [pt["equity"] for pt in equity if str(pt["date"] or "") >= cutoff_date]
+        if not pts:
+            return 0.0
+        peak_v = pts[0]
+        dd = 0.0
+        for v in pts:
+            peak_v = max(peak_v, v)
+            dd = min(dd, v - peak_v)
+        return round(dd, 2)
+
+    today_dt = datetime.now(timezone.utc).date()
+    week_start = (today_dt - timedelta(days=today_dt.weekday())).isoformat()
+    daily_drawdown = drawdown_since(today)
+    weekly_drawdown = drawdown_since(week_start)
+
+    # Monthly / weekly / daily performance buckets (for the "Performance Chart" widget)
+    def bucket_key(date_str, mode):
+        try:
+            dt = datetime.fromisoformat(str(date_str)[:10])
+        except ValueError:
+            return str(date_str)
+        if mode == "daily":
+            return dt.strftime("%d %b")
+        if mode == "weekly":
+            wk = dt - timedelta(days=dt.weekday())
+            return wk.strftime("%d %b")
+        return dt.strftime("%b %Y")
+
+    monthly_performance = []
+    for mode in ("monthly",):
+        buckets = defaultdict(float)
+        for t in closed:
+            buckets[bucket_key(t.get("date"), mode)] += (t.get("net_pnl") or 0)
+        monthly_performance = [{"period": k, "pnl": round(v, 2)} for k, v in buckets.items()]
+
+    # Strategy performance
+    by_strategy = defaultdict(lambda: {"pnl": 0.0, "wins": 0, "total": 0, "gross_win": 0.0, "gross_loss": 0.0})
+    for t in closed:
+        s = t.get("strategy") or "Unnamed"
+        d = by_strategy[s]
+        pnl = t.get("net_pnl") or 0
+        d["pnl"] += pnl
+        d["total"] += 1
+        if pnl > 0:
+            d["wins"] += 1
+            d["gross_win"] += pnl
+        elif pnl < 0:
+            d["gross_loss"] += abs(pnl)
+    strategies = [
+        {
+            "id": s, "name": s, "trades": v["total"], "pnl": round(v["pnl"], 2),
+            "win_rate": round(v["wins"] / v["total"] * 100, 1) if v["total"] else 0,
+            "profit_factor": round(v["gross_win"] / v["gross_loss"], 2) if v["gross_loss"] else (v["gross_win"] and 999 or 0),
+        }
+        for s, v in by_strategy.items()
+    ]
+    strategies.sort(key=lambda x: -x["pnl"])
+
+    # Long vs short direction stats
+    longs = [t for t in closed if t.get("direction") == "long"]
+    shorts = [t for t in closed if t.get("direction") == "short"]
+    def dir_stats(lst):
+        w = [t for t in lst if (t.get("net_pnl") or 0) > 0]
+        return {
+            "count": len(lst),
+            "pnl": round(sum((t.get("net_pnl") or 0) for t in lst), 2),
+            "wr": round(len(w) / len(lst) * 100, 1) if lst else 0,
+        }
+    ls, ss = dir_stats(longs), dir_stats(shorts)
+    direction_stats = {
+        "long_count": ls["count"], "long_pnl": ls["pnl"], "long_wr": ls["wr"],
+        "short_count": ss["count"], "short_pnl": ss["pnl"], "short_wr": ss["wr"],
+    } if closed else None
+
+    # Win rate trend (rolling win rate as trades accumulate, sampled per day)
+    winrate_trend = []
+    running_wins = 0
+    running_total = 0
+    for i, t in enumerate(closed):
+        running_total += 1
+        if (t.get("net_pnl") or 0) > 0:
+            running_wins += 1
+        winrate_trend.append({"date": t.get("date"), "winrate": round(running_wins / running_total * 100, 1)})
+
+    # P&L distribution buckets
+    def pnl_bucket(v):
+        if v <= -200: return "< -$200"
+        if v <= -50: return "-$200 to -$50"
+        if v < 0: return "-$50 to $0"
+        if v == 0: return "$0"
+        if v <= 50: return "$0 to $50"
+        if v <= 200: return "$50 to $200"
+        return "> $200"
+    bucket_order = ["< -$200", "-$200 to -$50", "-$50 to $0", "$0", "$0 to $50", "$50 to $200", "> $200"]
+    pnl_buckets = defaultdict(int)
+    for t in closed:
+        pnl_buckets[pnl_bucket(t.get("net_pnl") or 0)] += 1
+    pnl_distribution = [{"range": b, "count": pnl_buckets[b]} for b in bucket_order if pnl_buckets[b] > 0]
+
+    # Streaks
+    current_streak = 0
+    best_win_streak = 0
+    worst_loss_streak = 0
+    cur_win_run = 0
+    cur_loss_run = 0
+    for t in closed:
+        pnl = t.get("net_pnl") or 0
+        if pnl > 0:
+            cur_win_run += 1
+            cur_loss_run = 0
+            best_win_streak = max(best_win_streak, cur_win_run)
+        elif pnl < 0:
+            cur_loss_run += 1
+            cur_win_run = 0
+            worst_loss_streak = max(worst_loss_streak, cur_loss_run)
+        else:
+            cur_win_run = 0
+            cur_loss_run = 0
+    current_winning_streak = cur_win_run
+    current_losing_streak = cur_loss_run
+
+    # Mood vs performance
+    mood_map = defaultdict(lambda: {"pnl": 0.0, "count": 0, "wins": 0, "r_sum": 0.0, "r_count": 0})
+    for t in closed:
+        moods = set((t.get("mood_before") or []) + (t.get("mood_after") or []))
+        pnl = t.get("net_pnl") or 0
+        for m in moods:
+            d = mood_map[m]
+            d["pnl"] += pnl
+            d["count"] += 1
+            if pnl > 0: d["wins"] += 1
+            if t.get("r_multiple") is not None:
+                d["r_sum"] += t["r_multiple"]; d["r_count"] += 1
+    mood_analytics = [
+        {
+            "mood": m, "count": v["count"], "avg_pnl": round(v["pnl"] / v["count"], 2) if v["count"] else 0,
+            "wr": round(v["wins"] / v["count"] * 100, 1) if v["count"] else 0,
+            "avg_r": round(v["r_sum"] / v["r_count"], 2) if v["r_count"] else 0,
+        }
+        for m, v in mood_map.items()
+    ]
+    mood_analytics.sort(key=lambda x: -x["avg_pnl"])
+
+    # Trading calendar (current month, EVERY day 1..last-day so the grid always
+    # renders — days without trades just show as neutral cells)
+    cal_map = defaultdict(lambda: {"pnl": 0.0, "trades": 0})
+    for t in closed:
+        d = str(t.get("date") or "")[:10]
+        if d:
+            cal_map[d]["pnl"] += (t.get("net_pnl") or 0)
+            cal_map[d]["trades"] += 1
+    year_, month_ = today_dt.year, today_dt.month
+    days_in_month = calendar.monthrange(year_, month_)[1]
+    calendar_days = []
+    for day_num in range(1, days_in_month + 1):
+        d = f"{year_:04d}-{month_:02d}-{day_num:02d}"
+        v = cal_map.get(d, {"pnl": 0.0, "trades": 0})
+        calendar_days.append({"date": d, "pnl": round(v["pnl"], 2), "trades": v["trades"]})
+
     return {
         "total_trades": total, "closed_trades": len(closed), "wins": len(wins), "losses": len(losses),
         "win_rate": win_rate, "profit_factor": profit_factor, "total_pnl": total_pnl,
-        "todays_pnl": todays_pnl, "todays_trades": len(todays_trades), "open_positions": open_positions,
+        "todays_pnl": todays_pnl, "todays_trades": len(todays_trades),
+        "open_positions": open_positions, "open_positions_list": open_positions_list,
         "avg_win": avg_win, "avg_loss": avg_loss, "max_drawdown": round(max_dd, 2),
+        "daily_drawdown": daily_drawdown, "weekly_drawdown": weekly_drawdown,
+        "expectancy": expectancy, "avg_rr": avg_rr,
         "best_day": {"date": best_day[0], "pnl": round(best_day[1], 2)} if best_day[0] else None,
         "worst_day": {"date": worst_day[0], "pnl": round(worst_day[1], 2)} if worst_day[0] else None,
-        "sessions": sessions_perf, "equity_curve": equity[-90:],
+        "sessions": sessions_perf, "equity_curve": equity[-90:], "equity_candles": equity_candles[-60:],
         "hourly_performance": hourly_performance, "best_hour": best_hour,
+        "monthly_performance": monthly_performance, "daily_pnl": daily_pnl,
+        "strategies": strategies, "direction_stats": direction_stats,
+        "winrate_trend": winrate_trend, "pnl_distribution": pnl_distribution,
+        "current_winning_streak": current_winning_streak, "best_winning_streak": best_win_streak,
+        "current_losing_streak": current_losing_streak, "worst_losing_streak": worst_loss_streak,
+        "mood_analytics": mood_analytics, "calendar": calendar_days,
         "recent_trades": trades[-5:][::-1] if trades else [],
     }
 

@@ -311,7 +311,7 @@ function ViewBlock({ t }) {
   return (
     <>
       <div className="grid grid-cols-2 gap-3">
-        {[["Direction",t.direction],["Status",t.status],["Session",t.session],["Strategy",t.strategy],["Entry",t.entry_price],["Exit",t.exit_price||"—"],["SL",t.stop_loss||"—"],["TP",t.take_profit||"—"],["Lot",t.lot_size],["Risk %",t.risk_percent],["R Multiple",t.r_multiple||"—"],["Net P&L",`${(t.net_pnl||0)>=0?"+":""}$${(t.net_pnl||0).toFixed(2)}`]].map(([k,v]) => (
+        {[["Direction",t.direction],["Status",t.status],["Session",t.session],["Strategy",t.strategy],["Entry",t.entry_price],["Exit",t.exit_price||"—"],["SL",t.stop_loss||"—"],["TP",t.take_profit||"—"],["Lot",t.lot_size],["Risk %",t.risk_percent],["R Multiple",t.r_multiple||"—"],["Net P&L",`${(t.net_pnl||0)>=0?"+":""}$${(t.net_pnl||0).toFixed(2)}`],["Time",t.entry_time||"—"]].map(([k,v]) => (
           <div key={k} className="p-3 rounded-xl bg-[#F6F6FB]"><div className="text-[11px] text-[#6D6D82]">{k}</div><div className="font-semibold tjfx-mono">{v}</div></div>
         ))}
       </div>
@@ -374,6 +374,7 @@ function EditForm({ edit, setEdit, toggleEdit, computed, presets }) {
         <F label="Commission"><input className={inp} type="number" step="any" value={edit.commission||""} onChange={e=>setEdit({...edit,commission:e.target.value})}/></F>
         <F label="Swap"><input className={inp} type="number" step="any" value={edit.swap||""} onChange={e=>setEdit({...edit,swap:e.target.value})}/></F>
         <F label="Date"><input className={inp} type="date" value={edit.date||""} onChange={e=>setEdit({...edit,date:e.target.value})}/></F>
+        <F label="Time"><input className={inp} type="time" value={edit.entry_time||""} onChange={e=>setEdit({...edit,entry_time:e.target.value})}/></F>
         <F label="Status">
           <select value={edit.status} onChange={e=>setEdit({...edit,status:e.target.value})} className={inp}><option value="closed">closed</option><option value="open">open</option><option value="cancelled">cancelled</option></select>
         </F>
