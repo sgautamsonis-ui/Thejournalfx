@@ -38,6 +38,11 @@
 
 * { border-color: hsl(var(--border)); }
 
+/* Base scale kept slightly smaller across the whole app (like a zoomed-out
+   view). Every Tailwind size utility is rem-based, so this one change scales
+   the entire UI consistently without any font family/style ever changing. */
+html { font-size: 15px; }
+
 body {
   margin: 0;
   font-family: 'Satoshi', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -49,8 +54,13 @@ body {
 
 h1, h2, h3, h4, h5 { font-family: 'Cabinet Grotesk', sans-serif; letter-spacing: -0.02em; }
 
-.font-mono, .tjfx-mono { font-family: 'JetBrains Mono', monospace; }
+.font-mono, .tjfx-mono { font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1, "zero" 1; }
 .font-display { font-family: 'Cabinet Grotesk', sans-serif; letter-spacing: -0.02em; }
+
+/* Every number on the site (balances, P&L, stats, tables) uses one simple,
+   consistent numeral style so figures never look mismatched from section
+   to section. */
+.tjfx-num { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1, "zero" 1; }
 
 .tjfx-card {
   background: #fff;

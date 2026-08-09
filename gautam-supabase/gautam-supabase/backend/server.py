@@ -794,6 +794,30 @@ async def dashboard_stats(account_id: Optional[str] = None, user=Depends(get_cur
     ]
     sessions_perf.sort(key=lambda x: -x["pnl"])
 
+    # Performance by hour of day (entry_time is stored as "HH:MM" local/IST time),
+    # so a trader can see which hour of the day works best for them.
+    by_hour = defaultdict(lambda: {"pnl": 0.0, "wins": 0, "total": 0})
+    for t in closed:
+        et = t.get("entry_time")
+        if et and isinstance(et, str) and ":" in et:
+            try:
+                hr = int(et.split(":")[0]) % 24
+            except ValueError:
+                continue
+            by_hour[hr]["pnl"] += (t.get("net_pnl") or 0)
+            by_hour[hr]["total"] += 1
+            if (t.get("net_pnl") or 0) > 0:
+                by_hour[hr]["wins"] += 1
+    hourly_performance = [
+        {
+            "hour": h, "label": f"{h:02d}:00",
+            "pnl": round(v["pnl"], 2), "trades": v["total"],
+            "win_rate": round(v["wins"] / v["total"] * 100, 1) if v["total"] else 0,
+        }
+        for h, v in sorted(by_hour.items())
+    ]
+    best_hour = max(hourly_performance, key=lambda x: x["pnl"]) if hourly_performance else None
+
     return {
         "total_trades": total, "closed_trades": len(closed), "wins": len(wins), "losses": len(losses),
         "win_rate": win_rate, "profit_factor": profit_factor, "total_pnl": total_pnl,
@@ -802,6 +826,7 @@ async def dashboard_stats(account_id: Optional[str] = None, user=Depends(get_cur
         "best_day": {"date": best_day[0], "pnl": round(best_day[1], 2)} if best_day[0] else None,
         "worst_day": {"date": worst_day[0], "pnl": round(worst_day[1], 2)} if worst_day[0] else None,
         "sessions": sessions_perf, "equity_curve": equity[-90:],
+        "hourly_performance": hourly_performance, "best_hour": best_hour,
         "recent_trades": trades[-5:][::-1] if trades else [],
     }
 

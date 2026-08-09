@@ -12,17 +12,17 @@ export default function AccountSwitcher({ compact = false }) {
   return (
     <div className="relative" data-testid="account-switcher">
       <button onClick={()=>setOpen(!open)} data-testid="account-switcher-btn"
-        className={`flex items-center gap-2 rounded-xl border border-[#E8E8F1] bg-white hover:border-[#7C3AED] text-sm ${compact?"h-9 px-3":"h-11 px-4"}`}>
-        <div className={`rounded-lg bg-[#F3E8FF] flex items-center justify-center ${compact?"w-6 h-6":"w-8 h-8"}`}>
+        className={`w-full flex items-center gap-2 rounded-xl border border-[#E8E8F1] bg-white hover:border-[#7C3AED] text-sm ${compact?"h-9 px-3":"h-11 px-3"}`}>
+        <div className={`shrink-0 rounded-lg bg-[#F3E8FF] flex items-center justify-center ${compact?"w-6 h-6":"w-8 h-8"}`}>
           {activeId==="all" ? <Layers className="w-3.5 h-3.5 text-[#7C3AED]"/> : <Wallet className="w-3.5 h-3.5 text-[#7C3AED]"/>}
         </div>
-        <div className="text-left">
-          <div className="font-semibold leading-tight">{activeId==="all"?"All Accounts":active?.name||"—"}</div>
-          <div className="text-[10px] text-[#6D6D82] tjfx-mono leading-tight">
+        <div className="text-left min-w-0 flex-1">
+          <div className="font-semibold leading-tight truncate">{activeId==="all"?"All Accounts":active?.name||"—"}</div>
+          <div className="text-[10px] text-[#6D6D82] tjfx-mono tjfx-num leading-tight truncate">
             {activeId==="all" ? `${accounts.length} accounts · $${totalBalance.toFixed(2)}` : `${active?.account_type||""} · $${(active?.balance||0).toFixed(2)}`}
           </div>
         </div>
-        <ChevronDown className="w-4 h-4 text-[#6D6D82]"/>
+        <ChevronDown className="w-4 h-4 text-[#6D6D82] shrink-0"/>
       </button>
 
       {open && (

@@ -9,7 +9,7 @@ import {
 import { 
   TrendingUp, Target, Activity, Wallet, Sparkles, Settings2, Eye, EyeOff, 
   ArrowUp, ArrowDown, Trophy, Calendar, Flame, PiggyBank, GripVertical,
-  ChevronDown, AlertCircle, CheckCircle2
+  ChevronDown, ChevronLeft, ChevronRight, AlertCircle, CheckCircle2
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
@@ -62,11 +62,12 @@ const SIZE_CLASS = {
   full: "col-span-12"
 };
 
-const NEXT_SIZE = { sm: "md", md: "lg", lg: "full", full: "sm" };
-const SIZE_LABEL = { sm: "S", md: "M", lg: "L", full: "XL" };
+const SIZE_ORDER = ["sm", "md", "lg", "full"];
+const NEXT_SIZE = { sm: "md", md: "lg", lg: "full", full: "full" };
+const PREV_SIZE = { sm: "sm", md: "sm", lg: "md", full: "lg" };
 
 // =============== SORTABLE CARD WRAPPER ===============
-function SortableCard({ id, size, customize, onCycleSize, onToggleVisible, children, testid }) {
+function SortableCard({ id, size, customize, onGrow, onShrink, onToggleVisible, children, testid }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -87,13 +88,24 @@ function SortableCard({ id, size, customize, onCycleSize, onToggleVisible, child
           >
             <GripVertical className="w-4 h-4"/>
           </button>
-          <button 
-            onClick={() => onCycleSize(id)} 
-            className="h-8 px-2 rounded-full bg-white border border-[#E8E8F1] text-xs font-bold text-[#7C3AED] shadow hover:border-[#7C3AED]" 
-            title="Change size"
-          >
-            {SIZE_LABEL[size||"lg"]}
-          </button>
+          <div className="h-8 rounded-full bg-white border border-[#E8E8F1] shadow flex items-center overflow-hidden">
+            <button
+              onClick={() => onShrink(id)}
+              disabled={size === "sm"}
+              className="h-8 w-7 flex items-center justify-center text-[#7C3AED] hover:bg-[#F3E8FF] disabled:opacity-30 disabled:hover:bg-transparent"
+              title="Smaller"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => onGrow(id)}
+              disabled={size === "full"}
+              className="h-8 w-7 flex items-center justify-center text-[#7C3AED] hover:bg-[#F3E8FF] disabled:opacity-30 disabled:hover:bg-transparent border-l border-[#E8E8F1]"
+              title="Bigger"
+            >
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
           <button 
             onClick={() => onToggleVisible(id)}
             className="h-8 w-8 rounded-full bg-white border border-[#E8E8F1] flex items-center justify-center text-[#7C3AED] shadow hover:border-[#7C3AED]"
@@ -112,7 +124,7 @@ function SortableCard({ id, size, customize, onCycleSize, onToggleVisible, child
 
 // =============== CARD COMPONENT ===============
 const Card = ({ children, className = "", ...props }) => (
-  <div className={`tjfx-card p-6 tjfx-card-hover h-full ${className}`} {...props}>
+  <div className={`tjfx-card p-5 tjfx-card-hover h-full ${className}`} {...props}>
     {children}
   </div>
 );
@@ -120,14 +132,14 @@ const Card = ({ children, className = "", ...props }) => (
 // =============== STAT CARD ===============
 function StatCard({ label, value, change, icon: Icon, color = "text-[#16151F]", testid }) {
   return (
-    <div className="tjfx-card p-5 tjfx-card-hover" data-testid={testid}>
-      <div className="flex items-start justify-between mb-3">
-        <div className="text-[13px] text-[#6D6D82] font-medium">{label}</div>
-        <div className="w-8 h-8 rounded-xl bg-[#F3E8FF] flex items-center justify-center">
-          <Icon className="w-4 h-4 text-[#7C3AED]"/>
+    <div className="tjfx-card p-4 tjfx-card-hover" data-testid={testid}>
+      <div className="flex items-start justify-between mb-2">
+        <div className="text-[12px] text-[#6D6D82] font-medium">{label}</div>
+        <div className="w-7 h-7 rounded-lg bg-[#F3E8FF] flex items-center justify-center">
+          <Icon className="w-3.5 h-3.5 text-[#7C3AED]"/>
         </div>
       </div>
-      <div className={`tjfx-mono text-2xl font-semibold ${color}`}>{value}</div>
+      <div className={`tjfx-mono text-xl font-semibold tabular-nums ${color}`}>{value}</div>
       {change !== undefined && (
         <div className={`text-xs mt-2 ${change >= 0 ? "text-emerald-600" : "text-red-500"}`}>
           {change >= 0 ? "↑" : "↓"} {Math.abs(change).toFixed(2)}%
@@ -140,11 +152,11 @@ function StatCard({ label, value, change, icon: Icon, color = "text-[#16151F]", 
 // =============== EMPTY STATE ===============
 function EmptyState({ message, icon: Icon = PiggyBank }) {
   return (
-    <div className="h-full flex items-center justify-center text-center px-6 py-12">
+    <div className="h-full flex items-center justify-center text-center px-6 py-6">
       <div>
-        <Icon className="w-8 h-8 text-[#7C3AED] mx-auto mb-3 opacity-50"/>
-        <div className="text-sm text-[#6D6D82]">{message}</div>
-        <Link to="/add-trade" className="mt-3 inline-block text-sm text-[#7C3AED] font-semibold hover:underline">
+        <Icon className="w-6 h-6 text-[#7C3AED] mx-auto mb-2 opacity-50"/>
+        <div className="text-xs text-[#6D6D82]">{message}</div>
+        <Link to="/add-trade" className="mt-2 inline-block text-xs text-[#7C3AED] font-semibold hover:underline">
           + Add trade →
         </Link>
       </div>
@@ -186,8 +198,11 @@ export default function Dashboard() {
     }
   };
 
-  const cycleSize = (id) => 
+  const growSize = (id) => 
     setLayout(l => l.map(x => x.id === id ? { ...x, size: NEXT_SIZE[x.size || "lg"] } : x));
+
+  const shrinkSize = (id) => 
+    setLayout(l => l.map(x => x.id === id ? { ...x, size: PREV_SIZE[x.size || "lg"] } : x));
   
   const toggleVisible = (id) => 
     setLayout(l => l.map(x => x.id === id ? { ...x, visible: !x.visible } : x));
@@ -198,39 +213,26 @@ export default function Dashboard() {
   const widgetComponents = {
     // Header
     header: (
-      <Card className="bg-gradient-to-r from-[#F3E8FF] to-white mb-6">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex-1">
-            <div className="text-sm text-[#7C3AED] font-semibold uppercase tracking-wide mb-2">
-              Welcome back, {user?.name || "Trader"} 👋
-            </div>
-            <div className="font-display text-2xl font-bold text-[#16151F] mb-1">
-              Discipline today, freedom tomorrow.
-            </div>
-            <p className="text-sm text-[#6D6D82] mt-3">
-              {activeId === "all" 
-                ? `Viewing all ${accounts.length} account${accounts.length !== 1 ? "s" : ""}`
-                : `Viewing ${active?.name} • $${(active?.balance || 0).toFixed(2)}`
-              }
-            </p>
+      <div className="flex items-center justify-between gap-4 mb-2">
+        <div className="min-w-0 leading-tight">
+          <div className="text-sm font-semibold text-[#16151F] truncate">
+            Welcome back, {user?.name || "Trader"} 👋
           </div>
-          <div className="flex items-center gap-2">
-            <div className="text-right">
-              <div className="text-xs text-[#6D6D82] mb-1">Date Range</div>
-              <select 
-                className="h-10 px-3 rounded-lg border border-[#E8E8F1] text-sm font-medium bg-white"
-                onChange={(e) => setTimeframe(e.target.value)}
-                value={timeframe}
-              >
-                <option value="today">Today</option>
-                <option value="week">This Week</option>
-                <option value="month">This Month</option>
-                <option value="all">All Time</option>
-              </select>
-            </div>
+          <div className="text-xs text-[#6D6D82] truncate">
+            Discipline today, freedom tomorrow.
           </div>
         </div>
-      </Card>
+        <select 
+          className="h-8 px-2.5 rounded-lg border border-[#E8E8F1] text-xs font-medium bg-white shrink-0"
+          onChange={(e) => setTimeframe(e.target.value)}
+          value={timeframe}
+        >
+          <option value="today">Today</option>
+          <option value="week">This Week</option>
+          <option value="month">This Month</option>
+          <option value="all">All Time</option>
+        </select>
+      </div>
     ),
 
     // KPI Cards (6 cards)
@@ -281,53 +283,105 @@ export default function Dashboard() {
     // Performance Overview
     performance: (
       <Card data-testid="performance-overview">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-1">
           <h3 className="font-display text-lg font-bold">Performance Overview</h3>
           <select 
             value={timeframe}
             onChange={(e) => setTimeframe(e.target.value)}
             className="h-9 px-3 rounded-lg border border-[#E8E8F1] text-sm font-medium bg-white"
           >
-            <option value="hourly">Hourly</option>
+            <option value="hourly">Hourly (best time of day)</option>
             <option value="daily">Daily</option>
             <option value="weekly">Weekly</option>
             <option value="monthly">Monthly</option>
           </select>
         </div>
-        <div className="h-[300px]">
-          {stats?.equity_curve && stats.equity_curve.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={stats.equity_curve} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="perfGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#7C3AED" stopOpacity={0.35}/>
-                    <stop offset="100%" stopColor="#7C3AED" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E8E8F1" />
-                <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#A1A1AA" }} />
-                <YAxis tick={{ fontSize: 11, fill: "#A1A1AA" }} />
-                <Tooltip 
-                  contentStyle={{ 
-                    borderRadius: 12, 
-                    border: "1px solid #E8E8F1",
-                    backgroundColor: "#fff"
-                  }}
-                  formatter={(value) => `$${value.toFixed(2)}`}
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="equity" 
-                  stroke="#7C3AED" 
-                  strokeWidth={2}
-                  fill="url(#perfGrad)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          ) : (
-            <EmptyState message="No performance data yet. Add some trades to see your progress." />
-          )}
-        </div>
+
+        {timeframe === "hourly" ? (
+          <>
+            <p className="text-xs text-[#6D6D82] mb-4">
+              {stats?.best_hour
+                ? <>Your best entry hour is <span className="font-semibold text-[#7C3AED] tjfx-mono">{stats.best_hour.label}</span> with <span className={`tjfx-mono font-semibold ${stats.best_hour.pnl >= 0 ? "text-emerald-600" : "text-red-500"}`}>{stats.best_hour.pnl >= 0 ? "+" : ""}${stats.best_hour.pnl.toFixed(2)}</span> total P&amp;L.</>
+                : "Log an entry time on your trades to see which hour of the day works best for you."}
+            </p>
+            <div className="h-[280px]">
+              {stats?.hourly_performance && stats.hourly_performance.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={stats.hourly_performance} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#E8E8F1" vertical={false} />
+                    <XAxis 
+                      dataKey="label" 
+                      tick={{ fontSize: 11, fill: "#A1A1AA" }} 
+                      interval={0}
+                      angle={-45}
+                      textAnchor="end"
+                      height={50}
+                    />
+                    <YAxis tick={{ fontSize: 11, fill: "#A1A1AA" }} />
+                    <Tooltip 
+                      contentStyle={{ borderRadius: 12, border: "1px solid #E8E8F1", backgroundColor: "#fff" }}
+                      formatter={(value, name, props) => [`$${value.toFixed(2)} · ${props.payload.trades} trade(s) · ${props.payload.win_rate}% WR`, "P&L"]}
+                    />
+                    <Bar dataKey="pnl" radius={[6, 6, 0, 0]}>
+                      {stats.hourly_performance.map((entry, i) => (
+                        <Cell key={i} fill={entry.pnl >= 0 ? "#10B981" : "#EF4444"} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <EmptyState message="No entry-time data yet. Add entry time on your trades to find your best trading hour." />
+              )}
+            </div>
+          </>
+        ) : (
+          <div className="h-[300px] mt-4">
+            {stats?.equity_curve && stats.equity_curve.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={stats.equity_curve} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="perfGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#7C3AED" stopOpacity={0.35}/>
+                      <stop offset="100%" stopColor="#7C3AED" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E8E8F1" />
+                  <XAxis 
+                    dataKey="date" 
+                    tick={{ fontSize: 11, fill: "#A1A1AA" }} 
+                    tickFormatter={(d) => {
+                      const dt = new Date(d);
+                      return isNaN(dt) ? d : dt.toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
+                    }}
+                    minTickGap={24}
+                  />
+                  <YAxis tick={{ fontSize: 11, fill: "#A1A1AA" }} />
+                  <Tooltip 
+                    contentStyle={{ 
+                      borderRadius: 12, 
+                      border: "1px solid #E8E8F1",
+                      backgroundColor: "#fff"
+                    }}
+                    labelFormatter={(d) => {
+                      const dt = new Date(d);
+                      return isNaN(dt) ? d : dt.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+                    }}
+                    formatter={(value) => `$${value.toFixed(2)}`}
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="equity" 
+                    stroke="#7C3AED" 
+                    strokeWidth={2}
+                    fill="url(#perfGrad)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <EmptyState message="No performance data yet. Add some trades to see your progress." />
+            )}
+          </div>
+        )}
       </Card>
     ),
 
@@ -870,10 +924,10 @@ export default function Dashboard() {
   const visibleLayout = layout.filter(x => x.visible);
 
   return (
-    <div className="p-8 max-w-[1800px] mx-auto" data-testid="dashboard-page">
+    <div className="p-6 max-w-[1800px] mx-auto" data-testid="dashboard-page">
       {/* Customize Panel */}
       {customize && (
-        <div className="tjfx-card p-4 mb-6" data-testid="customize-panel">
+        <div className="tjfx-card p-4 mb-5" data-testid="customize-panel">
           <div className="text-sm text-[#6D6D82] mb-4">
             <strong className="text-[#16151F]">Drag widgets</strong> to reorder. 
             Use buttons to resize and hide/show widgets.
@@ -907,18 +961,19 @@ export default function Dashboard() {
       )}
 
       {/* Customize Button */}
-      <div className="flex items-center justify-end mb-6">
+      <div className="flex items-center justify-end mb-4">
         <button
           onClick={() => setCustomize(!customize)}
           data-testid="customize-btn"
-          className={`h-10 px-4 rounded-xl text-sm font-medium flex items-center gap-2 transition ${
+          title={customize ? "Done customizing" : "Customize dashboard"}
+          aria-label={customize ? "Done customizing" : "Customize dashboard"}
+          className={`h-9 w-9 rounded-xl flex items-center justify-center transition ${
             customize
               ? "bg-[#7C3AED] text-white"
-              : "border border-[#E8E8F1] text-[#16151F] hover:border-[#7C3AED]"
+              : "border border-[#E8E8F1] text-[#16151F] hover:border-[#7C3AED] hover:text-[#7C3AED]"
           }`}
         >
           <Settings2 className="w-4 h-4" />
-          {customize ? "Done Customizing" : "✏️ Customize"}
         </button>
       </div>
 
@@ -928,14 +983,15 @@ export default function Dashboard() {
           items={visibleLayout.map(x => x.id)} 
           strategy={rectSortingStrategy}
         >
-          <div className="grid grid-cols-12 auto-rows-max gap-6">
+          <div className="grid grid-cols-12 auto-rows-max gap-4">
             {visibleLayout.map((item) => (
               <SortableCard
                 key={item.id}
                 id={item.id}
                 size={item.size || "lg"}
                 customize={customize}
-                onCycleSize={cycleSize}
+                onGrow={growSize}
+                onShrink={shrinkSize}
                 onToggleVisible={toggleVisible}
                 testid={`widget-${item.id}`}
               >
