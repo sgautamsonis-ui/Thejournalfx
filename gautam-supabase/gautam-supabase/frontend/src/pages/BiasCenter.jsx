@@ -1,7 +1,60 @@
 import React, { useEffect, useState } from "react";
 import { biasApi, aiApi, prefsApi } from "@/lib/api";
-import { Save, Sparkles, TrendingUp, TrendingDown, Minus, Trash2, Upload, Clipboard } from "lucide-react";
+import { Save, Sparkles, TrendingUp, TrendingDown, Minus, Trash2, Upload, Clipboard, X } from "lucide-react";
 import { toast } from "sonner";
+
+const inp = "w-full h-10 px-3 rounded-xl border border-[#E8E8F1] focus:border-[#7C3AED] focus:ring-2 focus:ring-[#7C3AED]/20 outline-none text-sm bg-white tjfx-mono";
+const Field = ({ label, children }) => (
+  <div>
+    <label className="block text-[12px] font-medium text-[#6D6D82] mb-1.5">{label}</label>
+    {children}
+  </div>
+);
+
+// Same pattern as Add Trade's "HTF Points of Interest" / "Entry Confirmations":
+// pick a timeframe + a type, hit Add, it becomes a removable chip below.
+function PairedPresetBuilder({ title, description, timeframeLabel, typeLabel, timeframes, types, draft, onDraftChange, items, onAdd, onRemove, testid }) {
+  return (
+    <div className="tjfx-card p-6">
+      <div className="flex flex-wrap items-baseline justify-between gap-2 mb-4">
+        <div>
+          <h3 className="font-display text-lg font-bold">{title}</h3>
+          {description && <p className="text-xs text-[#6D6D82] mt-1">{description}</p>}
+        </div>
+        <span className="text-[11px] text-[#A1A1AA]">Manage options in Settings</span>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-2">
+        <Field label={timeframeLabel}>
+          <select value={draft.timeframe} onChange={e=>onDraftChange({...draft,timeframe:e.target.value})} className={inp} data-testid={`${testid}-timeframe`}>
+            <option value="">Select timeframe...</option>
+            {timeframes.map(value => <option key={value} value={value}>{value}</option>)}
+          </select>
+        </Field>
+        <Field label={typeLabel}>
+          <select value={draft.type} onChange={e=>onDraftChange({...draft,type:e.target.value})} className={inp} data-testid={`${testid}-type`}>
+            <option value="">Select type...</option>
+            {types.map(value => <option key={value} value={value}>{value}</option>)}
+          </select>
+        </Field>
+        <div className="flex items-end">
+          <button type="button" onClick={onAdd} data-testid={`${testid}-add`} className="h-10 w-full sm:w-auto px-4 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-sm font-semibold">+ Add</button>
+        </div>
+      </div>
+      {items.length > 0 ? (
+        <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-[#F0F0F5]">
+          {items.map(value => (
+            <span key={value} className="chip active inline-flex items-center gap-1.5 pr-1">
+              {value}
+              <button type="button" onClick={()=>onRemove(value)} aria-label={`Remove ${value}`} className="w-5 h-5 rounded-full hover:bg-white/60 flex items-center justify-center"><X className="w-3 h-3"/></button>
+            </span>
+          ))}
+        </div>
+      ) : (
+        <div className="mt-4 pt-4 border-t border-[#F0F0F5] text-sm text-[#6D6D82]">No POIs added yet.</div>
+      )}
+    </div>
+  );
+}
 
 const MAX_IMAGES = 15;
 
@@ -15,11 +68,22 @@ const emptyBias = (type) => ({
 function currentPeriodStart(type) {
   const d = new Date();
   if (type==="daily") return d.toISOString().slice(0,10);
-  // weekly - Monday start
-  const day = d.getDay();
-  const diff = (day===0?-6:1) - day;
-  d.setDate(d.getDate()+diff);
+  // weekly - Sunday start (Sunday to Saturday week)
+  const day = d.getDay(); // 0 = Sunday
+  d.setDate(d.getDate() - day);
   return d.toISOString().slice(0,10);
+}
+
+function periodEndFromStart(startStr) {
+  const d = new Date(startStr + "T00:00:00");
+  d.setDate(d.getDate() + 6);
+  return d.toISOString().slice(0,10);
+}
+
+function formatDisplayDate(iso) {
+  if (!iso) return "";
+  const d = new Date(iso + "T00:00:00");
+  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 export default function BiasCenter() {
@@ -27,13 +91,17 @@ export default function BiasCenter() {
   const [b, setB] = useState(emptyBias("weekly"));
   const [history, setHistory] = useState([]);
   const [aiLoading, setAiLoading] = useState(false);
-  const [htfPresets, setHtfPresets] = useState([]);
+  const [htfTimeframes, setHtfTimeframes] = useState([]);
+  const [htfPoiTypes, setHtfPoiTypes] = useState([]);
+  const [poiDraft, setPoiDraft] = useState({ timeframe: "", type: "" });
   const [sessionPresets, setSessionPresets] = useState([]);
   const [keyLevelPresets, setKeyLevelPresets] = useState([]);
+  const [keyLevelDraft, setKeyLevelDraft] = useState("");
 
   useEffect(() => {
-    prefsApi.listMany(["htf_poi","session"]).then(prefData => {
-      setHtfPresets((prefData.htf_poi || []).map(x=>x.value));
+    prefsApi.listMany(["htf_timeframe","htf_poi_type","session"]).then(prefData => {
+      setHtfTimeframes((prefData.htf_timeframe || []).map(x=>x.value));
+      setHtfPoiTypes((prefData.htf_poi_type || []).map(x=>x.value));
       setSessionPresets((prefData.session || []).map(x=>x.value));
     }).catch(()=>{});
   }, []);
@@ -55,7 +123,14 @@ export default function BiasCenter() {
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [tab]);
 
-  const toggle = (key, v) => setB(p => ({...p, [key]: p[key].includes(v) ? p[key].filter(x=>x!==v) : [...p[key], v]}));
+  const addPoiTag = () => {
+    if (!poiDraft.timeframe || !poiDraft.type) { toast.error("Choose a timeframe and POI type"); return; }
+    const value = `${poiDraft.timeframe} · ${poiDraft.type}`;
+    if (b.poi_tags.includes(value)) { toast.error("This POI has already been added"); return; }
+    setB(p => ({...p, poi_tags: [...p.poi_tags, value]}));
+    setPoiDraft({ timeframe: "", type: "" });
+  };
+  const removePoiTag = (value) => setB(p => ({...p, poi_tags: p.poi_tags.filter(x=>x!==value)}));
 
   const save = async () => {
     try {
@@ -120,7 +195,11 @@ export default function BiasCenter() {
   }, []);
 
   const addLevel = (name = "") => setB(p => ({...p, key_levels: [...p.key_levels, { name, price: 0 }]}));
-  const addLevelFromPreset = (name) => addLevel(name);
+  const addLevelFromPreset = () => {
+    if (!keyLevelDraft) { toast.error("Choose a key level"); return; }
+    addLevel(keyLevelDraft);
+    setKeyLevelDraft("");
+  };
   const addTarget = () => setB(p => ({...p, targets: [...p.targets, { name: `T${p.targets.length+1}`, price: 0 }]}));
   const addNote = () => setB(p => ({...p, notes: [...p.notes, ""]}));
 
@@ -154,6 +233,18 @@ export default function BiasCenter() {
       <div className="grid grid-cols-12 gap-5">
         <div className="col-span-12 lg:col-span-8 space-y-5">
           <div className="tjfx-card p-6">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-display text-lg font-bold">Chart Gallery <span className="text-xs text-[#6D6D82] font-normal tjfx-mono ml-1">{b.images.length}/{MAX_IMAGES}</span></h3>
+              <label className="text-sm text-[#7C3AED] font-medium cursor-pointer flex items-center gap-1"><Upload className="w-4 h-4"/> Add<input type="file" multiple accept="image/*" hidden onChange={uploadImg}/></label>
+            </div>
+            <div className="text-[11px] text-[#6D6D82] mb-3 flex items-center gap-1"><Clipboard className="w-3 h-3"/> Press <kbd className="px-1.5 py-0.5 rounded bg-[#F3E8FF] text-[#7C3AED] text-[10px] mx-1">Ctrl+V</kbd> to paste chart screenshots directly</div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              {b.images.map((s,i)=><div key={i} className="relative group"><img alt="" src={s} className="w-full h-28 object-cover rounded-lg"/><button onClick={()=>setB({...b,images:b.images.filter((_,j)=>j!==i)})} className="absolute top-1 right-1 w-6 h-6 rounded-full bg-white/90 opacity-0 group-hover:opacity-100"><Trash2 className="w-3 h-3 mx-auto text-red-500"/></button></div>)}
+              {b.images.length===0 && <div className="col-span-full text-center py-8 text-sm text-[#6D6D82] border-2 border-dashed border-[#E8E8F1] rounded-xl">No chart screenshots yet. Upload or paste from clipboard.</div>}
+            </div>
+          </div>
+
+          <div className="tjfx-card p-6">
             <h3 className="font-display text-lg font-bold mb-4">1. Direction & Confidence</h3>
             <div className="grid md:grid-cols-2 gap-6">
               <div>
@@ -185,12 +276,12 @@ export default function BiasCenter() {
             <div className="text-[11px] text-[#A1A1AA] text-right mt-1">{b.narrative.split(/\s+/).filter(Boolean).length} words</div>
           </div>
 
-          <div className="tjfx-card p-6">
-            <h3 className="font-display text-lg font-bold mb-3">3. HTF Confluences / POIs</h3>
-            {htfPresets.length===0 ? <div className="text-sm text-[#6D6D82]">No HTF POIs. Add in Settings → Trade Presets.</div> :
-              <div className="flex flex-wrap gap-2">{htfPresets.map(t => <button key={t} className={`chip ${b.poi_tags.includes(t)?"active":""}`} onClick={()=>toggle("poi_tags",t)}>{t}</button>)}</div>
-            }
-          </div>
+          <PairedPresetBuilder
+            title="3. HTF Confluences / POIs" description="Select a timeframe and POI type, then add it to this bias."
+            timeframeLabel="HTF Timeframe" typeLabel="POI Type" timeframes={htfTimeframes} types={htfPoiTypes}
+            draft={poiDraft} onDraftChange={setPoiDraft} items={b.poi_tags} onAdd={addPoiTag} onRemove={removePoiTag}
+            testid="bias-htf-poi"
+          />
 
           <div className="grid md:grid-cols-2 gap-5">
             <div className="tjfx-card p-6">
@@ -199,13 +290,12 @@ export default function BiasCenter() {
                 <button onClick={()=>addLevel("")} className="text-sm text-[#7C3AED] font-medium">+ Add custom</button>
               </div>
               {keyLevelPresets.length>0 && (
-                <div className="mb-3">
-                  <div className="text-[11px] text-[#6D6D82] mb-1.5">Quick add (managed in Settings → Bias Presets):</div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {keyLevelPresets.map(nm => (
-                      <button key={nm} onClick={()=>addLevelFromPreset(nm)} className="chip">+ {nm}</button>
-                    ))}
-                  </div>
+                <div className="mb-3 flex gap-2">
+                  <select value={keyLevelDraft} onChange={e=>setKeyLevelDraft(e.target.value)} className={inp} data-testid="key-level-preset-select">
+                    <option value="">Select key level...</option>
+                    {keyLevelPresets.map(nm => <option key={nm} value={nm}>{nm}</option>)}
+                  </select>
+                  <button type="button" onClick={addLevelFromPreset} className="h-10 px-4 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-sm font-semibold shrink-0" data-testid="key-level-preset-add">+ Add</button>
                 </div>
               )}
               <div className="space-y-2">
@@ -238,18 +328,6 @@ export default function BiasCenter() {
               </div>
             </div>
           </div>
-
-          <div className="tjfx-card p-6">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-display text-lg font-bold">Chart Gallery <span className="text-xs text-[#6D6D82] font-normal tjfx-mono ml-1">{b.images.length}/{MAX_IMAGES}</span></h3>
-              <label className="text-sm text-[#7C3AED] font-medium cursor-pointer flex items-center gap-1"><Upload className="w-4 h-4"/> Add<input type="file" multiple accept="image/*" hidden onChange={uploadImg}/></label>
-            </div>
-            <div className="text-[11px] text-[#6D6D82] mb-3 flex items-center gap-1"><Clipboard className="w-3 h-3"/> Press <kbd className="px-1.5 py-0.5 rounded bg-[#F3E8FF] text-[#7C3AED] text-[10px] mx-1">Ctrl+V</kbd> to paste chart screenshots directly</div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-              {b.images.map((s,i)=><div key={i} className="relative group"><img alt="" src={s} className="w-full h-28 object-cover rounded-lg"/><button onClick={()=>setB({...b,images:b.images.filter((_,j)=>j!==i)})} className="absolute top-1 right-1 w-6 h-6 rounded-full bg-white/90 opacity-0 group-hover:opacity-100"><Trash2 className="w-3 h-3 mx-auto text-red-500"/></button></div>)}
-              {b.images.length===0 && <div className="col-span-full text-center py-8 text-sm text-[#6D6D82] border-2 border-dashed border-[#E8E8F1] rounded-xl">No chart screenshots yet. Upload or paste from clipboard.</div>}
-            </div>
-          </div>
         </div>
 
         <div className="col-span-12 lg:col-span-4 space-y-5">
@@ -258,14 +336,16 @@ export default function BiasCenter() {
             <div className="grid grid-cols-2 gap-2">
               {(sessionPresets.length?sessionPresets:["Asian","London","New York","Overlap"]).map(s => <button key={s} onClick={()=>setB({...b,session:s})} className={`h-10 rounded-xl text-sm font-medium border ${b.session===s?"bg-[#F3E8FF] border-[#7C3AED] text-[#7C3AED]":"border-[#E8E8F1]"}`}>{s}</button>)}
             </div>
-            <div className="mt-4 text-[12px] text-[#6D6D82] mb-2">Date</div>
-            <input type="date" value={b.date} onChange={e=>setB({...b,date:e.target.value})} className="w-full h-10 px-3 rounded-xl border border-[#E8E8F1] text-sm tjfx-mono"/>
+            <div className="mt-4 text-[12px] text-[#6D6D82] mb-2">Date <span className="text-[10px] text-[#A1A1AA]">(automatic)</span></div>
+            <div className="w-full h-10 px-3 rounded-xl border border-[#E8E8F1] text-sm tjfx-mono flex items-center bg-[#F6F6FB] text-[#6D6D82]">{formatDisplayDate(b.date)}</div>
           </div>
 
           {tab==="weekly" && (
             <div className="tjfx-card p-6">
-              <div className="text-[12px] text-[#6D6D82] mb-2">Week Starting</div>
-              <input type="date" value={b.date} onChange={e=>setB({...b,date:e.target.value})} className="w-full h-10 px-3 rounded-xl border border-[#E8E8F1] text-sm tjfx-mono"/>
+              <div className="text-[12px] text-[#6D6D82] mb-2">Week Starting – End <span className="text-[10px] text-[#A1A1AA]">(automatic)</span></div>
+              <div className="w-full h-10 px-3 rounded-xl border border-[#E8E8F1] text-sm tjfx-mono flex items-center bg-[#F6F6FB] text-[#6D6D82]">
+                {formatDisplayDate(b.date)} – {formatDisplayDate(periodEndFromStart(b.date))}
+              </div>
             </div>
           )}
 

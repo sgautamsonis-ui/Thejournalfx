@@ -304,6 +304,18 @@ async def latest_bias(type: str, user=Depends(get_current_user)):
 async def create_bias(b: Bias, user=Depends(get_current_user)):
     doc = b.model_dump()
     doc["user_id"] = user["user_id"]
+    # Safety net: one bias per user+type+period(date). If a record already exists
+    # for this exact period, update it instead of inserting a duplicate — this
+    # guards against stale/out-of-sync frontend state creating extra entries.
+    existing = sb.table("bias").select("id").eq("user_id", user["user_id"]).eq("type", doc["type"]).eq("date", doc["date"]).limit(1).execute()
+    if existing.data:
+        existing_id = existing.data[0]["id"]
+        update_doc = {k: v for k, v in doc.items() if k not in ("id", "user_id")}
+        sb.table("bias").update(update_doc).eq("id", existing_id).eq("user_id", user["user_id"]).execute()
+        r = sb.table("bias").select("*").eq("id", existing_id).eq("user_id", user["user_id"]).limit(1).execute()
+        result = r.data[0]
+        result.pop("user_id", None)
+        return result
     sb.table("bias").insert(doc).execute()
     doc.pop("user_id", None)
     return doc
