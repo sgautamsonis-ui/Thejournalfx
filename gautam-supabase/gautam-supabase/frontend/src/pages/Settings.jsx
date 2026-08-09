@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { settingsApi, accountsApi, prefsApi } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
-import { Trash2, Plus, Pencil, Check, X } from "lucide-react";
+import { Trash2, Plus, Pencil, Check, X, Save } from "lucide-react";
 
 const TABS = ["Profile","Accounts","Preferences","Trade Presets","Bias Presets","Appearance"];
 
@@ -25,10 +25,12 @@ const BIAS_KINDS = [
 ];
 
 export default function Settings() {
+  const { refresh } = useAuth();
   const [tab, setTab] = useState("Trade Presets");
   const [settings, setSettings] = useState({});
   const [accounts, setAccounts] = useState([]);
-  const [newAcc, setNewAcc] = useState({ name: "", broker: "", account_type: "Live", balance: 10000, currency: "USD" });
+  const [newAcc, setNewAcc] = useState({ name: "", broker: "", account_type: "Live", balance: 10000, currency: "USD", dailyLimit: "", weeklyLimit: "" });
+  const [editAcc, setEditAcc] = useState(null);
 
   useEffect(() => {
     settingsApi.get().then(setSettings).catch(()=>{});
@@ -36,13 +38,50 @@ export default function Settings() {
   }, []);
 
   const savePrefs = async () => { await settingsApi.update(settings); toast.success("Settings saved"); };
+
+  const saveAccountLimits = async (accountId, dailyLimit, weeklyLimit) => {
+    const nextLimits = { ...(settings.account_limits || {}) };
+    if (dailyLimit || weeklyLimit) {
+      nextLimits[accountId] = {
+        daily: dailyLimit ? parseFloat(dailyLimit) : undefined,
+        weekly: weeklyLimit ? parseFloat(weeklyLimit) : undefined,
+      };
+    } else {
+      delete nextLimits[accountId];
+    }
+    const merged = await settingsApi.update({ account_limits: nextLimits });
+    setSettings(merged);
+    await refresh();
+  };
+
   const addAccount = async () => {
     if (!newAcc.name) return;
-    const a = await accountsApi.create(newAcc);
-    setAccounts([...accounts, a]); setNewAcc({ name: "", broker: "", account_type: "Live", balance: 10000, currency: "USD" });
+    const { dailyLimit, weeklyLimit, ...accPayload } = newAcc;
+    const a = await accountsApi.create(accPayload);
+    setAccounts([...accounts, a]);
+    if (dailyLimit || weeklyLimit) await saveAccountLimits(a.id, dailyLimit, weeklyLimit);
+    setNewAcc({ name: "", broker: "", account_type: "Live", balance: 10000, currency: "USD", dailyLimit: "", weeklyLimit: "" });
     toast.success("Account added");
   };
   const delAcc = async (id) => { await accountsApi.delete(id); setAccounts(accounts.filter(a=>a.id!==id)); };
+
+  const startEditAcc = (a) => {
+    const limits = settings.account_limits?.[a.id] || {};
+    setEditAcc({
+      id: a.id, name: a.name, broker: a.broker || "", account_type: a.account_type || "Live",
+      balance: a.balance, currency: a.currency || "USD",
+      dailyLimit: limits.daily ?? "", weeklyLimit: limits.weekly ?? "",
+    });
+  };
+  const saveEditAcc = async () => {
+    if (!editAcc?.name) return;
+    const { id, dailyLimit, weeklyLimit, ...accPayload } = editAcc;
+    const updated = await accountsApi.update(id, { ...accPayload, balance: parseFloat(accPayload.balance) || 0 });
+    setAccounts(accounts.map(a => a.id === id ? updated : a));
+    await saveAccountLimits(id, dailyLimit, weeklyLimit);
+    setEditAcc(null);
+    toast.success("Account updated");
+  };
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-[1300px] mx-auto" data-testid="settings-page">
@@ -86,19 +125,53 @@ export default function Settings() {
 
           {tab==="Accounts" && (
             <div className="tjfx-card p-6">
-              <h3 className="font-display text-lg font-bold mb-4">Trading Accounts</h3>
-              <div className="grid md:grid-cols-5 gap-2 mb-4">
+              <h3 className="font-display text-lg font-bold mb-1">Trading Accounts</h3>
+              <p className="text-xs text-[#6D6D82] mb-4">Optionally set Daily / Weekly Drawdown Limits per account — they'll show next to your actual drawdown in the sidebar.</p>
+              <div className="grid md:grid-cols-6 gap-2 mb-2">
                 <input value={newAcc.name} onChange={e=>setNewAcc({...newAcc,name:e.target.value})} placeholder="Account name" className="inp"/>
                 <input value={newAcc.broker} onChange={e=>setNewAcc({...newAcc,broker:e.target.value})} placeholder="Broker" className="inp"/>
                 <select value={newAcc.account_type} onChange={e=>setNewAcc({...newAcc,account_type:e.target.value})} className="inp">{["Live","Demo","Prop Firm"].map(x=><option key={x}>{x}</option>)}</select>
-                <input type="number" value={newAcc.balance} onChange={e=>setNewAcc({...newAcc,balance:parseFloat(e.target.value)||0})} className="inp"/>
-                <button onClick={addAccount} className="h-10 rounded-xl bg-[#7C3AED] text-white font-semibold">+ Add</button>
+                <input type="number" value={newAcc.balance} onChange={e=>setNewAcc({...newAcc,balance:parseFloat(e.target.value)||0})} placeholder="Balance" className="inp"/>
+                <input type="number" value={newAcc.dailyLimit} onChange={e=>setNewAcc({...newAcc,dailyLimit:e.target.value})} placeholder="Daily DD limit" className="inp"/>
+                <input type="number" value={newAcc.weeklyLimit} onChange={e=>setNewAcc({...newAcc,weeklyLimit:e.target.value})} placeholder="Weekly DD limit" className="inp"/>
               </div>
+              <button onClick={addAccount} className="h-10 px-5 mb-4 rounded-xl bg-[#7C3AED] text-white font-semibold">+ Add Account</button>
               <div className="space-y-2">
-                {accounts.map(a=>(
-                  <div key={a.id} className="flex items-center justify-between p-3 rounded-xl border border-[#E8E8F1]">
-                    <div><div className="font-semibold">{a.name}</div><div className="text-xs text-[#6D6D82]">{a.broker} • {a.account_type}</div></div>
-                    <div className="flex items-center gap-3"><span className="tjfx-mono">${a.balance?.toFixed(2)} {a.currency}</span><button onClick={()=>delAcc(a.id)} className="text-red-500"><Trash2 className="w-4 h-4"/></button></div>
+                {accounts.map(a => editAcc?.id === a.id ? (
+                  <div key={a.id} className="p-3 rounded-xl border border-[#7C3AED] bg-[#F3E8FF]/30 space-y-2" data-testid={`account-edit-${a.id}`}>
+                    <div className="grid md:grid-cols-6 gap-2">
+                      <input value={editAcc.name} onChange={e=>setEditAcc({...editAcc,name:e.target.value})} placeholder="Account name" className="inp"/>
+                      <input value={editAcc.broker} onChange={e=>setEditAcc({...editAcc,broker:e.target.value})} placeholder="Broker" className="inp"/>
+                      <select value={editAcc.account_type} onChange={e=>setEditAcc({...editAcc,account_type:e.target.value})} className="inp">{["Live","Demo","Prop Firm"].map(x=><option key={x}>{x}</option>)}</select>
+                      <input type="number" value={editAcc.balance} onChange={e=>setEditAcc({...editAcc,balance:e.target.value})} placeholder="Balance" className="inp"/>
+                      <input type="number" value={editAcc.dailyLimit} onChange={e=>setEditAcc({...editAcc,dailyLimit:e.target.value})} placeholder="Daily DD limit" className="inp"/>
+                      <input type="number" value={editAcc.weeklyLimit} onChange={e=>setEditAcc({...editAcc,weeklyLimit:e.target.value})} placeholder="Weekly DD limit" className="inp"/>
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={saveEditAcc} className="h-9 px-4 rounded-lg bg-[#7C3AED] text-white text-sm font-semibold flex items-center gap-1.5"><Save className="w-3.5 h-3.5"/> Save</button>
+                      <button onClick={()=>setEditAcc(null)} className="h-9 px-4 rounded-lg border border-[#E8E8F1] text-sm font-medium text-[#6D6D82]">Cancel</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div key={a.id} className="flex items-center justify-between p-3 rounded-xl border border-[#E8E8F1]" data-testid={`account-row-${a.id}`}>
+                    <div>
+                      <div className="font-semibold">{a.name}</div>
+                      <div className="text-xs text-[#6D6D82]">
+                        {a.broker} • {a.account_type}
+                        {settings.account_limits?.[a.id] && (
+                          <span className="ml-2 text-[#7C3AED]">
+                            {settings.account_limits[a.id].daily ? `Daily limit $${settings.account_limits[a.id].daily}` : ""}
+                            {settings.account_limits[a.id].daily && settings.account_limits[a.id].weekly ? " • " : ""}
+                            {settings.account_limits[a.id].weekly ? `Weekly limit $${settings.account_limits[a.id].weekly}` : ""}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="tjfx-mono">${a.balance?.toFixed(2)} {a.currency}</span>
+                      <button onClick={()=>startEditAcc(a)} className="text-[#7C3AED]" data-testid={`account-edit-btn-${a.id}`}><Pencil className="w-4 h-4"/></button>
+                      <button onClick={()=>delAcc(a.id)} className="text-red-500"><Trash2 className="w-4 h-4"/></button>
+                    </div>
                   </div>
                 ))}
                 {accounts.length===0 && <div className="text-sm text-[#6D6D82]">No accounts yet.</div>}

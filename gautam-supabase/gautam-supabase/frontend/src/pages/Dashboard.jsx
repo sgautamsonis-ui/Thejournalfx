@@ -1,5 +1,8 @@
-import React, { useEffect, useState, useMemo } from "react";
-import { statsApi, biasApi } from "@/lib/api";
+import React, { useEffect, useState, useMemo, useRef } from "react";
+import { statsApi, biasApi, tradesApi } from "@/lib/api";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
 import { useAuth } from "@/context/AuthContext";
 import { useAccount } from "@/context/AccountContext";
 import { 
@@ -9,7 +12,7 @@ import {
 import { 
   TrendingUp, Target, Activity, Wallet, Sparkles, Settings2, Eye, EyeOff, 
   ArrowUp, ArrowDown, Trophy, Calendar, Flame, PiggyBank, GripVertical,
-  ChevronDown, ChevronLeft, ChevronRight, AlertCircle, CheckCircle2
+  ChevronDown, AlertCircle, CheckCircle2
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
@@ -35,15 +38,28 @@ const WIDGETS = [
   { id: "ai-coach",       label: "AI Trading Coach",        category: "ai", size: "full" },
 ];
 
-const DEFAULT_LAYOUT = WIDGETS.map(w => ({ id: w.id, visible: true, size: w.size }));
-const LAYOUT_KEY = "tjfx.dashboard.layout.v3";
+// Widgets that always span the full width (KPIs, main charts, AI coach) —
+// these aren't horizontally resizable, everything else is.
+const FULL_WIDTH_IDS = new Set(WIDGETS.filter(w => w.size === "full").map(w => w.id));
+const SIZE_TO_COLS = { sm: 3, md: 4, lg: 6, full: 12 };
+const MIN_COLS = 3;
+const MAX_COLS = 12;
+
+const DEFAULT_LAYOUT = WIDGETS.map(w => ({ id: w.id, visible: true, cols: SIZE_TO_COLS[w.size] || 6 }));
+const LAYOUT_KEY = "tjfx.dashboard.layout.v4";
 
 function loadLayout() {
   try {
     const raw = JSON.parse(localStorage.getItem(LAYOUT_KEY) || "null");
     if (Array.isArray(raw) && raw.every(x => x && x.id)) {
       const validIds = new Set(WIDGETS.map(w => w.id));
-      const cleaned = raw.filter(x => validIds.has(x.id));
+      const cleaned = raw
+        .filter(x => validIds.has(x.id))
+        .map(x => ({
+          id: x.id,
+          visible: x.visible !== false,
+          cols: FULL_WIDTH_IDS.has(x.id) ? 12 : Math.min(MAX_COLS, Math.max(MIN_COLS, Number(x.cols) || 6)),
+        }));
       const known = new Set(cleaned.map(x => x.id));
       return [...cleaned, ...DEFAULT_LAYOUT.filter(x => !known.has(x.id))];
     }
@@ -55,30 +71,23 @@ function saveLayout(l) {
   localStorage.setItem(LAYOUT_KEY, JSON.stringify(l)); 
 }
 
-// =============== SIZING & STYLING ===============
-const SIZE_CLASS = {
-  sm: "col-span-12 md:col-span-4 lg:col-span-3",
-  md: "col-span-12 md:col-span-6 lg:col-span-4",
-  lg: "col-span-12 md:col-span-8 lg:col-span-6",
-  full: "col-span-12"
-};
-
-const SIZE_ORDER = ["sm", "md", "lg", "full"];
-const NEXT_SIZE = { sm: "md", md: "lg", lg: "full", full: "full" };
-const PREV_SIZE = { sm: "sm", md: "sm", lg: "md", full: "lg" };
-
 // =============== SORTABLE CARD WRAPPER ===============
-function SortableCard({ id, size, customize, onGrow, onShrink, onToggleVisible, children, testid }) {
+// Widgets are draggable (reorder) at all times via the grip handle in customize
+// mode, and horizontally resizable by dragging the bottom-right corner — like a
+// resizable side panel — snapped to the 12-column grid. Height simply grows with
+// content (no independent vertical drag), so nothing gets clipped or overflows.
+function SortableCard({ id, cols, full, customize, onResizeStart, onToggleVisible, children, testid }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.6 : 1,
     zIndex: isDragging ? 40 : "auto",
+    "--cols": full ? 12 : cols,
   };
 
   return (
-    <div ref={setNodeRef} style={style} className={`${SIZE_CLASS[size||"lg"]} relative`} data-testid={testid}>
+    <div ref={setNodeRef} style={style} className="col-span-12 tjfx-resizable relative min-w-0" data-testid={testid}>
       {customize && (
         <div className="absolute -top-3 -right-3 z-30 flex items-center gap-1">
           <button 
@@ -89,24 +98,6 @@ function SortableCard({ id, size, customize, onGrow, onShrink, onToggleVisible, 
           >
             <GripVertical className="w-4 h-4"/>
           </button>
-          <div className="h-8 rounded-full bg-white border border-[#E8E8F1] shadow flex items-center overflow-hidden">
-            <button
-              onClick={() => onShrink(id)}
-              disabled={size === "sm"}
-              className="h-8 w-7 flex items-center justify-center text-[#7C3AED] hover:bg-[#F3E8FF] disabled:opacity-30 disabled:hover:bg-transparent"
-              title="Smaller"
-            >
-              <ChevronLeft className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={() => onGrow(id)}
-              disabled={size === "full"}
-              className="h-8 w-7 flex items-center justify-center text-[#7C3AED] hover:bg-[#F3E8FF] disabled:opacity-30 disabled:hover:bg-transparent border-l border-[#E8E8F1]"
-              title="Bigger"
-            >
-              <ChevronRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
           <button 
             onClick={() => onToggleVisible(id)}
             className="h-8 w-8 rounded-full bg-white border border-[#E8E8F1] flex items-center justify-center text-[#7C3AED] shadow hover:border-[#7C3AED]"
@@ -116,16 +107,27 @@ function SortableCard({ id, size, customize, onGrow, onShrink, onToggleVisible, 
           </button>
         </div>
       )}
-      <div className={customize ? "ring-2 ring-[#7C3AED]/40 rounded-2xl transition-all" : ""}>
+      <div className={`relative h-full min-w-0 ${customize ? "ring-2 ring-[#7C3AED]/40 rounded-2xl transition-all" : ""}`}>
         {children}
+        {customize && !full && (
+          <div
+            onMouseDown={onResizeStart}
+            title="Drag to resize width"
+            className="hidden md:flex absolute bottom-1.5 right-1.5 z-30 h-5 w-5 items-center justify-center rounded-md bg-[#7C3AED] text-white cursor-ew-resize shadow-lg hover:bg-[#6D28D9]"
+          >
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M9 1L1 9M9 5L5 9" stroke="white" strokeWidth="1.4" strokeLinecap="round"/></svg>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
 // =============== CARD COMPONENT ===============
+// overflow-auto + min-h keeps long content (tables, labels) scrollable inside the
+// card instead of breaking the layout or spilling outside its box.
 const Card = ({ children, className = "", ...props }) => (
-  <div className={`tjfx-card p-5 tjfx-card-hover h-full ${className}`} {...props}>
+  <div className={`tjfx-card p-5 tjfx-card-hover h-full min-w-0 min-h-[160px] overflow-auto ${className}`} {...props}>
     {children}
   </div>
 );
@@ -175,6 +177,8 @@ export default function Dashboard() {
   const [customize, setCustomize] = useState(false);
   const [timeframe, setTimeframe] = useState("monthly");
   const [positionsTab, setPositionsTab] = useState("open");
+  const [allTrades, setAllTrades] = useState([]);
+  const [selectedDay, setSelectedDay] = useState(null);
   
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
@@ -185,7 +189,15 @@ export default function Dashboard() {
     statsApi.dashboard(activeId)
       .then(setStats)
       .catch(() => setStats(null));
+    tradesApi.list(activeId)
+      .then(setAllTrades)
+      .catch(() => setAllTrades([]));
   }, [activeId]);
+
+  const selectedDayTrades = useMemo(
+    () => (selectedDay ? allTrades.filter(t => String(t.date || "").slice(0, 10) === selectedDay) : []),
+    [selectedDay, allTrades]
+  );
 
   useEffect(() => { 
     saveLayout(layout); 
@@ -200,12 +212,34 @@ export default function Dashboard() {
     }
   };
 
-  const growSize = (id) => 
-    setLayout(l => l.map(x => x.id === id ? { ...x, size: NEXT_SIZE[x.size || "lg"] } : x));
+  // Drag-to-resize (bottom-right corner), snapped to the 12-column grid —
+  // like dragging a resizable panel.
+  const gridRef = useRef(null);
+  const [resizing, setResizing] = useState(null); // { id, startX, startCols }
 
-  const shrinkSize = (id) => 
-    setLayout(l => l.map(x => x.id === id ? { ...x, size: PREV_SIZE[x.size || "lg"] } : x));
-  
+  useEffect(() => {
+    if (!resizing) return;
+    const colWidth = () => (gridRef.current?.offsetWidth || 1200) / 12;
+    const onMove = (e) => {
+      const deltaCols = Math.round((e.clientX - resizing.startX) / colWidth());
+      const newCols = Math.min(MAX_COLS, Math.max(MIN_COLS, resizing.startCols + deltaCols));
+      setLayout(l => l.map(x => x.id === resizing.id ? { ...x, cols: newCols } : x));
+    };
+    const onUp = () => setResizing(null);
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, [resizing]);
+
+  const startResize = (id, cols) => (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setResizing({ id, startX: e.clientX, startCols: cols });
+  };
+
   const toggleVisible = (id) => 
     setLayout(l => l.map(x => x.id === id ? { ...x, visible: !x.visible } : x));
   
@@ -295,7 +329,7 @@ export default function Dashboard() {
                       textAnchor="end"
                       height={50}
                     />
-                    <YAxis tick={{ fontSize: 11, fill: "#A1A1AA" }} />
+                    <YAxis tick={{ fontSize: 11, fill: "#A1A1AA" }} domain={[(min) => (min < 0 ? min * 1.2 : 0), (max) => (max <= 0 ? 1 : max * 1.2)]} />
                     <Tooltip 
                       contentStyle={{ borderRadius: 12, border: "1px solid #E8E8F1", backgroundColor: "#fff" }}
                       formatter={(value, name, props) => [`$${value.toFixed(2)} · ${props.payload.trades} trade(s) · ${props.payload.win_rate}% WR`, "P&L"]}
@@ -327,7 +361,7 @@ export default function Dashboard() {
                     }}
                     minTickGap={24}
                   />
-                  <YAxis tick={{ fontSize: 11, fill: "#A1A1AA" }} />
+                  <YAxis tick={{ fontSize: 11, fill: "#A1A1AA" }} domain={[(min) => (min < 0 ? min * 1.2 : 0), (max) => (max <= 0 ? 1 : max * 1.2)]} />
                   <Tooltip 
                     contentStyle={{ 
                       borderRadius: 12, 
@@ -485,14 +519,16 @@ export default function Dashboard() {
             {stats.calendar.map((day) => (
               <button
                 key={day.date}
+                onClick={() => day.trades > 0 && setSelectedDay(day.date)}
+                disabled={day.trades === 0}
                 className={`aspect-square rounded-lg text-xs font-medium transition flex flex-col items-center justify-center ${
                   day.pnl > 0
-                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
+                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 cursor-pointer"
                     : day.pnl < 0
-                    ? "bg-red-50 text-red-700 border border-red-200 hover:bg-red-100"
-                    : "bg-[#F6F6FB] text-[#6D6D82] border border-[#E8E8F1] hover:bg-white"
+                    ? "bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 cursor-pointer"
+                    : "bg-[#F6F6FB] text-[#6D6D82] border border-[#E8E8F1] hover:bg-white disabled:cursor-default disabled:hover:bg-[#F6F6FB]"
                 }`}
-                title={`${day.date}: ${day.trades} trades`}
+                title={`${day.date}: ${day.trades} trade(s)`}
               >
                 <div>{day.date.split("-")[2]}</div>
                 {day.pnl !== 0 && <div className="text-[10px]">${Math.abs(day.pnl).toFixed(0)}</div>}
@@ -526,7 +562,7 @@ export default function Dashboard() {
               <BarChart data={stats.monthly_performance} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#E8E8F1" />
                 <XAxis dataKey="period" tick={{ fontSize: 11, fill: "#A1A1AA" }} />
-                <YAxis tick={{ fontSize: 11, fill: "#A1A1AA" }} />
+                <YAxis tick={{ fontSize: 11, fill: "#A1A1AA" }} domain={[(min) => (min < 0 ? min * 1.2 : 0), (max) => (max <= 0 ? 1 : max * 1.2)]} />
                 <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #E8E8F1" }} />
                 <Bar dataKey="pnl" radius={[8, 8, 0, 0]}>
                   {stats.monthly_performance.map((entry) => (
@@ -902,8 +938,8 @@ export default function Dashboard() {
       {customize && (
         <div className="tjfx-card p-4 mb-5" data-testid="customize-panel">
           <div className="text-sm text-[#6D6D82] mb-4">
-            <strong className="text-[#16151F]">Drag widgets</strong> to reorder. 
-            Use buttons to resize and hide/show widgets.
+            <strong className="text-[#16151F]">Drag the purple handle</strong> to reorder widgets, and the
+            <strong className="text-[#16151F]"> corner handle</strong> to resize their width. Use the chips below to show/hide widgets.
           </div>
           <div className="flex flex-wrap gap-2">
             {WIDGETS.map(widget => {
@@ -956,15 +992,15 @@ export default function Dashboard() {
           items={visibleLayout.map(x => x.id)} 
           strategy={rectSortingStrategy}
         >
-          <div className="grid grid-cols-12 auto-rows-max gap-4">
+          <div ref={gridRef} className="grid grid-cols-12 auto-rows-max gap-4">
             {visibleLayout.map((item) => (
               <SortableCard
                 key={item.id}
                 id={item.id}
-                size={item.size || "lg"}
+                cols={item.cols || 6}
+                full={FULL_WIDTH_IDS.has(item.id)}
                 customize={customize}
-                onGrow={growSize}
-                onShrink={shrinkSize}
+                onResizeStart={startResize(item.id, item.cols || 6)}
                 onToggleVisible={toggleVisible}
                 testid={`widget-${item.id}`}
               >
@@ -974,6 +1010,56 @@ export default function Dashboard() {
           </div>
         </SortableContext>
       </DndContext>
+      <style>{`@media (min-width: 768px) { .tjfx-resizable { grid-column: span var(--cols) / span var(--cols) !important; } }`}</style>
+
+      {/* Day Trades Dialog (from Trading Calendar click) */}
+      <Dialog open={!!selectedDay} onOpenChange={(open) => !open && setSelectedDay(null)}>
+        <DialogContent className="max-w-2xl bg-white" data-testid="day-trades-dialog">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedDay && new Date(selectedDay).toLocaleDateString("en-IN", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}
+            </DialogTitle>
+          </DialogHeader>
+          {selectedDayTrades.length > 0 ? (
+            <div className="overflow-x-auto scroll-thin max-h-[60vh]">
+              <table className="w-full text-sm">
+                <thead className="text-[#6D6D82] border-b border-[#E8E8F1]">
+                  <tr className="text-left">
+                    <th className="py-2 font-medium">Pair</th>
+                    <th className="py-2 font-medium">Dir</th>
+                    <th className="py-2 font-medium">Entry</th>
+                    <th className="py-2 font-medium">Exit</th>
+                    <th className="py-2 font-medium">P&L</th>
+                    <th className="py-2 font-medium">R</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedDayTrades.map((trade) => (
+                    <tr
+                      key={trade.id}
+                      onClick={() => { setSelectedDay(null); navigate("/trades"); }}
+                      className="border-t border-[#E8E8F1] hover:bg-[#F3E8FF]/40 cursor-pointer"
+                    >
+                      <td className="py-3 font-semibold tjfx-mono">{trade.symbol}</td>
+                      <td className={trade.direction === "long" ? "text-emerald-600" : "text-red-500"}>
+                        {trade.direction === "long" ? "↑ Long" : "↓ Short"}
+                      </td>
+                      <td className="py-3 tjfx-mono text-sm">{(trade.entry_price ?? 0).toFixed(2)}</td>
+                      <td className="py-3 tjfx-mono text-sm">{trade.exit_price != null ? trade.exit_price.toFixed(2) : "—"}</td>
+                      <td className={`py-3 tjfx-mono font-medium ${(trade.net_pnl || 0) >= 0 ? "text-emerald-600" : "text-red-500"}`}>
+                        {(trade.net_pnl || 0) >= 0 ? "+" : ""}{(trade.net_pnl || 0).toFixed(2)}
+                      </td>
+                      <td className="py-3 tjfx-mono">{trade.r_multiple != null ? `${trade.r_multiple.toFixed(2)}R` : "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="py-8 text-center text-sm text-[#6D6D82]">No trades on this day.</div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Empty State */}
       {visibleLayout.length === 0 && (

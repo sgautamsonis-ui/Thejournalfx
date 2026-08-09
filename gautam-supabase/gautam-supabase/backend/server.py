@@ -130,6 +130,25 @@ async def create_account(acc: Account, user=Depends(get_current_user)):
     doc.pop("user_id", None)
     return doc
 
+class AccountUpdate(BaseModel):
+    name: Optional[str] = None
+    broker: Optional[str] = None
+    account_type: Optional[str] = None
+    currency: Optional[str] = None
+    balance: Optional[float] = None
+
+@api_router.put("/accounts/{account_id}")
+async def update_account(account_id: str, payload: AccountUpdate, user=Depends(get_current_user)):
+    updates = {k: v for k, v in payload.model_dump().items() if v is not None}
+    if updates:
+        sb.table("accounts").update(updates).eq("id", account_id).eq("user_id", user["user_id"]).execute()
+    row = sb.table("accounts").select("*").eq("id", account_id).eq("user_id", user["user_id"]).limit(1).execute()
+    if not row.data:
+        return {"ok": False}
+    doc = row.data[0]
+    doc.pop("user_id", None)
+    return doc
+
 @api_router.delete("/accounts/{account_id}")
 async def delete_account(account_id: str, user=Depends(get_current_user)):
     sb.table("accounts").delete().eq("id", account_id).eq("user_id", user["user_id"]).execute()

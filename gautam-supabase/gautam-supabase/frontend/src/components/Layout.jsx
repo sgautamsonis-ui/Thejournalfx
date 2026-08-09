@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useNavigate, Link } from "react-router-dom";
 import { LayoutDashboard, PlusCircle, Target, BookOpen, Brain, Settings, LogOut, TrendingUp, Table2, CalendarDays, FileText, NotebookPen, Moon, Sun, Wallet, ArrowUp, ArrowDown, ChevronDown, User } from "lucide-react";
 import AccountSwitcher from "@/components/AccountSwitcher";
 import { useAuth } from "@/context/AuthContext";
@@ -12,6 +12,7 @@ import {
 
 function AccountOverview() {
   const { activeId, active, accounts } = useAccount();
+  const { user } = useAuth();
   const [stats, setStats] = useState(null);
 
   useEffect(() => {
@@ -26,13 +27,18 @@ function AccountOverview() {
   const dailyDD = stats?.daily_drawdown ?? 0;
   const weeklyDD = stats?.weekly_drawdown ?? 0;
 
-  const Row = ({ label, value, positive }) => (
+  // Per-account drawdown limits, set in Settings → Accounts (edit an account).
+  const limits = (activeId !== "all" && user?.settings?.account_limits?.[activeId]) || null;
+  const dailyLimit = limits?.daily;
+  const weeklyLimit = limits?.weekly;
+
+  const Row = ({ label, value, positive, limit }) => (
     <div className="flex items-center justify-between py-1.5">
       <span className="text-[11px] text-[#6D6D82]">{label}</span>
       <span className={`text-[12px] font-semibold tjfx-mono tjfx-num ${
         positive === undefined ? "text-[#16151F]" : positive ? "text-emerald-600" : "text-red-500"
       }`}>
-        {value}
+        {value}{limit ? <span className="text-[#A1A1AA] font-normal"> / ${limit.toFixed(0)}</span> : ""}
       </span>
     </div>
   );
@@ -50,13 +56,20 @@ function AccountOverview() {
         <Row
           label="Daily Drawdown"
           value={`${dailyDD === 0 ? "" : "-"}$${Math.abs(dailyDD).toFixed(2)}`}
-          positive={dailyDD >= -0.001 ? undefined : false}
+          positive={dailyLimit ? Math.abs(dailyDD) < dailyLimit : (dailyDD >= -0.001 ? undefined : false)}
+          limit={dailyLimit}
         />
         <Row
           label="Weekly Drawdown"
           value={`${weeklyDD === 0 ? "" : "-"}$${Math.abs(weeklyDD).toFixed(2)}`}
-          positive={weeklyDD >= -0.001 ? undefined : false}
+          positive={weeklyLimit ? Math.abs(weeklyDD) < weeklyLimit : (weeklyDD >= -0.001 ? undefined : false)}
+          limit={weeklyLimit}
         />
+        {activeId !== "all" && !limits && (
+          <Link to="/settings" className="mt-1 block text-[10px] text-[#7C3AED] hover:underline">
+            + Set drawdown limits →
+          </Link>
+        )}
       </div>
     </div>
   );
@@ -113,24 +126,14 @@ export default function Layout() {
           <AccountOverview />
         </div>
 
-        <div className="p-3 border-t border-[#E8E8F1] shrink-0">
-          <div className="flex items-center gap-3 px-2 py-2">
-            {user?.picture ? (
-              <img src={user.picture} alt="" className="w-9 h-9 rounded-full border border-[#E8E8F1]" />
-            ) : (
-              <div className="w-9 h-9 rounded-full border border-[#E8E8F1] bg-[#F3E8FF] flex items-center justify-center text-[#7C3AED] font-semibold text-sm">
-                {(user?.name?.[0] || "T").toUpperCase()}
-              </div>
-            )}
-            <div className="min-w-0">
-              <div className="text-[13px] font-semibold truncate">{user?.settings?.display_name || user?.name}</div>
-              <div className="text-[11px] text-[#6D6D82] truncate">{user?.email}</div>
-            </div>
-          </div>
-          <button data-testid="logout-btn" onClick={logout} className="mt-2 w-full flex items-center gap-2 px-3 py-2 rounded-xl text-[13px] text-[#6D6D82] hover:bg-red-50 hover:text-red-600 transition-colors">
-            <LogOut className="w-4 h-4"/> Logout
-          </button>
-        </div>
+        {/* Profile & logout live in the header menu (top-right) now — no need to repeat them here. */}
+        <button
+          data-testid="logout-btn"
+          onClick={logout}
+          className="m-3 mt-0 flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-[13px] text-[#6D6D82] border-t border-[#E8E8F1] pt-3 hover:text-red-600 transition-colors shrink-0"
+        >
+          <LogOut className="w-4 h-4"/> Logout
+        </button>
       </aside>
 
       <main className="flex-1 min-w-0">
