@@ -2,8 +2,11 @@ import React, { useEffect, useMemo, useState } from "react";
 import { biasApi, prefsApi, aiApi } from "@/lib/api";
 import { toast } from "sonner";
 import { X, Pencil, Save, Trash2, Upload, Clipboard, Sparkles, TrendingUp, TrendingDown, Minus, Search } from "lucide-react";
+import { useLightbox } from "@/components/ImageLightbox";
+import { compressImage } from "@/lib/imageUtils";
 
 export default function Records() {
+  const openLightbox = useLightbox();
   const [items, setItems] = useState([]);
   const [type, setType] = useState("all");
   const [q, setQ] = useState("");
@@ -35,7 +38,9 @@ export default function Records() {
   const del = async () => { if (!confirm("Delete this bias record?")) return; await biasApi.delete(sel.id); toast.success("Deleted"); setSel(null); load(); };
 
   const addImg = (data) => setEdit(p => ({...p, images: [...(p.images||[]), data]}));
-  const onFile = (e) => Array.from(e.target.files||[]).forEach(f => { const r = new FileReader(); r.onload=()=>addImg(r.result); r.readAsDataURL(f); });
+  const onFile = (e) => Array.from(e.target.files||[]).forEach(f => {
+    compressImage(f).then(addImg).catch(() => { const r = new FileReader(); r.onload=()=>addImg(r.result); r.readAsDataURL(f); });
+  });
 
   useEffect(() => {
     if (!edit) return;
@@ -44,7 +49,10 @@ export default function Records() {
       for (const it of items) {
         if (it.type?.startsWith("image/")) {
           const f = it.getAsFile();
-          if (f) { const r = new FileReader(); r.onload=()=>addImg(r.result); r.readAsDataURL(f); toast.success("Chart pasted"); }
+          if (f) {
+            compressImage(f).then(addImg).catch(() => { const r = new FileReader(); r.onload=()=>addImg(r.result); r.readAsDataURL(f); });
+            toast.success("Chart pasted");
+          }
         }
       }
     };
@@ -125,6 +133,7 @@ export default function Records() {
 }
 
 function BiasView({ b }) {
+  const openLightbox = useLightbox();
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-3 gap-2">
@@ -141,7 +150,7 @@ function BiasView({ b }) {
       {b.images?.length>0 && (
         <div>
           <div className="text-[11px] text-[#6D6D82] uppercase tracking-wide mb-2">Chart Gallery ({b.images.length})</div>
-          <div className="grid grid-cols-2 gap-2">{b.images.map((s,i) => <img key={i} alt="" src={s} className="w-full rounded-lg"/>)}</div>
+          <div className="grid grid-cols-2 gap-2">{b.images.map((s,i) => <img key={i} alt="" src={s} onClick={()=>openLightbox(b.images,i)} className="w-full rounded-lg cursor-zoom-in"/>)}</div>
         </div>
       )}
     </div>
@@ -149,6 +158,7 @@ function BiasView({ b }) {
 }
 
 function BiasEditForm({ b, setB, toggleP, onFile, htfPresets }) {
+  const openLightbox = useLightbox();
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-3 gap-2">
@@ -185,7 +195,7 @@ function BiasEditForm({ b, setB, toggleP, onFile, htfPresets }) {
         <div className="grid grid-cols-3 gap-2">
           {(b.images||[]).map((s,i) => (
             <div key={i} className="relative group">
-              <img alt="" src={s} className="w-full h-20 object-cover rounded-lg"/>
+              <img alt="" src={s} onClick={()=>openLightbox(b.images,i)} className="w-full h-20 object-cover rounded-lg cursor-zoom-in"/>
               <button onClick={()=>setB({...b, images: b.images.filter((_,j)=>j!==i)})} className="absolute top-1 right-1 w-6 h-6 rounded-full bg-white/90 opacity-0 group-hover:opacity-100"><X className="w-3 h-3 mx-auto text-red-500"/></button>
             </div>
           ))}

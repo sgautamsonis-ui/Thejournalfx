@@ -3,6 +3,7 @@ import "@/App.css";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { AccountProvider } from "@/context/AccountContext";
+import { LightboxProvider } from "@/components/ImageLightbox";
 import Login from "@/pages/Login";
 import Layout from "@/components/Layout";
 import { Loader2 } from "lucide-react";
@@ -64,9 +65,11 @@ export default function App() {
   return (
     <AuthProvider>
       <AccountProvider>
-        <BrowserRouter>
-          <AppRouter />
-        </BrowserRouter>
+        <LightboxProvider>
+          <BrowserRouter>
+            <AppRouter />
+          </BrowserRouter>
+        </LightboxProvider>
       </AccountProvider>
     </AuthProvider>
   );

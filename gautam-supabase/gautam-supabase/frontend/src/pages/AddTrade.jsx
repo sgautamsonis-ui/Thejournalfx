@@ -6,6 +6,7 @@ import { useAccount } from "@/context/AccountContext";import { toast } from "son
 import { useNavigate } from "react-router-dom";
 import { Sparkles, Save, X, Upload, Star, CheckCircle2, Circle, ClipboardList, Clipboard } from "lucide-react";
 import { AttachmentPanel, LinkedBiasCard } from "@/components/TradePanels";
+import { compressImage } from "@/lib/imageUtils";
 
 const MAX_IMAGES = 15;
 const BUILDER_DEFAULTS = {
@@ -133,9 +134,9 @@ export default function AddTrade() {
   const onFile = (e) => {
     const files = Array.from(e.target.files || []);
     files.forEach(f => {
-      const r = new FileReader();
-      r.onload = () => addImage(r.result);
-      r.readAsDataURL(f);
+      compressImage(f).then(addImage).catch(() => {
+        const r = new FileReader(); r.onload = () => addImage(r.result); r.readAsDataURL(f);
+      });
     });
   };
 
@@ -147,9 +148,9 @@ export default function AddTrade() {
         if (it.type?.startsWith("image/")) {
           const f = it.getAsFile();
           if (f) {
-            const r = new FileReader();
-            r.onload = () => addImage(r.result);
-            r.readAsDataURL(f);
+            compressImage(f).then(addImage).catch(() => {
+              const r = new FileReader(); r.onload = () => addImage(r.result); r.readAsDataURL(f);
+            });
             toast.success("Image pasted");
           }
         }

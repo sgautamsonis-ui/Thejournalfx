@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { biasApi, aiApi, prefsApi } from "@/lib/api";
-import { Save, Sparkles, TrendingUp, TrendingDown, Minus, Trash2, Upload, Clipboard, X } from "lucide-react";
+import { Save, Sparkles, TrendingUp, TrendingDown, Minus, Trash2, Upload, Clipboard } from "lucide-react";
 import { toast } from "sonner";
+import { useLightbox } from "@/components/ImageLightbox";
+import { compressImage } from "@/lib/imageUtils";
 
 const inp = "w-full h-10 px-3 rounded-xl border border-[#E8E8F1] focus:border-[#7C3AED] focus:ring-2 focus:ring-[#7C3AED]/20 outline-none text-sm bg-white tjfx-mono";
 
@@ -36,6 +38,7 @@ function formatDisplayDate(iso) {
 }
 
 export default function BiasCenter() {
+  const openLightbox = useLightbox();
   const [tab, setTab] = useState("weekly");
   const [b, setB] = useState(emptyBias("weekly"));
   const [history, setHistory] = useState([]);
@@ -76,10 +79,18 @@ export default function BiasCenter() {
     if (!poiDraft.timeframe || !poiDraft.type) { toast.error("Choose a timeframe and POI type"); return; }
     const value = `${poiDraft.timeframe} · ${poiDraft.type}`;
     if (b.poi_tags.includes(value)) { toast.error("This POI has already been added"); return; }
-    setB(p => ({...p, poi_tags: [...p.poi_tags, value]}));
+    // Instead of a separate chip floating below the selectors, drop it straight
+    // into the narrative text as a readable line — e.g. "4HR Bullish OB" —
+    // right where the trader is writing their narrative.
+    const narrativeLine = `${poiDraft.timeframe.toUpperCase()} ${poiDraft.type}`;
+    setB(p => ({
+      ...p,
+      poi_tags: [...p.poi_tags, value],
+      narrative: p.narrative ? `${p.narrative}\n${narrativeLine}` : narrativeLine,
+    }));
     setPoiDraft({ timeframe: "", type: "" });
+    toast.success(`Added "${narrativeLine}" to narrative`);
   };
-  const removePoiTag = (value) => setB(p => ({...p, poi_tags: p.poi_tags.filter(x=>x!==value)}));
 
   const save = async () => {
     try {
@@ -117,9 +128,9 @@ export default function BiasCenter() {
   });
   const uploadImg = (e) => {
     Array.from(e.target.files||[]).forEach(f => {
-      const r = new FileReader();
-      r.onload = () => addImage(r.result);
-      r.readAsDataURL(f);
+      compressImage(f).then(addImage).catch(() => {
+        const r = new FileReader(); r.onload = () => addImage(r.result); r.readAsDataURL(f);
+      });
     });
   };
 
@@ -130,9 +141,9 @@ export default function BiasCenter() {
         if (it.type?.startsWith("image/")) {
           const f = it.getAsFile();
           if (f) {
-            const r = new FileReader();
-            r.onload = () => addImage(r.result);
-            r.readAsDataURL(f);
+            compressImage(f).then(addImage).catch(() => {
+              const r = new FileReader(); r.onload = () => addImage(r.result); r.readAsDataURL(f);
+            });
             toast.success("Chart pasted");
           }
         }
@@ -191,7 +202,7 @@ export default function BiasCenter() {
           </div>
           <div className="text-[11px] text-[#6D6D82] mb-3 flex items-center gap-1"><Clipboard className="w-3 h-3"/> Press <kbd className="px-1.5 py-0.5 rounded bg-[#F3E8FF] text-[#7C3AED] text-[10px] mx-1">Ctrl+V</kbd> to paste chart screenshots directly</div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-            {b.images.map((s,i)=><div key={i} className="relative group"><img alt="" src={s} className="w-full h-28 object-cover rounded-lg"/><button onClick={()=>setB({...b,images:b.images.filter((_,j)=>j!==i)})} className="absolute top-1 right-1 w-6 h-6 rounded-full bg-white/90 opacity-0 group-hover:opacity-100"><Trash2 className="w-3 h-3 mx-auto text-red-500"/></button></div>)}
+            {b.images.map((s,i)=><div key={i} className="relative group"><img alt="" src={s} onClick={()=>openLightbox(b.images,i)} className="w-full h-28 object-cover rounded-lg cursor-zoom-in"/><button onClick={()=>setB({...b,images:b.images.filter((_,j)=>j!==i)})} className="absolute top-1 right-1 w-6 h-6 rounded-full bg-white/90 opacity-0 group-hover:opacity-100"><Trash2 className="w-3 h-3 mx-auto text-red-500"/></button></div>)}
             {b.images.length===0 && <div className="col-span-full text-center py-8 text-sm text-[#6D6D82] border-2 border-dashed border-[#E8E8F1] rounded-xl">No chart screenshots yet. Upload or paste from clipboard.</div>}
           </div>
         </div>
@@ -243,16 +254,7 @@ export default function BiasCenter() {
               </select>
               <button type="button" onClick={addPoiTag} data-testid="bias-htf-poi-add" className="h-10 w-full sm:w-auto px-4 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-sm font-semibold">+ Add</button>
             </div>
-            {b.poi_tags.length > 0 && (
-              <div className="flex flex-wrap gap-2 mt-3">
-                {b.poi_tags.map(value => (
-                  <span key={value} className="chip active inline-flex items-center gap-1.5 pr-1">
-                    {value}
-                    <button type="button" onClick={()=>removePoiTag(value)} aria-label={`Remove ${value}`} className="w-5 h-5 rounded-full hover:bg-white/60 flex items-center justify-center"><X className="w-3 h-3"/></button>
-                  </span>
-                ))}
-              </div>
-            )}
+            <div className="text-[11px] text-[#A1A1AA] mt-2">Adding a POI writes it straight into your narrative above — no separate chip list.</div>
           </div>
         </div>
 

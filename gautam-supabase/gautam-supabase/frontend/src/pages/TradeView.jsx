@@ -5,6 +5,8 @@ import { Search, Trash2, X, PlusCircle, Filter, Pencil, Save, ChevronDown, Uploa
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { computePnl } from "@/lib/pnlCalc";
+import { useLightbox } from "@/components/ImageLightbox";
+import { compressImage } from "@/lib/imageUtils";
 
 export default function TradeView() {
   const { reload: reloadAccounts } = useAccount();
@@ -308,6 +310,7 @@ function RangeInput({ label, type, leftPlaceholder, rightPlaceholder, left, righ
 }
 
 function ViewBlock({ t }) {
+  const openLightbox = useLightbox();
   return (
     <>
       <div className="grid grid-cols-2 gap-3">
@@ -325,7 +328,7 @@ function ViewBlock({ t }) {
       {t.screenshots?.length>0 && (
         <div>
           <div className="text-[12px] text-[#6D6D82] mb-2">Screenshots ({t.screenshots.length})</div>
-          <div className="grid grid-cols-2 gap-2">{t.screenshots.map((s,i)=><img key={i} alt="" src={s} className="w-full rounded-lg"/>)}</div>
+          <div className="grid grid-cols-2 gap-2">{t.screenshots.map((s,i)=><img key={i} alt="" src={s} onClick={()=>openLightbox(t.screenshots,i)} className="w-full rounded-lg cursor-zoom-in"/>)}</div>
         </div>
       )}
     </>
@@ -334,9 +337,12 @@ function ViewBlock({ t }) {
 
 function EditForm({ edit, setEdit, toggleEdit, computed, presets }) {
   const inp = "w-full h-9 px-3 rounded-lg border border-[#E8E8F1] focus:border-[#7C3AED] outline-none text-sm bg-white tjfx-mono";
+  const openLightbox = useLightbox();
 
   const addImg = (dataUrl) => setEdit(p => ({...p, screenshots: [...(p.screenshots||[]), dataUrl]}));
-  const onFile = (e) => Array.from(e.target.files||[]).forEach(f => { const r = new FileReader(); r.onload=()=>addImg(r.result); r.readAsDataURL(f); });
+  const onFile = (e) => Array.from(e.target.files||[]).forEach(f => {
+    compressImage(f).then(addImg).catch(() => { const r = new FileReader(); r.onload=()=>addImg(r.result); r.readAsDataURL(f); });
+  });
   const removeImg = (i) => setEdit(p => ({...p, screenshots: (p.screenshots||[]).filter((_,j)=>j!==i)}));
 
   React.useEffect(() => {
@@ -345,7 +351,10 @@ function EditForm({ edit, setEdit, toggleEdit, computed, presets }) {
       for (const it of items) {
         if (it.type?.startsWith("image/")) {
           const f = it.getAsFile();
-          if (f) { const r = new FileReader(); r.onload=()=>addImg(r.result); r.readAsDataURL(f); toast.success("Image pasted"); }
+          if (f) {
+            compressImage(f).then(addImg).catch(() => { const r = new FileReader(); r.onload=()=>addImg(r.result); r.readAsDataURL(f); });
+            toast.success("Image pasted");
+          }
         }
       }
     };
@@ -413,7 +422,7 @@ function EditForm({ edit, setEdit, toggleEdit, computed, presets }) {
         <div className="grid grid-cols-3 gap-2">
           {(edit.screenshots||[]).map((s,i) => (
             <div key={i} className="relative group">
-              <img alt="" src={s} className="w-full h-20 object-cover rounded-lg"/>
+              <img alt="" src={s} onClick={()=>openLightbox(edit.screenshots,i)} className="w-full h-20 object-cover rounded-lg cursor-zoom-in"/>
               <button onClick={()=>removeImg(i)} data-testid={`remove-img-${i}`} className="absolute top-1 right-1 w-6 h-6 rounded-full bg-white/90 flex items-center justify-center opacity-0 group-hover:opacity-100 transition"><X className="w-3 h-3 text-red-500"/></button>
             </div>
           ))}

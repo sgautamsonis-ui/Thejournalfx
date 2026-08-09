@@ -1,7 +1,7 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Request, Depends, Body
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
-import os, logging, uuid, asyncio, calendar
+import os, logging, uuid, asyncio, calendar, base64
 from pathlib import Path
 from pydantic import BaseModel, Field
 from typing import List, Optional, Any, Dict
@@ -488,12 +488,44 @@ async def delete_tag(tag_id: str, user=Depends(get_current_user)):
     return {"ok": True}
 
 # ---------- AI (Google Gemini) ----------
-async def call_ai(prompt: str, system: str = "You are an expert ICT/SMC trading coach. Be concise, use bullets when helpful.") -> str:
+# House style for every AI feature in the app: Roman Hindi (Hinglish), short bullet
+# points only, never a wall of English paragraph text. Trading terms (FVG, POI,
+# liquidity, displacement, MSS, etc.) stay in English since that's how the trader
+# actually thinks in them — only the connecting words are Hindi.
+HINGLISH_POINTS_SYSTEM = (
+    "Tum ek expert ICT/SMC trading coach ho. HAMESHA Roman Hindi (Hinglish) mein jawab do — "
+    "trading terms (FVG, POI, liquidity, displacement, MSS, OB, BSL/SSL, etc.) English mein hi "
+    "rakhna, baaki sentence Hindi mein likhna. KABHI paragraph mat likho — hamesha short bullet "
+    "points (each point starting with '- ') mein likho, ek point ek chhoti line. Koi markdown "
+    "bold (**) use mat karo, sirf plain bullet points aur simple headers."
+)
+
+def _data_url_to_gemini_part(data_url: str):
+    """Turn a stored `data:image/...;base64,XXXX` screenshot into a Gemini image part.
+    Returns None (and is skipped) if the string isn't a valid data URL."""
+    try:
+        header, b64data = data_url.split(",", 1)
+        mime = header.split(":")[1].split(";")[0] if ":" in header else "image/png"
+        return {"mime_type": mime, "data": base64.b64decode(b64data)}
+    except Exception:
+        return None
+
+# Cap how many screenshots get sent to Gemini per call. Sending all 15 possible
+# chart images every time is what makes "AI Summary" feel slow — 6 recent, full-size
+# charts is plenty of visual context and keeps the round-trip fast.
+MAX_AI_IMAGES = 6
+
+async def call_ai(prompt: str, system: str = HINGLISH_POINTS_SYSTEM, images: Optional[List[str]] = None) -> str:
     if not GEMINI_API_KEY:
         return "AI unavailable: GEMINI_API_KEY is not configured on the server."
     try:
         model = genai.GenerativeModel("gemini-3.6-flash", system_instruction=system)
-        resp = model.generate_content(prompt)
+        parts: List[Any] = [prompt]
+        for img in (images or [])[:MAX_AI_IMAGES]:
+            part = _data_url_to_gemini_part(img)
+            if part:
+                parts.append(part)
+        resp = model.generate_content(parts)
         return (resp.text or "").strip()
     except Exception as e:
         logger.exception("AI error")
@@ -501,15 +533,31 @@ async def call_ai(prompt: str, system: str = "You are an expert ICT/SMC trading 
 
 @api_router.post("/ai/bias-summary")
 async def ai_bias_summary(payload: Dict[str, Any] = Body(...), user=Depends(get_current_user)):
-    prompt = f"""Generate a concise Daily Execution Summary from this bias data:
-Direction: {payload.get('direction')}
-Confidence: {payload.get('confidence')}%
-Narrative: {payload.get('narrative','')}
-POI Tags: {', '.join(payload.get('poi_tags',[]))}
-Session: {payload.get('session','')}
-Targets: {payload.get('targets',[])}
-Give 3-5 short lines + 1 focus tip."""
-    text = await call_ai(prompt)
+    images = payload.get("images", []) or []
+    narrative = (payload.get("narrative") or "").strip()
+    prompt = f"""Yeh trader ka {payload.get('type','weekly')} bias hai. Pehle neeche attach kiye gaye chart \
+screenshots (HTF / POI / key-level charts) ko dekho aur analyze karo.
+
+Bias Data:
+- Direction: {payload.get('direction')}
+- Confidence: {payload.get('confidence')}%
+- Session: {payload.get('session','')}
+- POI Tags: {', '.join(payload.get('poi_tags',[])) or 'none'}
+- Key Levels: {payload.get('key_levels',[])}
+- Targets: {payload.get('targets',[])}
+
+Trader ka apna likha hua market narrative (SIRF background context ke liye hai — ISKO SUMMARIZE \
+YA DOBARA WORD MEIN MAT LIKHNA, wo already saved hai apni jagah):
+\"\"\"{narrative or '(khaali — sirf charts se judge karo)'}\"\"\"
+
+Ab do sections mein jawab do, dono bullet points ('- ') mein:
+
+Chart Summary
+(screenshots mein jo dikh raha hai — structure, liquidity, POIs — uska summary, 4-6 points)
+
+Mera View
+(tumhara khud ka analysis is bias par + agla step kya hona chahiye — 3-5 points, last point ek focus tip ho)"""
+    text = await call_ai(prompt, images=images)
     return {"summary": text}
 
 @api_router.post("/ai/trade-review")
@@ -762,7 +810,7 @@ Task:
 
 Keep it under 120 words, punchy, motivational, no bullet numbering fluff."""
 
-    text = await call_ai(prompt, system="You are a rigorous but supportive trading discipline coach.")
+    text = await call_ai(prompt, system=HINGLISH_POINTS_SYSTEM + " Tum ek rigorous lekin supportive trading discipline coach ho.")
     return {
         "insight": text,
         "top_broken": [{"rule": rt, "broken": br, "followed": fw} for rt, br, fw in top_broken],
