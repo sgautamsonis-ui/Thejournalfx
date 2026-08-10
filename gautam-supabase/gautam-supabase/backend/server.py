@@ -29,6 +29,15 @@ if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 
 app = FastAPI(title="TheJournalFX API")
+
+@app.get("/")
+async def root_health():
+    # Zero-DB, zero-auth endpoint — point an uptime pinger (UptimeRobot / cron-job.org)
+    # here every ~10 minutes so Render's free plan doesn't spin the backend down.
+    # This alone fixes most of the "every tab takes 10-15s" slowness — that's Render's
+    # free-tier cold start, not the app being slow.
+    return {"status": "ok"}
+
 api_router = APIRouter(prefix="/api")
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -45,7 +54,7 @@ async def get_current_user(request: Request) -> Dict[str, Any]:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
     try:
-        resp = sb_auth.auth.get_user(token)
+        resp = await asyncio.to_thread(sb_auth.auth.get_user, token)
         auth_user = resp.user
     except Exception:
         auth_user = None
@@ -56,7 +65,7 @@ async def get_current_user(request: Request) -> Dict[str, Any]:
     email = auth_user.email
     meta = auth_user.user_metadata or {}
 
-    prof = sb.table("profiles").select("*").eq("user_id", user_id).limit(1).execute()
+    prof = await asyncio.to_thread(sb.table("profiles").select("*").eq("user_id", user_id).limit(1).execute)
     if prof.data:
         profile = prof.data[0]
     else:
@@ -68,7 +77,7 @@ async def get_current_user(request: Request) -> Dict[str, Any]:
             "onboarding_done": False,
             "settings": DEFAULT_SETTINGS,
         }
-        sb.table("profiles").insert(profile).execute()
+        await asyncio.to_thread(sb.table("profiles").insert(profile).execute)
 
     profile["email"] = email
     profile.setdefault("settings", DEFAULT_SETTINGS)
@@ -87,8 +96,8 @@ async def me(user=Depends(get_current_user)):
 @api_router.post("/auth/onboarding")
 async def onboarding(payload: Dict[str, Any] = Body(...), user=Depends(get_current_user)):
     merged = {**(user.get("settings") or {}), **payload}
-    sb.table("profiles").update({"onboarding_done": True, "settings": merged}).eq("user_id", user["user_id"]).execute()
-    updated = sb.table("profiles").select("*").eq("user_id", user["user_id"]).limit(1).execute()
+    await asyncio.to_thread(sb.table("profiles").update({"onboarding_done": True, "settings": merged}).eq("user_id", user["user_id"]).execute)
+    updated = await asyncio.to_thread(sb.table("profiles").select("*").eq("user_id", user["user_id"]).limit(1).execute)
     row = updated.data[0]
     row["email"] = user.get("email")
     return row
@@ -101,7 +110,7 @@ async def get_settings(user=Depends(get_current_user)):
 @api_router.put("/settings")
 async def update_settings(payload: Dict[str, Any] = Body(...), user=Depends(get_current_user)):
     merged = {**(user.get("settings") or {}), **payload}
-    sb.table("profiles").update({"settings": merged}).eq("user_id", user["user_id"]).execute()
+    await asyncio.to_thread(sb.table("profiles").update({"settings": merged}).eq("user_id", user["user_id"]).execute)
     return merged
 
 # ---------- Accounts ----------
@@ -117,7 +126,7 @@ class Account(BaseModel):
 
 @api_router.get("/accounts")
 async def list_accounts(user=Depends(get_current_user)):
-    r = sb.table("accounts").select("*").eq("user_id", user["user_id"]).execute()
+    r = await asyncio.to_thread(sb.table("accounts").select("*").eq("user_id", user["user_id"]).execute)
     return [{k: v for k, v in d.items() if k != "user_id"} for d in r.data]
 
 @api_router.post("/accounts")
@@ -126,7 +135,7 @@ async def create_account(acc: Account, user=Depends(get_current_user)):
     doc["user_id"] = user["user_id"]
     if not doc.get("starting_balance"):
         doc["starting_balance"] = doc.get("balance", 0.0)
-    sb.table("accounts").insert(doc).execute()
+    await asyncio.to_thread(sb.table("accounts").insert(doc).execute)
     doc.pop("user_id", None)
     return doc
 
@@ -141,8 +150,8 @@ class AccountUpdate(BaseModel):
 async def update_account(account_id: str, payload: AccountUpdate, user=Depends(get_current_user)):
     updates = {k: v for k, v in payload.model_dump().items() if v is not None}
     if updates:
-        sb.table("accounts").update(updates).eq("id", account_id).eq("user_id", user["user_id"]).execute()
-    row = sb.table("accounts").select("*").eq("id", account_id).eq("user_id", user["user_id"]).limit(1).execute()
+        await asyncio.to_thread(sb.table("accounts").update(updates).eq("id", account_id).eq("user_id", user["user_id"]).execute)
+    row = await asyncio.to_thread(sb.table("accounts").select("*").eq("id", account_id).eq("user_id", user["user_id"]).limit(1).execute)
     if not row.data:
         return {"ok": False}
     doc = row.data[0]
@@ -151,18 +160,18 @@ async def update_account(account_id: str, payload: AccountUpdate, user=Depends(g
 
 @api_router.delete("/accounts/{account_id}")
 async def delete_account(account_id: str, user=Depends(get_current_user)):
-    sb.table("accounts").delete().eq("id", account_id).eq("user_id", user["user_id"]).execute()
+    await asyncio.to_thread(sb.table("accounts").delete().eq("id", account_id).eq("user_id", user["user_id"]).execute)
     return {"ok": True}
 
 # ---------- Trades ----------
 async def apply_pnl_to_account(user_id: str, account_id: Optional[str], delta: float):
     if not account_id or not delta:
         return
-    row = sb.table("accounts").select("balance").eq("id", account_id).eq("user_id", user_id).limit(1).execute()
+    row = await asyncio.to_thread(sb.table("accounts").select("balance").eq("id", account_id).eq("user_id", user_id).limit(1).execute)
     if not row.data:
         return
     new_balance = float(row.data[0].get("balance") or 0) + float(delta)
-    sb.table("accounts").update({"balance": new_balance}).eq("id", account_id).eq("user_id", user_id).execute()
+    await asyncio.to_thread(sb.table("accounts").update({"balance": new_balance}).eq("id", account_id).eq("user_id", user_id).execute)
 
 class Trade(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -202,12 +211,12 @@ async def list_trades(account_id: Optional[str] = None, user=Depends(get_current
     q = sb.table("trades").select("*").eq("user_id", user["user_id"])
     if account_id and account_id != "all":
         q = q.eq("account_id", account_id)
-    r = q.order("date", desc=True).execute()
+    r = await asyncio.to_thread(q.order("date", desc=True).execute)
     return [{k: v for k, v in d.items() if k != "user_id"} for d in r.data]
 
 @api_router.get("/trades/{trade_id}")
 async def get_trade(trade_id: str, user=Depends(get_current_user)):
-    r = sb.table("trades").select("*").eq("id", trade_id).eq("user_id", user["user_id"]).limit(1).execute()
+    r = await asyncio.to_thread(sb.table("trades").select("*").eq("id", trade_id).eq("user_id", user["user_id"]).limit(1).execute)
     if not r.data:
         raise HTTPException(404, "Not found")
     doc = r.data[0]
@@ -218,7 +227,7 @@ async def get_trade(trade_id: str, user=Depends(get_current_user)):
 async def create_trade(trade: Trade, user=Depends(get_current_user)):
     doc = trade.model_dump()
     doc["user_id"] = user["user_id"]
-    sb.table("trades").insert(doc).execute()
+    await asyncio.to_thread(sb.table("trades").insert(doc).execute)
     if doc.get("status") == "closed" and doc.get("net_pnl") is not None:
         await apply_pnl_to_account(user["user_id"], doc.get("account_id"), doc.get("net_pnl") or 0)
     doc.pop("user_id", None)
@@ -227,7 +236,7 @@ async def create_trade(trade: Trade, user=Depends(get_current_user)):
 @api_router.put("/trades/{trade_id}")
 async def update_trade(trade_id: str, payload: Dict[str, Any] = Body(...), user=Depends(get_current_user)):
     payload.pop("user_id", None); payload.pop("id", None)
-    existing_r = sb.table("trades").select("*").eq("id", trade_id).eq("user_id", user["user_id"]).limit(1).execute()
+    existing_r = await asyncio.to_thread(sb.table("trades").select("*").eq("id", trade_id).eq("user_id", user["user_id"]).limit(1).execute)
     if not existing_r.data:
         raise HTTPException(404, "Not found")
     existing = existing_r.data[0]
@@ -249,19 +258,19 @@ async def update_trade(trade_id: str, payload: Dict[str, Any] = Body(...), user=
         delta = effective(new_state) - effective(existing)
         await apply_pnl_to_account(user["user_id"], new_acc, delta)
 
-    sb.table("trades").update(payload).eq("id", trade_id).eq("user_id", user["user_id"]).execute()
-    doc = sb.table("trades").select("*").eq("id", trade_id).eq("user_id", user["user_id"]).limit(1).execute().data[0]
+    await asyncio.to_thread(sb.table("trades").update(payload).eq("id", trade_id).eq("user_id", user["user_id"]).execute)
+    doc = (await asyncio.to_thread(sb.table("trades").select("*").eq("id", trade_id).eq("user_id", user["user_id"]).limit(1).execute)).data[0]
     doc.pop("user_id", None)
     return doc
 
 @api_router.delete("/trades/{trade_id}")
 async def delete_trade(trade_id: str, user=Depends(get_current_user)):
-    existing_r = sb.table("trades").select("*").eq("id", trade_id).eq("user_id", user["user_id"]).limit(1).execute()
+    existing_r = await asyncio.to_thread(sb.table("trades").select("*").eq("id", trade_id).eq("user_id", user["user_id"]).limit(1).execute)
     if existing_r.data:
         existing = existing_r.data[0]
         if existing.get("status") == "closed" and existing.get("net_pnl") is not None:
             await apply_pnl_to_account(user["user_id"], existing.get("account_id"), -(existing.get("net_pnl") or 0))
-    sb.table("trades").delete().eq("id", trade_id).eq("user_id", user["user_id"]).execute()
+    await asyncio.to_thread(sb.table("trades").delete().eq("id", trade_id).eq("user_id", user["user_id"]).execute)
     return {"ok": True}
 
 # ---------- Bias ----------
@@ -288,12 +297,12 @@ async def list_bias(type: Optional[str] = None, user=Depends(get_current_user)):
     q = sb.table("bias").select("*").eq("user_id", user["user_id"])
     if type:
         q = q.eq("type", type)
-    r = q.order("date", desc=True).execute()
+    r = await asyncio.to_thread(q.order("date", desc=True).execute)
     return [{k: v for k, v in d.items() if k != "user_id"} for d in r.data]
 
 @api_router.get("/bias/latest")
 async def latest_bias(type: str, user=Depends(get_current_user)):
-    r = sb.table("bias").select("*").eq("user_id", user["user_id"]).eq("type", type).order("date", desc=True).limit(1).execute()
+    r = await asyncio.to_thread(sb.table("bias").select("*").eq("user_id", user["user_id"]).eq("type", type).order("date", desc=True).limit(1).execute)
     if not r.data:
         return None
     doc = r.data[0]
@@ -307,24 +316,24 @@ async def create_bias(b: Bias, user=Depends(get_current_user)):
     # Safety net: one bias per user+type+period(date). If a record already exists
     # for this exact period, update it instead of inserting a duplicate — this
     # guards against stale/out-of-sync frontend state creating extra entries.
-    existing = sb.table("bias").select("id").eq("user_id", user["user_id"]).eq("type", doc["type"]).eq("date", doc["date"]).limit(1).execute()
+    existing = await asyncio.to_thread(sb.table("bias").select("id").eq("user_id", user["user_id"]).eq("type", doc["type"]).eq("date", doc["date"]).limit(1).execute)
     if existing.data:
         existing_id = existing.data[0]["id"]
         update_doc = {k: v for k, v in doc.items() if k not in ("id", "user_id")}
-        sb.table("bias").update(update_doc).eq("id", existing_id).eq("user_id", user["user_id"]).execute()
-        r = sb.table("bias").select("*").eq("id", existing_id).eq("user_id", user["user_id"]).limit(1).execute()
+        await asyncio.to_thread(sb.table("bias").update(update_doc).eq("id", existing_id).eq("user_id", user["user_id"]).execute)
+        r = await asyncio.to_thread(sb.table("bias").select("*").eq("id", existing_id).eq("user_id", user["user_id"]).limit(1).execute)
         result = r.data[0]
         result.pop("user_id", None)
         return result
-    sb.table("bias").insert(doc).execute()
+    await asyncio.to_thread(sb.table("bias").insert(doc).execute)
     doc.pop("user_id", None)
     return doc
 
 @api_router.put("/bias/{bias_id}")
 async def update_bias(bias_id: str, payload: Dict[str, Any] = Body(...), user=Depends(get_current_user)):
     payload.pop("user_id", None); payload.pop("id", None)
-    sb.table("bias").update(payload).eq("id", bias_id).eq("user_id", user["user_id"]).execute()
-    r = sb.table("bias").select("*").eq("id", bias_id).eq("user_id", user["user_id"]).limit(1).execute()
+    await asyncio.to_thread(sb.table("bias").update(payload).eq("id", bias_id).eq("user_id", user["user_id"]).execute)
+    r = await asyncio.to_thread(sb.table("bias").select("*").eq("id", bias_id).eq("user_id", user["user_id"]).limit(1).execute)
     if not r.data:
         raise HTTPException(404, "Not found")
     doc = r.data[0]
@@ -333,7 +342,7 @@ async def update_bias(bias_id: str, payload: Dict[str, Any] = Body(...), user=De
 
 @api_router.delete("/bias/{bias_id}")
 async def delete_bias(bias_id: str, user=Depends(get_current_user)):
-    sb.table("bias").delete().eq("id", bias_id).eq("user_id", user["user_id"]).execute()
+    await asyncio.to_thread(sb.table("bias").delete().eq("id", bias_id).eq("user_id", user["user_id"]).execute)
     return {"ok": True}
 
 # ---------- Preferences (user-managed dropdowns) ----------
@@ -412,7 +421,7 @@ async def list_prefs(kind: str, user=Depends(get_current_user)):
     if kind not in VALID_KINDS:
         raise HTTPException(400, "Invalid kind")
     await ensure_prefs_seeded(user["user_id"], kind)
-    r = sb.table("preferences").select("*").eq("user_id", user["user_id"]).eq("kind", kind).order("order").execute()
+    r = await asyncio.to_thread(sb.table("preferences").select("*").eq("user_id", user["user_id"]).eq("kind", kind).order("order").execute)
     return [{k: v for k, v in d.items() if k != "user_id"} for d in r.data]
 
 @api_router.post("/preferences/{kind}")
@@ -422,9 +431,9 @@ async def create_pref(kind: str, payload: Dict[str, Any] = Body(...), user=Depen
     value = (payload.get("value") or "").strip()
     if not value:
         raise HTTPException(400, "Value required")
-    count_r = sb.table("preferences").select("id").eq("user_id", user["user_id"]).eq("kind", kind).execute()
+    count_r = await asyncio.to_thread(sb.table("preferences").select("id").eq("user_id", user["user_id"]).eq("kind", kind).execute)
     item = {"id": str(uuid.uuid4()), "user_id": user["user_id"], "kind": kind, "value": value, "order": len(count_r.data)}
-    sb.table("preferences").insert(item).execute()
+    await asyncio.to_thread(sb.table("preferences").insert(item).execute)
     item.pop("user_id", None)
     return item
 
@@ -434,8 +443,8 @@ async def update_pref(kind: str, pref_id: str, payload: Dict[str, Any] = Body(..
     if "value" in payload: upd["value"] = (payload["value"] or "").strip()
     if "order" in payload: upd["order"] = int(payload["order"])
     if upd:
-        sb.table("preferences").update(upd).eq("id", pref_id).eq("user_id", user["user_id"]).eq("kind", kind).execute()
-    r = sb.table("preferences").select("*").eq("id", pref_id).eq("user_id", user["user_id"]).eq("kind", kind).limit(1).execute()
+        await asyncio.to_thread(sb.table("preferences").update(upd).eq("id", pref_id).eq("user_id", user["user_id"]).eq("kind", kind).execute)
+    r = await asyncio.to_thread(sb.table("preferences").select("*").eq("id", pref_id).eq("user_id", user["user_id"]).eq("kind", kind).limit(1).execute)
     if not r.data:
         return None
     doc = r.data[0]
@@ -444,7 +453,7 @@ async def update_pref(kind: str, pref_id: str, payload: Dict[str, Any] = Body(..
 
 @api_router.delete("/preferences/{kind}/{pref_id}")
 async def delete_pref(kind: str, pref_id: str, user=Depends(get_current_user)):
-    sb.table("preferences").delete().eq("id", pref_id).eq("user_id", user["user_id"]).eq("kind", kind).execute()
+    await asyncio.to_thread(sb.table("preferences").delete().eq("id", pref_id).eq("user_id", user["user_id"]).eq("kind", kind).execute)
     return {"ok": True}
 
 # ---------- Setup Tags ----------
@@ -468,23 +477,23 @@ DEFAULT_TAGS = [
 
 @api_router.get("/tags")
 async def get_tags(user=Depends(get_current_user)):
-    r = sb.table("tags").select("*").eq("user_id", user["user_id"]).execute()
+    r = await asyncio.to_thread(sb.table("tags").select("*").eq("user_id", user["user_id"]).execute)
     if not r.data:
         seeded = [{"id": str(uuid.uuid4()), "user_id": user["user_id"], "enabled": True, **t} for t in DEFAULT_TAGS]
-        sb.table("tags").insert(seeded).execute()
+        await asyncio.to_thread(sb.table("tags").insert(seeded).execute)
         return [{k: v for k, v in d.items() if k != "user_id"} for d in seeded]
     return [{k: v for k, v in d.items() if k != "user_id"} for d in r.data]
 
 @api_router.post("/tags")
 async def create_tag(payload: Dict[str, Any] = Body(...), user=Depends(get_current_user)):
     item = {"id": str(uuid.uuid4()), "user_id": user["user_id"], "enabled": True, **payload}
-    sb.table("tags").insert(item).execute()
+    await asyncio.to_thread(sb.table("tags").insert(item).execute)
     item.pop("user_id", None)
     return item
 
 @api_router.delete("/tags/{tag_id}")
 async def delete_tag(tag_id: str, user=Depends(get_current_user)):
-    sb.table("tags").delete().eq("id", tag_id).eq("user_id", user["user_id"]).execute()
+    await asyncio.to_thread(sb.table("tags").delete().eq("id", tag_id).eq("user_id", user["user_id"]).execute)
     return {"ok": True}
 
 # ---------- AI (Google Gemini) ----------
@@ -579,7 +588,7 @@ Give: 1) Summary  2) Strengths  3) Weaknesses  4) One suggestion. Max 120 words.
 
 @api_router.post("/ai/psychology-coach")
 async def ai_psychology(payload: Dict[str, Any] = Body(default={}), user=Depends(get_current_user)):
-    r = sb.table("trades").select("*").eq("user_id", user["user_id"]).order("date", desc=True).limit(300).execute()
+    r = await asyncio.to_thread(sb.table("trades").select("*").eq("user_id", user["user_id"]).order("date", desc=True).limit(300).execute)
     trades_all = [{k: v for k, v in d.items() if k != "user_id"} for d in r.data]
     filters = (payload or {})
 
@@ -686,22 +695,22 @@ async def list_notebook(kind: Optional[str] = None, user=Depends(get_current_use
     q = sb.table("notebook").select("*").eq("user_id", user["user_id"])
     if kind:
         q = q.eq("kind", kind)
-    r = q.order("created_at", desc=True).execute()
+    r = await asyncio.to_thread(q.order("created_at", desc=True).execute)
     return [{k: v for k, v in d.items() if k != "user_id"} for d in r.data]
 
 @api_router.post("/notebook")
 async def create_notebook(entry: NotebookEntry, user=Depends(get_current_user)):
     doc = entry.model_dump()
     doc["user_id"] = user["user_id"]
-    sb.table("notebook").insert(doc).execute()
+    await asyncio.to_thread(sb.table("notebook").insert(doc).execute)
     doc.pop("user_id", None)
     return doc
 
 @api_router.put("/notebook/{entry_id}")
 async def update_notebook(entry_id: str, payload: Dict[str, Any] = Body(...), user=Depends(get_current_user)):
     payload.pop("user_id", None); payload.pop("id", None)
-    sb.table("notebook").update(payload).eq("id", entry_id).eq("user_id", user["user_id"]).execute()
-    r = sb.table("notebook").select("*").eq("id", entry_id).eq("user_id", user["user_id"]).limit(1).execute()
+    await asyncio.to_thread(sb.table("notebook").update(payload).eq("id", entry_id).eq("user_id", user["user_id"]).execute)
+    r = await asyncio.to_thread(sb.table("notebook").select("*").eq("id", entry_id).eq("user_id", user["user_id"]).limit(1).execute)
     if not r.data:
         raise HTTPException(404, "Not found")
     doc = r.data[0]
@@ -710,13 +719,13 @@ async def update_notebook(entry_id: str, payload: Dict[str, Any] = Body(...), us
 
 @api_router.delete("/notebook/{entry_id}")
 async def delete_notebook(entry_id: str, user=Depends(get_current_user)):
-    sb.table("notebook").delete().eq("id", entry_id).eq("user_id", user["user_id"]).execute()
+    await asyncio.to_thread(sb.table("notebook").delete().eq("id", entry_id).eq("user_id", user["user_id"]).execute)
     return {"ok": True}
 
 # ---------- Discipline Streak ----------
 @api_router.get("/stats/discipline")
 async def discipline_stats(user=Depends(get_current_user)):
-    r = sb.table("trades").select("*").eq("user_id", user["user_id"]).order("date", desc=True).execute()
+    r = await asyncio.to_thread(sb.table("trades").select("*").eq("user_id", user["user_id"]).order("date", desc=True).execute)
     trades = [{k: v for k, v in d.items() if k != "user_id"} for d in r.data]
     settings = user.get("settings", {}) or {}
     max_risk = float(settings.get("risk_percent", 1.0))
@@ -776,9 +785,9 @@ async def discipline_stats(user=Depends(get_current_user)):
 
 @api_router.post("/ai/rule-adherence")
 async def ai_rule_adherence(user=Depends(get_current_user)):
-    tr_r = sb.table("trades").select("*").eq("user_id", user["user_id"]).order("date", desc=True).limit(60).execute()
+    tr_r = await asyncio.to_thread(sb.table("trades").select("*").eq("user_id", user["user_id"]).order("date", desc=True).limit(60).execute)
     trades = [{k: v for k, v in d.items() if k != "user_id"} for d in tr_r.data]
-    ru_r = sb.table("notebook").select("*").eq("user_id", user["user_id"]).eq("kind", "rule").execute()
+    ru_r = await asyncio.to_thread(sb.table("notebook").select("*").eq("user_id", user["user_id"]).eq("kind", "rule").execute)
     rules = [{k: v for k, v in d.items() if k != "user_id"} for d in ru_r.data]
 
     rule_titles = [r["title"] for r in rules]
@@ -830,7 +839,7 @@ async def dashboard_stats(account_id: Optional[str] = None, user=Depends(get_cur
     q = sb.table("trades").select("*").eq("user_id", user["user_id"])
     if account_id and account_id != "all":
         q = q.eq("account_id", account_id)
-    r = q.order("date").execute()
+    r = await asyncio.to_thread(q.order("date").execute)
     trades = [{k: v for k, v in d.items() if k != "user_id"} for d in r.data]
 
     total = len(trades)
