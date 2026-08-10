@@ -37,7 +37,10 @@ export default function Settings() {
     accountsApi.list().then(setAccounts).catch(()=>{});
   }, []);
 
-  const savePrefs = async () => { await settingsApi.update(settings); toast.success("Settings saved"); };
+  const savePrefs = async () => {
+    try { await settingsApi.update(settings); toast.success("Settings saved"); }
+    catch { toast.error("Could not save settings — please try again."); }
+  };
 
   const saveAccountLimits = async (accountId, dailyLimit, weeklyLimit) => {
     const nextLimits = { ...(settings.account_limits || {}) };
@@ -49,21 +52,32 @@ export default function Settings() {
     } else {
       delete nextLimits[accountId];
     }
-    const merged = await settingsApi.update({ account_limits: nextLimits });
-    setSettings(merged);
-    await refresh();
+    try {
+      const merged = await settingsApi.update({ account_limits: nextLimits });
+      setSettings(merged);
+      await refresh();
+    } catch {
+      toast.error("Could not save drawdown limits — please try again.");
+    }
   };
 
   const addAccount = async () => {
-    if (!newAcc.name) return;
-    const { dailyLimit, weeklyLimit, ...accPayload } = newAcc;
-    const a = await accountsApi.create(accPayload);
-    setAccounts([...accounts, a]);
-    if (dailyLimit || weeklyLimit) await saveAccountLimits(a.id, dailyLimit, weeklyLimit);
-    setNewAcc({ name: "", broker: "", account_type: "Live", balance: 10000, currency: "USD", dailyLimit: "", weeklyLimit: "" });
-    toast.success("Account added");
+    if (!newAcc.name) { toast.error("Account name is required"); return; }
+    try {
+      const { dailyLimit, weeklyLimit, ...accPayload } = newAcc;
+      const a = await accountsApi.create(accPayload);
+      setAccounts(prev => [...prev, a]);
+      if (dailyLimit || weeklyLimit) await saveAccountLimits(a.id, dailyLimit, weeklyLimit);
+      setNewAcc({ name: "", broker: "", account_type: "Live", balance: 10000, currency: "USD", dailyLimit: "", weeklyLimit: "" });
+      toast.success("Account added");
+    } catch {
+      toast.error("Could not add account — please try again.");
+    }
   };
-  const delAcc = async (id) => { await accountsApi.delete(id); setAccounts(accounts.filter(a=>a.id!==id)); };
+  const delAcc = async (id) => {
+    try { await accountsApi.delete(id); setAccounts(prev => prev.filter(a=>a.id!==id)); toast.success("Account deleted"); }
+    catch { toast.error("Could not delete account — please try again."); }
+  };
 
   const startEditAcc = (a) => {
     const limits = settings.account_limits?.[a.id] || {};
@@ -74,17 +88,21 @@ export default function Settings() {
     });
   };
   const saveEditAcc = async () => {
-    if (!editAcc?.name) return;
-    const { id, dailyLimit, weeklyLimit, ...accPayload } = editAcc;
-    const updated = await accountsApi.update(id, { ...accPayload, balance: parseFloat(accPayload.balance) || 0 });
-    setAccounts(accounts.map(a => a.id === id ? updated : a));
-    await saveAccountLimits(id, dailyLimit, weeklyLimit);
-    setEditAcc(null);
-    toast.success("Account updated");
+    if (!editAcc?.name) { toast.error("Account name is required"); return; }
+    try {
+      const { id, dailyLimit, weeklyLimit, ...accPayload } = editAcc;
+      const updated = await accountsApi.update(id, { ...accPayload, balance: parseFloat(accPayload.balance) || 0 });
+      setAccounts(prev => prev.map(a => a.id === id ? updated : a));
+      await saveAccountLimits(id, dailyLimit, weeklyLimit);
+      setEditAcc(null);
+      toast.success("Account updated");
+    } catch {
+      toast.error("Could not update account — please try again.");
+    }
   };
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-[1300px] mx-auto" data-testid="settings-page">
+    <div className="p-4 sm:p-5 lg:p-6 max-w-[1300px] mx-auto" data-testid="settings-page">
       <h1 className="font-display text-3xl font-bold">Settings</h1>
       <p className="text-[#6D6D82] mt-1 mb-6">All your presets and preferences live here. Add once, use everywhere.</p>
 
@@ -97,7 +115,7 @@ export default function Settings() {
           </div>
         </div>
 
-        <div className="col-span-12 md:col-span-9 space-y-5">
+        <div className="col-span-12 md:col-span-9 space-y-4">
           {tab==="Preferences" && (
             <div className="tjfx-card p-6 space-y-4">
               <h3 className="font-display text-lg font-bold">Trading Preferences</h3>

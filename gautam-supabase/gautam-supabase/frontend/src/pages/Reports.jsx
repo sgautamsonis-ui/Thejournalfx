@@ -102,7 +102,7 @@ export default function Reports() {
   };
 
   return (
-    <div className="p-8 max-w-[1400px] mx-auto space-y-5" data-testid="reports-page">
+    <div className="p-5 max-w-[1400px] mx-auto space-y-4" data-testid="reports-page">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-display text-3xl font-bold">Reports & Export</h1>
@@ -118,7 +118,7 @@ export default function Reports() {
 
       <div className="grid grid-cols-12 gap-5">
         {/* Config panel */}
-        <div className="col-span-12 lg:col-span-4 space-y-5">
+        <div className="col-span-12 lg:col-span-4 space-y-4">
           <div className="tjfx-card p-6 space-y-4">
             <div>
               <div className="text-[12px] text-[#6D6D82] mb-2">Report Type</div>

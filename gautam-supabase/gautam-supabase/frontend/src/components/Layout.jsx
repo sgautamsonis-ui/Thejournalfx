@@ -43,6 +43,26 @@ function AccountOverview() {
     </div>
   );
 
+  // Battery-style usage bar for a drawdown vs its limit — fills up (and turns
+  // amber/red) as more of the daily/weekly allowance gets used.
+  const DrawdownBar = ({ label, used, limit }) => {
+    const pct = limit ? Math.min(100, (Math.abs(used) / limit) * 100) : 0;
+    const barColor = pct >= 90 ? "bg-red-500" : pct >= 60 ? "bg-amber-500" : "bg-emerald-500";
+    return (
+      <div className="py-1.5">
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-[11px] text-[#6D6D82]">{label}</span>
+          <span className="text-[11px] font-semibold tjfx-mono text-[#16151F]">
+            ${Math.abs(used).toFixed(0)} <span className="text-[#A1A1AA] font-normal">/ ${limit.toFixed(0)}</span>
+          </span>
+        </div>
+        <div className="h-2 w-full rounded-full bg-[#E8E8F1] overflow-hidden">
+          <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="px-3 py-3 border-t border-[#E8E8F1]" data-testid="account-overview">
       <div className="text-[10px] font-semibold text-[#A1A1AA] uppercase tracking-wide px-1 mb-2">
@@ -53,18 +73,24 @@ function AccountOverview() {
         <Row label="Today's P&L" value={`${todaysPnl >= 0 ? "+" : ""}$${todaysPnl.toFixed(2)}`} positive={todaysPnl >= 0} />
         <Row label="Total P&L" value={`${totalPnl >= 0 ? "+" : ""}$${totalPnl.toFixed(2)}`} positive={totalPnl >= 0} />
         <Row label="Win Rate" value={`${stats?.win_rate ?? 0}%`} />
-        <Row
-          label="Daily Drawdown"
-          value={`${dailyDD === 0 ? "" : "-"}$${Math.abs(dailyDD).toFixed(2)}`}
-          positive={dailyLimit ? Math.abs(dailyDD) < dailyLimit : (dailyDD >= -0.001 ? undefined : false)}
-          limit={dailyLimit}
-        />
-        <Row
-          label="Weekly Drawdown"
-          value={`${weeklyDD === 0 ? "" : "-"}$${Math.abs(weeklyDD).toFixed(2)}`}
-          positive={weeklyLimit ? Math.abs(weeklyDD) < weeklyLimit : (weeklyDD >= -0.001 ? undefined : false)}
-          limit={weeklyLimit}
-        />
+        {dailyLimit ? (
+          <DrawdownBar label="Daily Drawdown" used={dailyDD} limit={dailyLimit} />
+        ) : (
+          <Row
+            label="Daily Drawdown"
+            value={`${dailyDD === 0 ? "" : "-"}$${Math.abs(dailyDD).toFixed(2)}`}
+            positive={dailyDD >= -0.001 ? undefined : false}
+          />
+        )}
+        {weeklyLimit ? (
+          <DrawdownBar label="Weekly Drawdown" used={weeklyDD} limit={weeklyLimit} />
+        ) : (
+          <Row
+            label="Weekly Drawdown"
+            value={`${weeklyDD === 0 ? "" : "-"}$${Math.abs(weeklyDD).toFixed(2)}`}
+            positive={weeklyDD >= -0.001 ? undefined : false}
+          />
+        )}
         {activeId !== "all" && !limits && (
           <Link to="/settings" className="mt-1 block text-[10px] text-[#7C3AED] hover:underline">
             + Set drawdown limits →
@@ -147,7 +173,7 @@ export default function Layout() {
                 return <>{g}, {name.split(" ")[0]} <span>👋</span></>;
               })()}
             </div>
-            <div className="text-[11px] text-[#6D6D82] truncate">Discipline today, freedom tomorrow.</div>
+            <div className="text-[11px] text-[#6D6D82] truncate">{user?.settings?.motivation || "Discipline today, freedom tomorrow."}</div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <NavLink to="/settings" data-testid="header-settings-btn" aria-label="Settings" className="w-8 h-8 rounded-xl border border-[#E8E8F1] flex items-center justify-center text-[#6D6D82] hover:text-[#7C3AED] hover:border-[#7C3AED]">

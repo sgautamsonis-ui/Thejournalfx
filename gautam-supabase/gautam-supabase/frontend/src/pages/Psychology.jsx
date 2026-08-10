@@ -53,7 +53,7 @@ export default function Psychology() {
   }, [filters]);
 
   return (
-    <div className="p-8 max-w-[1300px] mx-auto space-y-5" data-testid="psychology-page">
+    <div className="p-5 max-w-[1300px] mx-auto space-y-4" data-testid="psychology-page">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="font-display text-3xl font-bold">Psychology AI</h1>

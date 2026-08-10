@@ -164,7 +164,7 @@ export default function BiasCenter() {
   const addNote = () => setB(p => ({...p, notes: [...p.notes, ""]}));
 
   return (
-    <div className="p-8 max-w-[1000px] mx-auto space-y-5" data-testid="bias-page">
+    <div className="p-5 max-w-[1000px] mx-auto space-y-4" data-testid="bias-page">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <div className="flex items-center gap-2">
@@ -194,7 +194,7 @@ export default function BiasCenter() {
         </div>
       </div>
 
-      <div className="space-y-5">
+      <div className="space-y-4">
         <div className="tjfx-card p-6">
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-display text-lg font-bold">Chart Gallery <span className="text-xs text-[#6D6D82] font-normal tjfx-mono ml-1">{b.images.length}/{MAX_IMAGES}</span></h3>

@@ -136,7 +136,7 @@ export default function TradeView() {
   };
 
   return (
-    <div className="p-8 max-w-[1500px] mx-auto space-y-5" data-testid="trade-view-page">
+    <div className="p-5 max-w-[1500px] mx-auto space-y-4" data-testid="trade-view-page">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-display text-3xl font-bold">Trade View</h1>

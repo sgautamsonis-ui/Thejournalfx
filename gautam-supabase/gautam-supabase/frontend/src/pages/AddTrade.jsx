@@ -94,10 +94,10 @@ export default function AddTrade() {
     const r = computePnl({
       symbol: t.symbol, direction: t.direction,
       entry: t.entry_price, exit: t.exit_price, lot: t.lot_size,
-      stop_loss: t.stop_loss, commission: t.commission, swap: t.swap,
+      stop_loss: t.stop_loss, take_profit: t.take_profit, commission: t.commission, swap: t.swap,
     });
     const rMultiple = r.risk ? Math.round((r.pnl / r.risk) * 100) / 100 : 0;
-    return { pnl: r.pnl, r: rMultiple, risk: r.risk, cls: r.cls, pipValue: r.pipValuePerLot };
+    return { pnl: r.pnl, r: rMultiple, risk: r.risk, reward: r.reward, cls: r.cls, pipValue: r.pipValuePerLot };
   }, [t]);
 
   const recommendedLot = useMemo(() => {
@@ -215,7 +215,7 @@ export default function AddTrade() {
     saving={saving} save={save} onFile={onFile} />;
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-[1400px] mx-auto space-y-5" data-testid="add-trade-page">
+    <div className="p-4 sm:p-5 lg:p-6 max-w-[1400px] mx-auto space-y-4" data-testid="add-trade-page">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="font-display text-3xl font-bold">Add Trade</h1>
@@ -232,7 +232,7 @@ export default function AddTrade() {
       </div>
 
       <div className="grid grid-cols-12 gap-5">
-        <div className="col-span-12 lg:col-span-8 space-y-5">
+        <div className="col-span-12 lg:col-span-8 space-y-4">
           {/* Trade Details */}
           <div className="tjfx-card p-6">
             <SectionHeading number="1" title="Trade Details" subtitle="Execution, risk and account information" />
@@ -360,7 +360,7 @@ export default function AddTrade() {
         </div>
 
         {/* Right column */}
-        <div className="col-span-12 lg:col-span-4 space-y-5">
+        <div className="col-span-12 lg:col-span-4 space-y-4">
           <div className="tjfx-card p-6">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-display text-lg font-bold">Screenshots</h3>
@@ -483,17 +483,31 @@ function ChipRow({ label, items, selected, onToggle }) {
 function AddTradeWorkspace({ t, setT, presets, accounts, computed, recommendedLot, htfDraft, setHtfDraft, entryDraft, setEntryDraft, addPairedPreset, removePairedPreset, toggle, saving, save, onFile }) {
   const chooseStrategy = (strategy) => setT({ ...t, strategy });
   return (
-    <div className="add-trade-page p-4 sm:p-6 lg:p-8 max-w-[1500px] mx-auto space-y-5" data-testid="add-trade-page">
+    <div className="add-trade-page p-4 sm:p-5 lg:p-6 max-w-[1500px] mx-auto space-y-4" data-testid="add-trade-page">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div><h1 className="font-display text-3xl font-bold">Add New Trade</h1><p className="text-sm text-[#6D6D82] mt-1">Document your trade and build your edge.</p></div>
         <button onClick={save} disabled={saving} className="h-11 px-5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-sm font-semibold disabled:opacity-60">{saving ? "Saving..." : "Save Trade"}</button>
       </header>
 
       <React.Fragment>
+          <LinkedBiasCard number="1" />
+
+          <section className="tjfx-card p-5"><SectionHeading number="2" title="Strategy" subtitle="Choose or add your trading model" /><select value={t.strategy} onChange={e=>chooseStrategy(e.target.value)} className={inp}><option value="">Select strategy...</option>{presets.strategy.map(x=><option key={x}>{x}</option>)}</select><div className="flex flex-wrap gap-2 mt-4">{presets.strategy.slice(0,6).map(x=><Chip key={x} label={x} active={t.strategy===x} onClick={()=>chooseStrategy(x)}/>)}</div></section>
+
+          <PairedPresetBuilder number="3" title="HTF Points of Interest" description="Select a timeframe and POI type, then add it to this trade." timeframeLabel="HTF Timeframe" typeLabel="POI Type" timeframes={presets.htf_timeframe} types={presets.htf_poi_type} draft={htfDraft} onDraftChange={setHtfDraft} items={t.htf_poi} onAdd={()=>addPairedPreset("htf_poi",htfDraft,setHtfDraft,"HTF POI")} onRemove={value=>removePairedPreset("htf_poi",value)} testid="htf-poi"/>
+
+          <PairedPresetBuilder number="4" title="Entry Confirmations" description="Log the confirmation that triggered the entry." timeframeLabel="Entry Timeframe" typeLabel="Confirmation Type" timeframes={presets.entry_timeframe} types={presets.entry_confirmation_type} draft={entryDraft} onDraftChange={setEntryDraft} items={t.entry_tags} onAdd={()=>addPairedPreset("entry_tags",entryDraft,setEntryDraft,"entry confirmation")} onRemove={value=>removePairedPreset("entry_tags",value)} testid="entry-confirmation"/>
+
+          <section className="tjfx-card p-6"><SectionHeading number="5" title="Psychology & Mood" subtitle="Record your state before and after the trade" /><ChipRow label="Mood Before" items={presets.mood} selected={t.mood_before} onToggle={x=>toggle("mood_before",x)}/><div className="mt-4"><ChipRow label="Setup Tags" items={presets.setup_tag} selected={t.setup_tags} onToggle={x=>toggle("setup_tags",x)}/></div><textarea value={t.notes} onChange={e=>setT({...t,notes:e.target.value})} rows={5} className="w-full mt-5 p-3 rounded-xl border border-[#E8E8F1] focus:border-[#7C3AED] outline-none text-sm" placeholder="Notes (pre-trade mindset, execution and lessons)"/></section>
+
           <section className="tjfx-card p-5 sm:p-6">
-            <SectionHeading number="1" title="Trade Details" subtitle="Execution, risk and account information" />
+            <SectionHeading number="6" title="Trade Details" subtitle="Execution, risk and account information" />
             {accounts.length > 0 && <Field label="Trading Account"><select value={t.account_id||""} onChange={e=>setT({...t,account_id:e.target.value})} className={inp}>{accounts.map(a=><option key={a.id} value={a.id}>{a.name} · {a.broker} · ${Number(a.balance||0).toFixed(2)}</option>)}</select></Field>}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
+              <Field label="Date"><input value={t.date} onChange={e=>setT({...t,date:e.target.value})} type="date" className={inp}/></Field>
+              <Field label="Time"><input value={t.entry_time} onChange={e=>setT({...t,entry_time:e.target.value})} type="time" className={inp}/></Field>
+              <Field label="Lot Size"><input value={t.lot_size} onChange={e=>setT({...t,lot_size:e.target.value})} type="number" step="any" className={inp}/></Field>
+              <Field label="Session"><select value={t.session} onChange={e=>setT({...t,session:e.target.value})} className={inp}>{(presets.session.length?presets.session:["London"]).map(x=><option key={x}>{x}</option>)}</select></Field>
               <Field label="Symbol"><select value={t.symbol} onChange={e=>setT({...t,symbol:e.target.value})} className={inp}>{(presets.symbol.length?presets.symbol:["XAUUSD"]).map(x=><option key={x}>{x}</option>)}</select></Field>
               <Field label="Direction"><div className="grid grid-cols-2 gap-1"><button type="button" onClick={()=>setT({...t,direction:"long"})} className={`h-10 rounded-xl text-sm border ${t.direction==="long"?"bg-emerald-600 text-white border-emerald-600":"border-[#E8E8F1]"}`}>Long</button><button type="button" onClick={()=>setT({...t,direction:"short"})} className={`h-10 rounded-xl text-sm border ${t.direction==="short"?"bg-red-600 text-white border-red-600":"border-[#E8E8F1]"}`}>Short</button></div></Field>
               <Field label="Order Type"><select value={t.order_type} onChange={e=>setT({...t,order_type:e.target.value})} className={inp}>{["Market","Limit","Stop"].map(x=><option key={x}>{x}</option>)}</select></Field>
@@ -503,22 +517,91 @@ function AddTradeWorkspace({ t, setT, presets, accounts, computed, recommendedLo
               <Field label="SL Price"><input value={t.stop_loss} onChange={e=>setT({...t,stop_loss:e.target.value})} type="number" step="any" className={inp}/></Field>
               <Field label="TP Price"><input value={t.take_profit} onChange={e=>setT({...t,take_profit:e.target.value})} type="number" step="any" className={inp}/></Field>
               <Field label="Risk %"><input value={t.risk_percent} onChange={e=>setT({...t,risk_percent:e.target.value})} type="number" step="any" className={inp}/></Field>
-              <Field label="Lot Size"><input value={t.lot_size} onChange={e=>setT({...t,lot_size:e.target.value})} type="number" step="any" className={inp}/></Field>
-              <Field label="Session"><select value={t.session} onChange={e=>setT({...t,session:e.target.value})} className={inp}>{(presets.session.length?presets.session:["London"]).map(x=><option key={x}>{x}</option>)}</select></Field>
-              <Field label="Date"><input value={t.date} onChange={e=>setT({...t,date:e.target.value})} type="date" className={inp}/></Field>
-              <Field label="Time"><input value={t.entry_time} onChange={e=>setT({...t,entry_time:e.target.value})} type="time" className={inp}/></Field>
               <Field label="Commission"><input value={t.commission} onChange={e=>setT({...t,commission:e.target.value})} type="number" step="any" className={inp}/></Field>
               <Field label="Swap"><input value={t.swap} onChange={e=>setT({...t,swap:e.target.value})} type="number" step="any" className={inp}/></Field>
             </div>
             <div className="mt-5"><LotCalculator recommendedLot={recommendedLot} computed={computed} onUse={()=>recommendedLot.lot!==null&&setT({...t,lot_size:recommendedLot.lot})}/></div>
           </section>
-          <section className="tjfx-card p-5"><SectionHeading number="2" title="Strategy" subtitle="Choose or add your trading model" /><select value={t.strategy} onChange={e=>chooseStrategy(e.target.value)} className={inp}><option value="">Select strategy...</option>{presets.strategy.map(x=><option key={x}>{x}</option>)}</select><div className="flex flex-wrap gap-2 mt-4">{presets.strategy.slice(0,6).map(x=><Chip key={x} label={x} active={t.strategy===x} onClick={()=>chooseStrategy(x)}/>)}</div></section>
-          <PairedPresetBuilder number="3" title="HTF Points of Interest" description="Select a timeframe and POI type, then add it to this trade." timeframeLabel="HTF Timeframe" typeLabel="POI Type" timeframes={presets.htf_timeframe} types={presets.htf_poi_type} draft={htfDraft} onDraftChange={setHtfDraft} items={t.htf_poi} onAdd={()=>addPairedPreset("htf_poi",htfDraft,setHtfDraft,"HTF POI")} onRemove={value=>removePairedPreset("htf_poi",value)} testid="htf-poi"/>
-          <LinkedBiasCard />
-          <PairedPresetBuilder number="5" title="Entry Confirmations" description="Log the confirmation that triggered the entry." timeframeLabel="Entry Timeframe" typeLabel="Confirmation Type" timeframes={presets.entry_timeframe} types={presets.entry_confirmation_type} draft={entryDraft} onDraftChange={setEntryDraft} items={t.entry_tags} onAdd={()=>addPairedPreset("entry_tags",entryDraft,setEntryDraft,"entry confirmation")} onRemove={value=>removePairedPreset("entry_tags",value)} testid="entry-confirmation"/>
-          <section className="grid grid-cols-1 lg:grid-cols-2 gap-5"><div className="tjfx-card p-6"><SectionHeading number="6" title="Psychology & Mood" subtitle="Record your state before and after the trade" /><ChipRow label="Mood Before" items={presets.mood} selected={t.mood_before} onToggle={x=>toggle("mood_before",x)}/><div className="mt-4"><ChipRow label="Setup Tags" items={presets.setup_tag} selected={t.setup_tags} onToggle={x=>toggle("setup_tags",x)}/></div><textarea value={t.notes} onChange={e=>setT({...t,notes:e.target.value})} rows={5} className="w-full mt-5 p-3 rounded-xl border border-[#E8E8F1] focus:border-[#7C3AED] outline-none text-sm" placeholder="Notes (pre-trade mindset, execution and lessons)"/></div><AttachmentPanel images={t.screenshots} onFile={onFile}/></section>
-          <section className="tjfx-card p-5"><SectionHeading number="7" title="Review & Save" subtitle="Check your execution details before saving." /><div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-9 gap-3 text-sm"><Review label="Symbol" value={t.symbol}/><Review label="Direction" value={t.direction}/><Review label="Entry" value={t.entry_price||"--"}/><Review label="Exit" value={t.exit_price||"--"}/><Review label="SL" value={t.stop_loss||"--"}/><Review label="TP" value={t.take_profit||"--"}/><Review label="Risk" value={`${t.risk_percent}%`}/><Review label="Lot" value={t.lot_size}/><Review label="R:R" value={`${computed.r}R`}/></div><button onClick={save} disabled={saving} className="mt-5 h-11 min-w-[220px] rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-sm font-semibold disabled:opacity-60">{saving?"Saving trade...":"Save Trade"}</button></section>
+
+          <section className="tjfx-card p-5"><SectionHeading number="7" title="Trade Screenshot" subtitle="Upload or paste chart images for this trade." /><AttachmentPanel images={t.screenshots} onFile={onFile}/></section>
+
+          <section className="tjfx-card p-5">
+            <SectionHeading number="8" title="Review & Save" subtitle="Check your execution details before saving." />
+            <div className="mt-4"><ReviewCard t={t} computed={computed} /></div>
+            <button onClick={save} disabled={saving} className="mt-5 h-11 min-w-[220px] rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-sm font-semibold disabled:opacity-60">{saving?"Saving trade...":"Save Trade"}</button>
+          </section>
       </React.Fragment>
+    </div>
+  );
+}
+
+function ReviewCard({ t, computed }) {
+  const lossAmt = computed.risk;
+  const profitAmt = computed.reward;
+  const pnl = computed.pnl;
+  const hasPnl = Number(t.exit_price) > 0;
+  const dt = t.date ? new Date(t.date) : null;
+
+  return (
+    <div className="rounded-2xl border border-[#E8E8F1] bg-gradient-to-br from-white to-[#FAFAFF] p-5" data-testid="review-card">
+      {/* Meta strip: Date & Time → Lot → Session → Symbol/Direction */}
+      <div className="flex flex-wrap items-center gap-2 mb-5 pb-4 border-b border-[#E8E8F1]">
+        <MetaPill label={dt && !isNaN(dt) ? dt.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : t.date} sub={t.entry_time} />
+        <MetaPill label={`${t.lot_size || 0} lot`} />
+        <MetaPill label={t.session || "—"} />
+        <span className="ml-auto flex items-center gap-2">
+          <span className="tjfx-mono font-bold text-sm">{t.symbol}</span>
+          <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${t.direction === "long" ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>
+            {t.direction === "long" ? "↑ LONG" : "↓ SHORT"}
+          </span>
+        </span>
+      </div>
+
+      {/* Price levels */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+        <PriceBox label="Entry" value={t.entry_price} />
+        <PriceBox label="Exit" value={t.exit_price} />
+        <PriceBox label="Stop Loss" value={t.stop_loss} tone="red" amount={lossAmt} amountLabel="Potential loss" />
+        <PriceBox label="Take Profit" value={t.take_profit} tone="green" amount={profitAmt} amountLabel="Potential profit" />
+      </div>
+
+      {/* P&L summary */}
+      <div className={`rounded-xl p-4 flex items-center justify-between flex-wrap gap-3 ${hasPnl ? (pnl >= 0 ? "bg-emerald-50 border border-emerald-200" : "bg-red-50 border border-red-200") : "bg-[#F6F6FB] border border-[#E8E8F1]"}`}>
+        <div>
+          <div className="text-xs text-[#6D6D82] font-medium">P&amp;L Summary</div>
+          <div className={`font-display text-2xl font-extrabold tjfx-mono ${hasPnl ? (pnl >= 0 ? "text-emerald-600" : "text-red-500") : "text-[#16151F]"}`}>
+            {hasPnl ? `${pnl >= 0 ? "+" : ""}$${pnl.toFixed(2)}` : "Trade still open"}
+          </div>
+        </div>
+        <div className="text-right">
+          <div className="text-xs text-[#6D6D82]">R Multiple</div>
+          <div className="tjfx-mono font-bold text-lg">{computed.r}R</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MetaPill({ label, sub }) {
+  return (
+    <div className="px-3 py-1.5 rounded-lg bg-[#F6F6FB] border border-[#E8E8F1] text-xs font-medium text-[#16151F] tjfx-mono">
+      {label}{sub ? <span className="text-[#A1A1AA]"> · {sub}</span> : null}
+    </div>
+  );
+}
+
+function PriceBox({ label, value, tone, amount, amountLabel }) {
+  const toneBorder = tone === "red" ? "border-red-200 bg-red-50" : tone === "green" ? "border-emerald-200 bg-emerald-50" : "border-[#E8E8F1] bg-white";
+  const toneText = tone === "red" ? "text-red-600" : tone === "green" ? "text-emerald-600" : "text-[#6D6D82]";
+  return (
+    <div className={`rounded-xl border p-3 min-w-0 ${toneBorder}`}>
+      <div className={`text-[11px] font-semibold ${toneText}`}>{label}</div>
+      <div className="tjfx-mono font-bold text-base mt-0.5 truncate">{value || "--"}</div>
+      {amount != null && amount > 0 && (
+        <div className={`text-[11px] font-medium mt-1 ${toneText}`}>
+          {amountLabel}: {tone === "red" ? "-" : "+"}${amount.toFixed(2)}
+        </div>
+      )}
     </div>
   );
 }

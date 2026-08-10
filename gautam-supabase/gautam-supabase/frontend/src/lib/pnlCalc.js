@@ -41,14 +41,14 @@ function instrumentClass(symbolRaw) {
  * @param {number} [p.swap]
  * @returns {{ pnl:number, gross:number, risk:number, pipValuePerLot:number, cls:string }}
  */
-export function computePnl({ symbol, direction, entry, exit, lot, stop_loss, commission = 0, swap = 0 }) {
+export function computePnl({ symbol, direction, entry, exit, lot, stop_loss, take_profit, commission = 0, swap = 0 }) {
   const e = parseFloat(entry) || 0;
   const x = parseFloat(exit) || 0;
   const L = parseFloat(lot) || 0;
   const cls = instrumentClass(symbol);
-  if (!e || !x || !L) return { pnl: 0, gross: 0, risk: 0, pipValuePerLot: 0, cls };
+  if (!e || !L) return { pnl: 0, gross: 0, risk: 0, reward: 0, pipValuePerLot: 0, cls };
 
-  const diff = direction === "long" ? (x - e) : (e - x);
+  const diff = (x && direction === "long") ? (x - e) : (x && direction === "short") ? (e - x) : 0;
 
   let gross = 0;             // USD P&L before fees
   let pipValuePerLot = 0;    // USD per pip per lot (informational)
@@ -106,7 +106,7 @@ export function computePnl({ symbol, direction, entry, exit, lot, stop_loss, com
     }
   }
 
-  const pnl = gross - (parseFloat(commission) || 0) - (parseFloat(swap) || 0);
+  const pnl = x ? round2(gross - (parseFloat(commission) || 0) - (parseFloat(swap) || 0)) : 0;
 
   // Risk = distance from entry to SL * contract multiplier (same class formula, using SL instead of exit)
   let risk = 0;
@@ -125,10 +125,28 @@ export function computePnl({ symbol, direction, entry, exit, lot, stop_loss, com
     }
   }
 
+  // Reward = distance from entry to TP * contract multiplier (potential profit at target)
+  let reward = 0;
+  if (take_profit) {
+    const tpDiff = Math.abs(parseFloat(take_profit) - e);
+    switch (cls) {
+      case "metal100":    reward = tpDiff * 100 * L; break;
+      case "metal5000":   reward = tpDiff * 5000 * L; break;
+      case "oil":         reward = tpDiff * 1000 * L; break;
+      case "crypto":      reward = tpDiff * 1 * L; break;
+      case "index":       reward = tpDiff * 1 * L; break;
+      case "fx_usd_quote":reward = tpDiff * 100000 * L; break;
+      case "fx_usd_base": reward = (tpDiff * 100000 * L) / e; break;
+      case "fx_cross":    reward = (tpDiff * 100000 * L) / e; break;
+      default:            reward = tpDiff * 100000 * L;
+    }
+  }
+
   return {
-    pnl: round2(pnl),
+    pnl,
     gross: round2(gross),
     risk: round2(risk),
+    reward: round2(reward),
     pipValuePerLot: round2(pipValuePerLot),
     cls,
   };

@@ -18,40 +18,39 @@ export function AttachmentPanel({ images, onFile }) {
 
 function formatBullets(text) {
   if (!text) return [];
-  return text.split("\n").map(l => l.trim()).filter(Boolean);
+  return text.split("\n").map(l => l.trim()).filter(l => /^[-•*]/.test(l));
 }
 
-export function LinkedBiasCard() {
-  const openLightbox = useLightbox();
+export function LinkedBiasCard({ number = "1" }) {
   const [biases, setBiases] = useState({ daily: null, weekly: null });
   useEffect(() => { let alive = true; Promise.all([biasApi.latest("daily"), biasApi.latest("weekly")]).then(([daily, weekly]) => alive && setBiases({ daily, weekly })).catch(() => {}); return () => { alive = false; }; }, []);
   return <section className="tjfx-card p-6" data-testid="linked-bias-card">
-    <h3 className="font-display text-lg font-bold">4. Daily / Weekly Bias</h3><p className="text-xs text-[#6D6D82] mt-1">Live view from Bias Center — edit the source there.</p>
-    <div className="grid md:grid-cols-2 gap-4 mt-4">{[["Daily",biases.daily],["Weekly",biases.weekly]].map(([label,b])=><div key={label} className="rounded-2xl border border-[#E8E8F1] overflow-hidden">
-      <div className="p-4 flex items-center justify-between"><b>{label} Bias</b><span className={`text-xs font-bold uppercase ${b?.direction==="bullish"?"text-emerald-600":b?.direction==="bearish"?"text-red-500":"text-[#6D6D82]"}`}>{b?.direction || "Not set"}</span></div>
-      {b?.images?.length>0 && (
-        <div className="grid grid-cols-3 gap-1 p-1">
-          {b.images.slice(0,3).map((img,i)=><img key={i} src={img} alt={`${label} bias chart ${i+1}`} onClick={()=>openLightbox(b.images,i)} className="w-full h-16 object-cover rounded cursor-zoom-in"/>)}
-        </div>
-      )}
-      <div className="p-4 text-sm text-[#6D6D82] space-y-3">
-        {b?.ai_summary ? (
-          <div>
-            <div className="font-semibold text-[#7C3AED] mb-1">AI Summary</div>
-            <ul className="space-y-1 list-disc list-inside">
-              {formatBullets(b.ai_summary).map((line,i) => <li key={i}>{line.replace(/^-\s*/,"")}</li>)}
+    <div className="flex items-start gap-3 mb-1"><span className="w-7 h-7 rounded-full bg-[#7C3AED] text-white text-sm font-bold flex items-center justify-center shrink-0">{number}</span><div><h3 className="font-display text-lg font-bold leading-6">Daily / Weekly Bias</h3><p className="text-xs text-[#6D6D82] mt-0.5">Condensed live view from Bias Center — edit the full source there.</p></div></div>
+    <div className="grid md:grid-cols-2 gap-4 mt-4">{[["Daily",biases.daily],["Weekly",biases.weekly]].map(([label,b])=>{
+      const dir = b?.direction;
+      const tint = dir === "bullish" ? "border-emerald-200 bg-emerald-50/40" : dir === "bearish" ? "border-red-200 bg-red-50/40" : "border-[#E8E8F1]";
+      const bullets = formatBullets(b?.ai_summary).map(l => l.replace(/^[-•*]\s*/, "")).slice(0, 4);
+      const levels = (b?.key_levels || []).map(x => x.name || x.price).filter(Boolean).slice(0, 6);
+      return (
+      <div key={label} className={`rounded-2xl border overflow-hidden ${tint}`}>
+        <div className="p-3.5 flex items-center justify-between border-b border-black/5"><b className="text-sm">{label} Bias</b><span className={`text-[11px] font-bold uppercase px-2 py-0.5 rounded-full ${dir==="bullish"?"bg-emerald-500 text-white":dir==="bearish"?"bg-red-500 text-white":"bg-[#E8E8F1] text-[#6D6D82]"}`}>{dir || "Not set"}</span></div>
+        <div className="p-3.5 text-sm text-[#6D6D82] space-y-2.5">
+          {bullets.length > 0 ? (
+            <ul className="space-y-1 list-disc list-inside text-[13px]">
+              {bullets.map((line,i) => <li key={i} className="text-[#16151F]">{line}</li>)}
             </ul>
-          </div>
-        ) : <div className="text-xs text-[#A1A1AA]">No AI summary generated yet — run it from Bias Center.</div>}
-        {b?.narrative && (
-          <div>
-            <div className="font-semibold text-[#6D6D82] mb-1">Narrative</div>
-            <p className="whitespace-pre-wrap">{b.narrative}</p>
-          </div>
-        )}
-        {!b?.ai_summary && !b?.narrative && <p>No saved bias for the current period yet.</p>}
-        {b?.key_levels?.length>0 && <p className="text-xs pt-1 border-t border-[#F0F0F5]"><b>Key levels:</b> {b.key_levels.map(x=>x.name || x.price).filter(Boolean).join(" · ")}</p>}
+          ) : b?.narrative ? (
+            <p className="text-[13px] line-clamp-3 whitespace-pre-wrap">{b.narrative}</p>
+          ) : <p className="text-xs text-[#A1A1AA]">No saved bias for the current period yet — run it from Bias Center.</p>}
+          {levels.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 pt-2 border-t border-black/5">
+              {levels.map((lv, i) => (
+                <span key={i} className={`text-[11px] font-semibold tjfx-mono px-2 py-0.5 rounded-full ${dir==="bearish"?"bg-red-100 text-red-700":"bg-emerald-100 text-emerald-700"}`}>{lv}</span>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
-    </div>)}</div>
+    );})}</div>
   </section>;
 }

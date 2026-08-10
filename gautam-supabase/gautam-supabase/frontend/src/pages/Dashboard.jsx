@@ -31,7 +31,7 @@ const WIDGETS = [
   { id: "winrate-trend",  label: "Win Rate Trend",          category: "analytics", size: "md" },
   { id: "pnl-dist",       label: "P&L Distribution",        category: "analytics", size: "md" },
   { id: "expectancy",     label: "Expectancy Breakdown",    category: "analytics", size: "sm" },
-  { id: "streaks",        label: "Streaks",                 category: "psychology", size: "sm" },
+  { id: "streaks",        label: "Streak",                  category: "psychology", size: "sm" },
   { id: "mood-analytics", label: "Mood vs Performance",     category: "psychology", size: "lg" },
   { id: "notes",          label: "Recent Notes",            category: "insights", size: "sm" },
   { id: "events",         label: "Upcoming Events",         category: "insights", size: "sm" },
@@ -127,7 +127,7 @@ function SortableCard({ id, cols, full, customize, onResizeStart, onToggleVisibl
 // overflow-auto + min-h keeps long content (tables, labels) scrollable inside the
 // card instead of breaking the layout or spilling outside its box.
 const Card = ({ children, className = "", ...props }) => (
-  <div className={`tjfx-card p-5 tjfx-card-hover h-full min-w-0 min-h-[160px] overflow-auto ${className}`} {...props}>
+  <div className={`tjfx-card p-4 tjfx-card-hover h-full min-w-0 min-h-[160px] overflow-auto ${className}`} {...props}>
     {children}
   </div>
 );
@@ -149,6 +149,20 @@ function StatCard({ label, value, change, icon: Icon, color = "text-[#16151F]", 
         </div>
       )}
     </div>
+  );
+}
+
+// =============== CUSTOM X-AXIS TICK (date + weekday) ===============
+function DateWeekdayTick({ x, y, payload }) {
+  const dt = new Date(payload.value);
+  if (isNaN(dt)) return <text x={x} y={y + 12} textAnchor="middle" fontSize={11} fill="#A1A1AA">{payload.value}</text>;
+  const dateStr = dt.toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
+  const dayStr = dt.toLocaleDateString("en-IN", { weekday: "short" });
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <text x={0} y={0} dy={12} textAnchor="middle" fontSize={11} fill="#A1A1AA">{dateStr}</text>
+      <text x={0} y={0} dy={25} textAnchor="middle" fontSize={9} fill="#C4C4CE">({dayStr})</text>
+    </g>
   );
 }
 
@@ -198,6 +212,32 @@ export default function Dashboard() {
     () => (selectedDay ? allTrades.filter(t => String(t.date || "").slice(0, 10) === selectedDay) : []),
     [selectedDay, allTrades]
   );
+
+  // Journaling streak = consecutive days with at least one trade logged.
+  const { journalCurrent, journalBest } = useMemo(() => {
+    const daySet = new Set(allTrades.map(t => String(t.date || "").slice(0, 10)).filter(Boolean));
+    if (daySet.size === 0) return { journalCurrent: 0, journalBest: 0 };
+    const toISO = (d) => d.toISOString().slice(0, 10);
+    let cursor = new Date();
+    cursor.setHours(0, 0, 0, 0);
+    if (!daySet.has(toISO(cursor))) cursor.setDate(cursor.getDate() - 1);
+    let current = 0;
+    while (daySet.has(toISO(cursor))) {
+      current++;
+      cursor.setDate(cursor.getDate() - 1);
+    }
+    const days = Array.from(daySet).sort();
+    let best = 0, run = 0, prev = null;
+    for (const d of days) {
+      if (prev) {
+        const diff = Math.round((new Date(d) - new Date(prev)) / 86400000);
+        run = diff === 1 ? run + 1 : 1;
+      } else run = 1;
+      best = Math.max(best, run);
+      prev = d;
+    }
+    return { journalCurrent: current, journalBest: best };
+  }, [allTrades]);
 
   useEffect(() => { 
     saveLayout(layout); 
@@ -300,9 +340,9 @@ export default function Dashboard() {
           <select 
             value={timeframe}
             onChange={(e) => setTimeframe(e.target.value)}
-            className="h-9 px-3 rounded-lg border border-[#E8E8F1] text-sm font-medium bg-white"
+            className="h-9 px-3 rounded-lg border border-[#E8E8F1] text-sm font-medium bg-white w-[150px] shrink-0"
           >
-            <option value="hourly">Hourly (best time of day)</option>
+            <option value="hourly">Hourly (best hour)</option>
             <option value="daily">Daily</option>
             <option value="weekly">Weekly</option>
             <option value="monthly">Monthly</option>
@@ -334,7 +374,7 @@ export default function Dashboard() {
                       contentStyle={{ borderRadius: 12, border: "1px solid #E8E8F1", backgroundColor: "#fff" }}
                       formatter={(value, name, props) => [`$${value.toFixed(2)} · ${props.payload.trades} trade(s) · ${props.payload.win_rate}% WR`, "P&L"]}
                     />
-                    <Bar dataKey="pnl" radius={[6, 6, 0, 0]}>
+                    <Bar dataKey="pnl" radius={[6, 6, 0, 0]} maxBarSize={40}>
                       {stats.hourly_performance.map((entry, i) => (
                         <Cell key={i} fill={entry.pnl >= 0 ? "#10B981" : "#EF4444"} />
                       ))}
@@ -354,11 +394,8 @@ export default function Dashboard() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#E8E8F1" vertical={false} />
                   <XAxis 
                     dataKey="date" 
-                    tick={{ fontSize: 11, fill: "#A1A1AA" }} 
-                    tickFormatter={(d) => {
-                      const dt = new Date(d);
-                      return isNaN(dt) ? d : dt.toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
-                    }}
+                    tick={<DateWeekdayTick />}
+                    height={40}
                     minTickGap={24}
                   />
                   <YAxis tick={{ fontSize: 11, fill: "#A1A1AA" }} domain={[(min) => (min < 0 ? min * 1.2 : 0), (max) => (max <= 0 ? 1 : max * 1.2)]} />
@@ -374,7 +411,7 @@ export default function Dashboard() {
                     }}
                     formatter={(value) => [`$${value.toFixed(2)}`, "P&L"]}
                   />
-                  <Bar dataKey="pnl" radius={[4, 4, 4, 4]} maxBarSize={36}>
+                  <Bar dataKey="pnl" radius={[4, 4, 4, 4]} maxBarSize={40}>
                     {stats.daily_pnl.map((entry, i) => (
                       <Cell key={i} fill={entry.pnl >= 0 ? "#10B981" : "#EF4444"} />
                     ))}
@@ -392,7 +429,7 @@ export default function Dashboard() {
     // Open Positions + Recent Trades (COMBINED)
     positions: (
       <Card data-testid="positions-trades-card">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-4">
           <h3 className="font-display text-lg font-bold">Positions & Recent Trades</h3>
           <div className="flex gap-2">
             <button
@@ -549,7 +586,7 @@ export default function Dashboard() {
           <select 
             value={timeframe}
             onChange={(e) => setTimeframe(e.target.value)}
-            className="h-8 px-2 rounded-lg border border-[#E8E8F1] text-xs font-medium bg-white"
+            className="h-8 px-2 rounded-lg border border-[#E8E8F1] text-xs font-medium bg-white w-[110px] shrink-0"
           >
             <option value="daily">Daily</option>
             <option value="weekly">Weekly</option>
@@ -564,7 +601,7 @@ export default function Dashboard() {
                 <XAxis dataKey="period" tick={{ fontSize: 11, fill: "#A1A1AA" }} />
                 <YAxis tick={{ fontSize: 11, fill: "#A1A1AA" }} domain={[(min) => (min < 0 ? min * 1.2 : 0), (max) => (max <= 0 ? 1 : max * 1.2)]} />
                 <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #E8E8F1" }} />
-                <Bar dataKey="pnl" radius={[8, 8, 0, 0]}>
+                <Bar dataKey="pnl" radius={[8, 8, 0, 0]} maxBarSize={40}>
                   {stats.monthly_performance.map((entry) => (
                     <Cell key={`cell-${entry.period}`} fill={entry.pnl >= 0 ? "#10B981" : "#EF4444"} />
                   ))}
@@ -591,12 +628,14 @@ export default function Dashboard() {
                     <div className="font-semibold text-sm">{strat.name}</div>
                     <div className="text-xs text-[#6D6D82]">{strat.trades} trades</div>
                   </div>
-                  <div className={`font-semibold text-sm ${strat.pnl >= 0 ? "text-emerald-600" : "text-red-500"}`}>
-                    {strat.pnl >= 0 ? "+" : ""}{strat.pnl.toFixed(2)}
+                  <div className={`font-bold text-lg tjfx-mono ${strat.win_rate >= 50 ? "text-emerald-600" : "text-red-500"}`}>
+                    {strat.win_rate}% <span className="text-[11px] font-medium text-[#6D6D82]">WR</span>
                   </div>
                 </div>
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-[#6D6D82]">{strat.win_rate}% WR</span>
+                  <span className={strat.pnl >= 0 ? "text-emerald-600" : "text-red-500"}>
+                    {strat.pnl >= 0 ? "+" : ""}{strat.pnl.toFixed(2)} P&amp;L
+                  </span>
                   <span className="text-[#6D6D82]">{strat.profit_factor}PF</span>
                 </div>
               </div>
@@ -689,7 +728,7 @@ export default function Dashboard() {
                 <XAxis dataKey="range" tick={{ fontSize: 10, fill: "#A1A1AA" }} />
                 <YAxis tick={{ fontSize: 10, fill: "#A1A1AA" }} />
                 <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #E8E8F1" }} />
-                <Bar dataKey="count" radius={[4, 4, 0, 0]} fill="#7C3AED" />
+                <Bar dataKey="count" radius={[4, 4, 0, 0]} fill="#7C3AED" maxBarSize={40} />
               </BarChart>
             </ResponsiveContainer>
           ) : (
@@ -726,10 +765,35 @@ export default function Dashboard() {
       </Card>
     ),
 
-    // Streaks
+    // Streak
     streaks: (
       <Card data-testid="streaks-card">
-        <h3 className="font-display text-lg font-bold mb-4">Streaks</h3>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-display text-lg font-bold flex items-center gap-2">
+            <Flame className="w-4 h-4 text-orange-500"/> Streak
+          </h3>
+        </div>
+        <div className="flex items-end gap-4 mb-5">
+          <div className="relative shrink-0">
+            <Flame
+              className={`w-14 h-14 ${journalCurrent > 0 ? "text-orange-500" : "text-[#E8E8F1]"} drop-shadow`}
+              strokeWidth={1.5}
+              fill={journalCurrent > 0 ? "currentColor" : "none"}
+            />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="tjfx-mono text-lg font-extrabold text-white mix-blend-difference" style={{ textShadow: "0 1px 2px rgba(0,0,0,0.2)" }}>
+                {journalCurrent}
+              </span>
+            </div>
+          </div>
+          <div>
+            <div className="text-[13px] text-[#6D6D82]">Journaling streak</div>
+            <div className="font-display text-2xl font-extrabold tjfx-mono">
+              {journalCurrent} <span className="text-[13px] text-[#6D6D82] font-medium">days</span>
+            </div>
+            <div className="text-xs text-[#6D6D82]">Best: {journalBest} days</div>
+          </div>
+        </div>
         <div className="space-y-3">
           <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-200">
             <div className="flex items-start justify-between mb-1">
@@ -829,7 +893,7 @@ export default function Dashboard() {
     // AI Trading Coach
     "ai-coach": (
       <Card className="bg-gradient-to-br from-[#F3E8FF] to-white" data-testid="ai-coach">
-        <div className="flex items-start justify-between mb-6">
+        <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-lg bg-[#7C3AED] flex items-center justify-center">
               <Sparkles className="w-6 h-6 text-white" />
@@ -842,7 +906,7 @@ export default function Dashboard() {
         </div>
 
         {stats?.ai_insights ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
             {/* What's Working */}
             <div className="p-4 bg-emerald-50 rounded-lg border border-emerald-200">
               <div className="flex items-center gap-2 mb-3">
@@ -902,7 +966,9 @@ export default function Dashboard() {
               </p>
             </div>
           </div>
-        ) : null}
+        ) : (
+          <EmptyState message="Close a few trades to unlock AI-powered coaching insights." />
+        )}
 
         {/* Discipline Score */}
         {stats?.discipline_score && (
@@ -933,10 +999,10 @@ export default function Dashboard() {
   const visibleLayout = layout.filter(x => x.visible);
 
   return (
-    <div className="p-6 max-w-[1800px] mx-auto" data-testid="dashboard-page">
+    <div className="p-5 max-w-[1800px] mx-auto" data-testid="dashboard-page">
       {/* Customize Panel */}
       {customize && (
-        <div className="tjfx-card p-4 mb-5" data-testid="customize-panel">
+        <div className="tjfx-card p-4 mb-4" data-testid="customize-panel">
           <div className="text-sm text-[#6D6D82] mb-4">
             <strong className="text-[#16151F]">Drag the purple handle</strong> to reorder widgets, and the
             <strong className="text-[#16151F]"> corner handle</strong> to resize their width. Use the chips below to show/hide widgets.
@@ -992,7 +1058,7 @@ export default function Dashboard() {
           items={visibleLayout.map(x => x.id)} 
           strategy={rectSortingStrategy}
         >
-          <div ref={gridRef} className="grid grid-cols-12 auto-rows-max gap-4">
+          <div ref={gridRef} className="grid grid-cols-12 auto-rows-max gap-3">
             {visibleLayout.map((item) => (
               <SortableCard
                 key={item.id}

@@ -525,8 +525,13 @@ async def call_ai(prompt: str, system: str = HINGLISH_POINTS_SYSTEM, images: Opt
             part = _data_url_to_gemini_part(img)
             if part:
                 parts.append(part)
-        resp = model.generate_content(parts)
+        # generate_content is a blocking network call — run it off the event loop so
+        # one slow AI request doesn't freeze every other request on the server
+        # (this was why pages felt "stuck on Thinking..." for everyone at once).
+        resp = await asyncio.wait_for(asyncio.to_thread(model.generate_content, parts), timeout=45)
         return (resp.text or "").strip()
+    except asyncio.TimeoutError:
+        return "AI is taking longer than usual — please try again in a moment."
     except Exception as e:
         logger.exception("AI error")
         return f"AI unavailable right now: {e}"
@@ -1091,6 +1096,89 @@ async def dashboard_stats(account_id: Optional[str] = None, user=Depends(get_cur
         v = cal_map.get(d, {"pnl": 0.0, "trades": 0})
         calendar_days.append({"date": d, "pnl": round(v["pnl"], 2), "trades": v["trades"]})
 
+    # ---------- AI Trading Coach (rule-based insights from the stats above) ----------
+    def clamp100(v):
+        return max(0, min(100, round(v)))
+
+    ai_insights = None
+    discipline_score = None
+
+    if closed:
+        positives, negatives, recommendations = [], [], []
+
+        if win_rate >= 55:
+            positives.append(f"Solid win rate of {win_rate}% across {len(closed)} closed trades.")
+        if profit_factor >= 1.5:
+            positives.append(f"Profit factor of {profit_factor} — your winners are outweighing your losers well.")
+        if strategies:
+            best_strat = max(strategies, key=lambda s: s["pnl"])
+            if best_strat["pnl"] > 0 and best_strat["trades"] >= 2:
+                positives.append(f"\"{best_strat['name']}\" is your strongest setup — {best_strat['win_rate']}% WR, +${best_strat['pnl']:.2f}.")
+        if best_hour and best_hour["pnl"] > 0:
+            positives.append(f"You trade best around {best_hour['label']}, +${best_hour['pnl']:.2f} total P&L in that hour.")
+        if current_winning_streak >= 2:
+            positives.append(f"You're on a {current_winning_streak}-trade winning streak — keep following your plan.")
+        if not positives:
+            positives.append("Keep logging trades — insights get sharper the more data you add.")
+
+        if win_rate < 40 and len(closed) >= 3:
+            negatives.append(f"Win rate is low at {win_rate}% — review your entry criteria for quality over quantity.")
+        if profit_factor < 1 and gross_loss > 1:
+            negatives.append(f"Profit factor is {profit_factor} — losses are outweighing wins overall.")
+        if worst_loss_streak >= 3:
+            negatives.append(f"You've had a {worst_loss_streak}-trade losing streak — watch for revenge trading after a loss.")
+        if direction_stats:
+            if direction_stats["long_count"] >= 2 and direction_stats["long_wr"] < 40:
+                negatives.append(f"Long trades are underperforming ({direction_stats['long_wr']}% WR) — worth a closer look.")
+            if direction_stats["short_count"] >= 2 and direction_stats["short_wr"] < 40:
+                negatives.append(f"Short trades are underperforming ({direction_stats['short_wr']}% WR) — worth a closer look.")
+        if mood_analytics:
+            bad_moods = [m for m in mood_analytics if m["avg_pnl"] < 0 and m["count"] >= 2]
+            if bad_moods:
+                worst_mood = min(bad_moods, key=lambda m: m["avg_pnl"])
+                negatives.append(f"Trades logged while \"{worst_mood['mood']}\" average ${worst_mood['avg_pnl']:.2f} — consider skipping entries in that state.")
+        if not negatives:
+            negatives.append("No major red flags in your recent trades — nice discipline.")
+
+        if best_hour:
+            recommendations.append(f"Prioritise setups around {best_hour['label']} where your edge is clearest.")
+        if strategies:
+            weak_strat = min(strategies, key=lambda s: s["pnl"])
+            if weak_strat["pnl"] < 0 and weak_strat["trades"] >= 2:
+                recommendations.append(f"Reassess or pause \"{weak_strat['name']}\" — it's currently at -${abs(weak_strat['pnl']):.2f}.")
+        if expectancy < 0:
+            recommendations.append("Your expectancy per trade is negative — tighten stop-loss discipline or entry filters.")
+        if not recommendations:
+            recommendations.append("Stay consistent with your current process and keep journaling every trade.")
+
+        headline = positives[0] if profit_factor >= 1 else negatives[0]
+        recommendation_text = f"{headline} {recommendations[0]}"
+
+        ai_insights = {
+            "positives": positives[:4], "negatives": negatives[:4],
+            "recommendations": recommendations[:4], "recommendation": recommendation_text,
+        }
+
+        # Discipline score — heuristic breakdown out of 100 per dimension.
+        risk_percents = [float(t.get("risk_percent") or 0) for t in closed if t.get("risk_percent")]
+        avg_risk_pct = (sum(risk_percents) / len(risk_percents)) if risk_percents else 1.0
+        risk_dim = clamp100(100 - abs(avg_risk_pct - 1) * 25)
+        execution_dim = clamp100(50 + (profit_factor - 1) * 30)
+        consistency_dim = clamp100(100 - worst_loss_streak * 12)
+        strategies_named = sum(1 for t in closed if (t.get("strategy") or "").strip())
+        rules_dim = clamp100((strategies_named / len(closed)) * 100) if closed else 60
+        if mood_analytics:
+            good = [m for m in mood_analytics if m["avg_pnl"] >= 0]
+            psychology_dim = clamp100((sum(m["count"] for m in good) / sum(m["count"] for m in mood_analytics)) * 100)
+        else:
+            psychology_dim = 60
+        overall = clamp100((risk_dim + execution_dim + consistency_dim + rules_dim + psychology_dim) / 5)
+
+        discipline_score = {
+            "risk": risk_dim, "rules": rules_dim, "psychology": psychology_dim,
+            "execution": execution_dim, "consistency": consistency_dim, "overall": overall,
+        }
+
     return {
         "total_trades": total, "closed_trades": len(closed), "wins": len(wins), "losses": len(losses),
         "win_rate": win_rate, "profit_factor": profit_factor, "total_pnl": total_pnl,
@@ -1110,6 +1198,7 @@ async def dashboard_stats(account_id: Optional[str] = None, user=Depends(get_cur
         "current_losing_streak": current_losing_streak, "worst_losing_streak": worst_loss_streak,
         "mood_analytics": mood_analytics, "calendar": calendar_days,
         "recent_trades": trades[-5:][::-1] if trades else [],
+        "ai_insights": ai_insights, "discipline_score": discipline_score,
     }
 
 # ---------- Root ----------

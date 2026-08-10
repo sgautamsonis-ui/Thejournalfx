@@ -62,7 +62,7 @@ export default function Records() {
   }, [edit]);
 
   return (
-    <div className="p-8 max-w-[1300px] mx-auto space-y-5" data-testid="records-page">
+    <div className="p-5 max-w-[1300px] mx-auto space-y-4" data-testid="records-page">
       <div>
         <h1 className="font-display text-3xl font-bold">Bias Records</h1>
         <p className="text-[#6D6D82] mt-1">Every plan you've written. Click any record to view or edit.</p>

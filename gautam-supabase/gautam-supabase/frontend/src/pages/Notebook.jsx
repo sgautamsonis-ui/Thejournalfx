@@ -52,7 +52,7 @@ export default function Notebook() {
   const rest = entries.filter(e => !e.pinned);
 
   return (
-    <div className="p-8 max-w-[1200px] mx-auto space-y-5" data-testid="notebook-page">
+    <div className="p-5 max-w-[1200px] mx-auto space-y-4" data-testid="notebook-page">
       <div>
         <h1 className="font-display text-3xl font-bold">Notebook & Rules</h1>
         <p className="text-[#6D6D82] mt-1">Write your rules, capture lessons, build checklists. They sync to Add Trade automatically.</p>
