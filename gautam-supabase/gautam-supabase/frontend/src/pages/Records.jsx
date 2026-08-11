@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { biasApi, prefsApi, aiApi } from "@/lib/api";
+import { biasApi, prefsApi, aiApi, uploadApi } from "@/lib/api";
 import { toast } from "sonner";
 import { X, Pencil, Save, Trash2, Upload, Clipboard, Sparkles, TrendingUp, TrendingDown, Minus, Search } from "lucide-react";
 import { useLightbox } from "@/components/ImageLightbox";
@@ -25,7 +25,11 @@ export default function Records() {
     return list;
   }, [items, type, q]);
 
-  const openRec = (b) => { setSel(b); setEdit(null); };
+  const openRec = (b) => {
+    setSel(b); // show the lightweight version instantly
+    setEdit(null);
+    biasApi.get(b.id).then(setSel).catch(() => {}); // then fill in images
+  };
   const startEdit = () => setEdit({...sel});
   const cancelEdit = () => setEdit(null);
   const toggleP = (k, v) => setEdit(p => ({...p, [k]: (p[k]||[]).includes(v) ? p[k].filter(x=>x!==v) : [...(p[k]||[]), v]}));
@@ -37,7 +41,15 @@ export default function Records() {
   };
   const del = async () => { if (!confirm("Delete this bias record?")) return; await biasApi.delete(sel.id); toast.success("Deleted"); setSel(null); load(); };
 
-  const addImg = (data) => setEdit(p => ({...p, images: [...(p.images||[]), data]}));
+  const [uploadingCount, setUploadingCount] = useState(0);
+  const addImg = async (data) => {
+    setUploadingCount(c => c + 1);
+    try {
+      const { url } = await uploadApi.image(data);
+      setEdit(p => ({...p, images: [...(p.images||[]), url]}));
+    } catch { toast.error("Image upload failed"); }
+    finally { setUploadingCount(c => c - 1); }
+  };
   const onFile = (e) => Array.from(e.target.files||[]).forEach(f => {
     compressImage(f).then(addImg).catch(() => { const r = new FileReader(); r.onload=()=>addImg(r.result); r.readAsDataURL(f); });
   });
@@ -120,7 +132,7 @@ export default function Records() {
               </div>
             </div>
 
-            {edit ? <BiasEditForm b={edit} setB={setEdit} toggleP={toggleP} onFile={onFile} htfPresets={htfPresets}/> :
+            {edit ? <BiasEditForm b={edit} setB={setEdit} toggleP={toggleP} onFile={onFile} htfPresets={htfPresets} uploadingCount={uploadingCount}/> :
               <BiasView b={sel}/>
             }
 
@@ -157,7 +169,7 @@ function BiasView({ b }) {
   );
 }
 
-function BiasEditForm({ b, setB, toggleP, onFile, htfPresets }) {
+function BiasEditForm({ b, setB, toggleP, onFile, htfPresets, uploadingCount = 0 }) {
   const openLightbox = useLightbox();
   return (
     <div className="space-y-3">
@@ -199,6 +211,7 @@ function BiasEditForm({ b, setB, toggleP, onFile, htfPresets }) {
               <button onClick={()=>setB({...b, images: b.images.filter((_,j)=>j!==i)})} className="absolute top-1 right-1 w-6 h-6 rounded-full bg-white/90 opacity-0 group-hover:opacity-100"><X className="w-3 h-3 mx-auto text-red-500"/></button>
             </div>
           ))}
+          {Array.from({length: uploadingCount}).map((_,i) => <div key={`u${i}`} className="w-full h-20 rounded-lg border-2 border-dashed border-[#7C3AED]/40 bg-[#F3E8FF]/40 flex items-center justify-center text-[10px] text-[#7C3AED] animate-pulse">Uploading...</div>)}
         </div>
       </div>
     </div>

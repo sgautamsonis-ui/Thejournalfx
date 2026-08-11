@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { tradesApi, aiApi, notebookApi, prefsApi, accountsApi, biasApi } from "@/lib/api";
+import { tradesApi, aiApi, notebookApi, prefsApi, accountsApi, biasApi, uploadApi } from "@/lib/api";
 import { computePnl } from "@/lib/pnlCalc";
 import { setPendingTrade, clearPendingTrade, notifyTradeSync } from "@/lib/pendingTrade";
 import { useAccount } from "@/context/AccountContext";import { toast } from "sonner";
@@ -126,10 +126,22 @@ export default function AddTrade() {
   };
   const removePairedPreset = (field, value) => setT(p => ({ ...p, [field]: p[field].filter(x => x !== value) }));
 
-  const addImage = (dataUrl) => setT(p => {
-    if (p.screenshots.length >= MAX_IMAGES) { toast.error(`Max ${MAX_IMAGES} images`); return p; }
-    return { ...p, screenshots: [...p.screenshots, dataUrl] };
-  });
+  const [uploadingCount, setUploadingCount] = useState(0);
+
+  const addImage = async (dataUrl) => {
+    let tooMany = false;
+    setT(p => { if (p.screenshots.length >= MAX_IMAGES) tooMany = true; return p; });
+    if (tooMany) { toast.error(`Max ${MAX_IMAGES} images`); return; }
+    setUploadingCount(c => c + 1);
+    try {
+      const { url } = await uploadApi.image(dataUrl);
+      setT(p => ({ ...p, screenshots: [...p.screenshots, url] }));
+    } catch {
+      toast.error("Image upload failed");
+    } finally {
+      setUploadingCount(c => c - 1);
+    }
+  };
 
   const onFile = (e) => {
     const files = Array.from(e.target.files || []);
@@ -151,7 +163,7 @@ export default function AddTrade() {
             compressImage(f).then(addImage).catch(() => {
               const r = new FileReader(); r.onload = () => addImage(r.result); r.readAsDataURL(f);
             });
-            toast.success("Image pasted");
+            toast.success("Image pasted — uploading...");
           }
         }
       }
@@ -212,7 +224,7 @@ export default function AddTrade() {
   return <AddTradeWorkspace t={t} setT={setT} presets={presets} accounts={accounts} computed={computed} recommendedLot={recommendedLot}
     htfDraft={htfDraft} setHtfDraft={setHtfDraft} entryDraft={entryDraft} setEntryDraft={setEntryDraft}
     addPairedPreset={addPairedPreset} removePairedPreset={removePairedPreset} toggle={toggle}
-    saving={saving} save={save} onFile={onFile} />;
+    saving={saving} save={save} onFile={onFile} uploadingCount={uploadingCount} />;
 
   return (
     <div className="p-4 sm:p-5 lg:p-6 max-w-[1400px] mx-auto space-y-4" data-testid="add-trade-page">
@@ -480,7 +492,7 @@ function ChipRow({ label, items, selected, onToggle }) {
   );
 }
 
-function AddTradeWorkspace({ t, setT, presets, accounts, computed, recommendedLot, htfDraft, setHtfDraft, entryDraft, setEntryDraft, addPairedPreset, removePairedPreset, toggle, saving, save, onFile }) {
+function AddTradeWorkspace({ t, setT, presets, accounts, computed, recommendedLot, htfDraft, setHtfDraft, entryDraft, setEntryDraft, addPairedPreset, removePairedPreset, toggle, saving, save, onFile, uploadingCount }) {
   const chooseStrategy = (strategy) => setT({ ...t, strategy });
   return (
     <div className="add-trade-page p-4 sm:p-5 lg:p-6 max-w-[1500px] mx-auto space-y-4" data-testid="add-trade-page">
@@ -523,7 +535,7 @@ function AddTradeWorkspace({ t, setT, presets, accounts, computed, recommendedLo
             <div className="mt-5"><LotCalculator recommendedLot={recommendedLot} computed={computed} onUse={()=>recommendedLot.lot!==null&&setT({...t,lot_size:recommendedLot.lot})}/></div>
           </section>
 
-          <section className="tjfx-card p-5"><SectionHeading number="7" title="Trade Screenshot" subtitle="Upload or paste chart images for this trade." /><AttachmentPanel images={t.screenshots} onFile={onFile}/></section>
+          <section className="tjfx-card p-5"><SectionHeading number="7" title="Trade Screenshot" subtitle="Upload or paste chart images for this trade." /><AttachmentPanel images={t.screenshots} onFile={onFile} uploadingCount={uploadingCount}/></section>
 
           <section className="tjfx-card p-5">
             <SectionHeading number="8" title="Review & Save" subtitle="Check your execution details before saving." />

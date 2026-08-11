@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { biasApi, aiApi, prefsApi } from "@/lib/api";
+import { biasApi, aiApi, prefsApi, uploadApi } from "@/lib/api";
 import { Save, Sparkles, TrendingUp, TrendingDown, Minus, Trash2, Upload, Clipboard } from "lucide-react";
 import { toast } from "sonner";
 import { useLightbox } from "@/components/ImageLightbox";
@@ -9,26 +9,29 @@ const inp = "w-full h-10 px-3 rounded-xl border border-[#E8E8F1] focus:border-[#
 
 const MAX_IMAGES = 15;
 
-const emptyBias = (type) => ({
-  type, date: new Date().toISOString().slice(0,10),
-  direction: "neutral", confidence: 60, narrative: "",
-  poi_tags: [], setup_tags: [], key_levels: [], targets: [], invalidation: null,
-  session: "London", notes: [], images: [], ai_summary: null, ai_confidence: null,
-});
+function toLocalISODate(d) {
+  // Local calendar date (not UTC) — avoids the weekly/daily bias record
+  // silently "disappearing" for users in timezones ahead of UTC (e.g. IST),
+  // where toISOString() can roll the date back during early morning hours.
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 
 function currentPeriodStart(type) {
   const d = new Date();
-  if (type==="daily") return d.toISOString().slice(0,10);
+  if (type==="daily") return toLocalISODate(d);
   // weekly - Sunday start (Sunday to Saturday week)
   const day = d.getDay(); // 0 = Sunday
   d.setDate(d.getDate() - day);
-  return d.toISOString().slice(0,10);
+  return toLocalISODate(d);
 }
 
 function periodEndFromStart(startStr) {
   const d = new Date(startStr + "T00:00:00");
   d.setDate(d.getDate() + 6);
-  return d.toISOString().slice(0,10);
+  return toLocalISODate(d);
 }
 
 function formatDisplayDate(iso) {
@@ -36,6 +39,16 @@ function formatDisplayDate(iso) {
   const d = new Date(iso + "T00:00:00");
   return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
+
+const emptyBias = (type) => ({
+  // Date must always match currentPeriodStart(type) — the Bias Center and
+  // Add Trade page both look up "the current period's bias" by this exact
+  // date, so a mismatch here made saved weekly bias appear to vanish.
+  type, date: currentPeriodStart(type),
+  direction: "neutral", confidence: 60, narrative: "",
+  poi_tags: [], setup_tags: [], key_levels: [], targets: [], invalidation: null,
+  session: "London", notes: [], images: [], ai_summary: null, ai_confidence: null,
+});
 
 export default function BiasCenter() {
   const openLightbox = useLightbox();
@@ -65,15 +78,29 @@ export default function BiasCenter() {
   }, [tab]);
 
   const load = async () => {
+    // list() now returns lightweight records (no images) so the sidebar
+    // history loads fast — fetch the full record (with images) only for
+    // whichever one we're actually going to edit.
     const list = await biasApi.list(tab).catch(()=>[]);
     setHistory(list);
-    // Auto: if latest record is for current period → edit it, else start fresh (auto-move old to Records)
     const periodStart = currentPeriodStart(tab);
     const current = list.find(x => x.date === periodStart);
-    if (current) setB(current);
-    else setB(emptyBias(tab));
+    if (current) {
+      const full = await biasApi.get(current.id).catch(() => current);
+      setB(full);
+    } else {
+      setB(emptyBias(tab));
+    }
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [tab]);
+
+  const openHistoryRecord = async (h) => {
+    setB(h); // show the lightweight version immediately (feels instant)
+    try {
+      const full = await biasApi.get(h.id);
+      setB(full); // then swap in images once they arrive
+    } catch { /* keep lightweight version */ }
+  };
 
   const addPoiTag = () => {
     if (!poiDraft.timeframe || !poiDraft.type) { toast.error("Choose a timeframe and POI type"); return; }
@@ -122,16 +149,42 @@ export default function BiasCenter() {
     } catch { toast.error("AI failed"); } finally { setAiLoading(false); }
   };
 
-  const addImage = (dataUrl) => setB(p => {
-    if (p.images.length >= MAX_IMAGES) { toast.error(`Max ${MAX_IMAGES} images`); return p; }
-    return {...p, images: [...p.images, dataUrl]};
-  });
+  const [uploadingCount, setUploadingCount] = useState(0);
+
+  // Compress locally, then upload to Supabase Storage and store the returned
+  // URL (not the raw base64) — this is what makes the browser cache the
+  // image after the first view, instead of re-downloading it every time.
+  const addImage = async (dataUrl) => {
+    let tooMany = false;
+    setB(p => { if (p.images.length >= MAX_IMAGES) tooMany = true; return p; });
+    if (tooMany) { toast.error(`Max ${MAX_IMAGES} images`); return; }
+    setUploadingCount(c => c + 1);
+    try {
+      const { url } = await uploadApi.image(dataUrl);
+      setB(p => ({ ...p, images: [...p.images, url] }));
+    } catch {
+      toast.error("Image upload failed");
+    } finally {
+      setUploadingCount(c => c - 1);
+    }
+  };
   const uploadImg = (e) => {
     Array.from(e.target.files||[]).forEach(f => {
       compressImage(f).then(addImage).catch(() => {
         const r = new FileReader(); r.onload = () => addImage(r.result); r.readAsDataURL(f);
       });
     });
+  };
+
+  const removeImage = async (idx) => {
+    const url = b.images[idx];
+    setB(p => ({ ...p, images: p.images.filter((_, j) => j !== idx) }));
+    // Best-effort cleanup in storage — path is the part after the bucket name in the public URL.
+    const marker = `/journal-images/`;
+    const i = url?.indexOf?.(marker);
+    if (i !== -1 && i != null) {
+      uploadApi.deleteImage(url.slice(i + marker.length)).catch(() => {});
+    }
   };
 
   useEffect(() => {
@@ -144,7 +197,7 @@ export default function BiasCenter() {
             compressImage(f).then(addImage).catch(() => {
               const r = new FileReader(); r.onload = () => addImage(r.result); r.readAsDataURL(f);
             });
-            toast.success("Chart pasted");
+            toast.success("Chart pasted — uploading...");
           }
         }
       }
@@ -202,8 +255,9 @@ export default function BiasCenter() {
           </div>
           <div className="text-[11px] text-[#6D6D82] mb-3 flex items-center gap-1"><Clipboard className="w-3 h-3"/> Press <kbd className="px-1.5 py-0.5 rounded bg-[#F3E8FF] text-[#7C3AED] text-[10px] mx-1">Ctrl+V</kbd> to paste chart screenshots directly</div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-            {b.images.map((s,i)=><div key={i} className="relative group"><img alt="" src={s} onClick={()=>openLightbox(b.images,i)} className="w-full h-28 object-cover rounded-lg cursor-zoom-in"/><button onClick={()=>setB({...b,images:b.images.filter((_,j)=>j!==i)})} className="absolute top-1 right-1 w-6 h-6 rounded-full bg-white/90 opacity-0 group-hover:opacity-100"><Trash2 className="w-3 h-3 mx-auto text-red-500"/></button></div>)}
-            {b.images.length===0 && <div className="col-span-full text-center py-8 text-sm text-[#6D6D82] border-2 border-dashed border-[#E8E8F1] rounded-xl">No chart screenshots yet. Upload or paste from clipboard.</div>}
+            {b.images.map((s,i)=><div key={i} className="relative group"><img alt="" src={s} onClick={()=>openLightbox(b.images,i)} className="w-full h-28 object-cover rounded-lg cursor-zoom-in"/><button onClick={()=>removeImage(i)} className="absolute top-1 right-1 w-6 h-6 rounded-full bg-white/90 opacity-0 group-hover:opacity-100"><Trash2 className="w-3 h-3 mx-auto text-red-500"/></button></div>)}
+            {Array.from({length: uploadingCount}).map((_,i)=><div key={`u${i}`} className="w-full h-28 rounded-lg border-2 border-dashed border-[#7C3AED]/40 bg-[#F3E8FF]/40 flex items-center justify-center text-[11px] text-[#7C3AED] animate-pulse">Uploading...</div>)}
+            {b.images.length===0 && uploadingCount===0 && <div className="col-span-full text-center py-8 text-sm text-[#6D6D82] border-2 border-dashed border-[#E8E8F1] rounded-xl">No chart screenshots yet. Upload or paste from clipboard.</div>}
           </div>
         </div>
 

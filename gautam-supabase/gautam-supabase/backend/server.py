@@ -28,6 +28,25 @@ sb_auth: Client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 
+# ---------- Storage (chart screenshots etc.) ----------
+# Images used to be saved as base64 straight into the DB row (bias.images, trade
+# attachments). That made every list/detail response huge and slow to fetch,
+# and meant the browser could never cache them (embedded base64 isn't
+# cacheable the way a real URL is). Now we upload the bytes to a Supabase
+# Storage bucket and only store the resulting public URL — small DB rows,
+# and the browser caches the image itself after the first view.
+STORAGE_BUCKET = "journal-images"
+
+def ensure_bucket():
+    try:
+        buckets = sb.storage.list_buckets()
+        if not any(b.name == STORAGE_BUCKET for b in buckets):
+            sb.storage.create_bucket(STORAGE_BUCKET, options={"public": True})
+    except Exception as e:
+        logging.warning(f"Could not verify/create storage bucket: {e}")
+
+ensure_bucket()
+
 app = FastAPI(title="TheJournalFX API")
 
 @app.get("/")
@@ -82,6 +101,37 @@ async def get_current_user(request: Request) -> Dict[str, Any]:
     profile["email"] = email
     profile.setdefault("settings", DEFAULT_SETTINGS)
     return profile
+
+
+# ---------- Storage endpoints (chart screenshots etc.) ----------
+@api_router.post("/uploads/image")
+async def upload_image(payload: Dict[str, Any] = Body(...), user=Depends(get_current_user)):
+    data_url = payload.get("data_url", "")
+    if not data_url.startswith("data:"):
+        raise HTTPException(400, "Expected a data: URL")
+    header, b64data = data_url.split(",", 1)
+    ext = "png"
+    if "jpeg" in header or "jpg" in header:
+        ext = "jpg"
+    elif "webp" in header:
+        ext = "webp"
+    raw = base64.b64decode(b64data)
+    path = f"{user['user_id']}/{uuid.uuid4()}.{ext}"
+    content_type = header.split(":")[1].split(";")[0] if ":" in header else "image/jpeg"
+    await asyncio.to_thread(
+        sb.storage.from_(STORAGE_BUCKET).upload,
+        path, raw, {"content-type": content_type, "cache-control": "31536000", "upsert": "false"}
+    )
+    url = sb.storage.from_(STORAGE_BUCKET).get_public_url(path)
+    return {"url": url, "path": path}
+
+@api_router.delete("/uploads/image")
+async def delete_image(payload: Dict[str, Any] = Body(...), user=Depends(get_current_user)):
+    path = payload.get("path", "")
+    if not path.startswith(f"{user['user_id']}/"):
+        raise HTTPException(403, "Not allowed")
+    await asyncio.to_thread(sb.storage.from_(STORAGE_BUCKET).remove, [path])
+    return {"ok": True}
 
 
 # ---------- Auth endpoints ----------
@@ -294,17 +344,38 @@ class Bias(BaseModel):
 
 @api_router.get("/bias")
 async def list_bias(type: Optional[str] = None, user=Depends(get_current_user)):
+    # Strip heavy base64 chart images from the list response — the Bias
+    # Records sidebar only needs date/direction/narrative, and pulling every
+    # image of every past record on every page load is what made Bias Center
+    # feel slow (each record can carry several MB of embedded screenshots).
+    # Full images are fetched on-demand via GET /bias/{id} when a record is opened.
     q = sb.table("bias").select("*").eq("user_id", user["user_id"])
     if type:
         q = q.eq("type", type)
     r = await asyncio.to_thread(q.order("date", desc=True).execute)
-    return [{k: v for k, v in d.items() if k != "user_id"} for d in r.data]
+    out = []
+    for d in r.data:
+        d = {k: v for k, v in d.items() if k != "user_id"}
+        img_count = len(d.get("images") or [])
+        d["images"] = []
+        d["image_count"] = img_count
+        out.append(d)
+    return out
 
 @api_router.get("/bias/latest")
 async def latest_bias(type: str, user=Depends(get_current_user)):
     r = await asyncio.to_thread(sb.table("bias").select("*").eq("user_id", user["user_id"]).eq("type", type).order("date", desc=True).limit(1).execute)
     if not r.data:
         return None
+    doc = r.data[0]
+    doc.pop("user_id", None)
+    return doc
+
+@api_router.get("/bias/{bias_id}")
+async def get_bias(bias_id: str, user=Depends(get_current_user)):
+    r = await asyncio.to_thread(sb.table("bias").select("*").eq("id", bias_id).eq("user_id", user["user_id"]).limit(1).execute)
+    if not r.data:
+        raise HTTPException(404, "Not found")
     doc = r.data[0]
     doc.pop("user_id", None)
     return doc

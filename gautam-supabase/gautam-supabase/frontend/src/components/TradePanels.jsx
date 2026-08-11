@@ -3,7 +3,7 @@ import { Upload } from "lucide-react";
 import { biasApi } from "@/lib/api";
 import { useLightbox } from "@/components/ImageLightbox";
 
-export function AttachmentPanel({ images, onFile }) {
+export function AttachmentPanel({ images, onFile, uploadingCount = 0 }) {
   const openLightbox = useLightbox();
   return <div className="tjfx-card p-6">
     <h3 className="font-display text-lg font-bold">Trade Notes & Attachments</h3>
@@ -12,7 +12,10 @@ export function AttachmentPanel({ images, onFile }) {
       <Upload className="w-7 h-7 mx-auto text-[#7C3AED] mb-2"/><div className="text-sm text-[#6D6D82]">Click to upload chart images, or paste directly</div>
       <input type="file" multiple accept="image/*" onChange={onFile} className="hidden"/>
     </label>
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">{images.map((image,i)=><img key={i} src={image} alt={`Trade chart ${i+1}`} onClick={()=>openLightbox(images,i)} className="w-full h-52 object-cover rounded-xl border border-[#E8E8F1] cursor-zoom-in"/>)}</div>
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+      {images.map((image,i)=><img key={i} src={image} alt={`Trade chart ${i+1}`} onClick={()=>openLightbox(images,i)} className="w-full h-52 object-cover rounded-xl border border-[#E8E8F1] cursor-zoom-in"/>)}
+      {Array.from({length: uploadingCount}).map((_,i)=><div key={`u${i}`} className="w-full h-52 rounded-xl border-2 border-dashed border-[#7C3AED]/40 bg-[#F3E8FF]/40 flex items-center justify-center text-sm text-[#7C3AED] animate-pulse">Uploading...</div>)}
+    </div>
   </div>;
 }
 

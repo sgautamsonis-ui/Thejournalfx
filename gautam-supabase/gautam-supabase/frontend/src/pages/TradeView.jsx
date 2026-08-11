@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { tradesApi, prefsApi } from "@/lib/api";
+import { tradesApi, prefsApi, uploadApi } from "@/lib/api";
 import { useAccount } from "@/context/AccountContext";
 import { Search, Trash2, X, PlusCircle, Filter, Pencil, Save, ChevronDown, Upload, Clipboard, Image as ImageIcon } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -339,7 +339,15 @@ function EditForm({ edit, setEdit, toggleEdit, computed, presets }) {
   const inp = "w-full h-9 px-3 rounded-lg border border-[#E8E8F1] focus:border-[#7C3AED] outline-none text-sm bg-white tjfx-mono";
   const openLightbox = useLightbox();
 
-  const addImg = (dataUrl) => setEdit(p => ({...p, screenshots: [...(p.screenshots||[]), dataUrl]}));
+  const [uploadingCount, setUploadingCount] = React.useState(0);
+  const addImg = async (dataUrl) => {
+    setUploadingCount(c => c + 1);
+    try {
+      const { url } = await uploadApi.image(dataUrl);
+      setEdit(p => ({...p, screenshots: [...(p.screenshots||[]), url]}));
+    } catch { toast.error("Image upload failed"); }
+    finally { setUploadingCount(c => c - 1); }
+  };
   const onFile = (e) => Array.from(e.target.files||[]).forEach(f => {
     compressImage(f).then(addImg).catch(() => { const r = new FileReader(); r.onload=()=>addImg(r.result); r.readAsDataURL(f); });
   });
@@ -426,7 +434,8 @@ function EditForm({ edit, setEdit, toggleEdit, computed, presets }) {
               <button onClick={()=>removeImg(i)} data-testid={`remove-img-${i}`} className="absolute top-1 right-1 w-6 h-6 rounded-full bg-white/90 flex items-center justify-center opacity-0 group-hover:opacity-100 transition"><X className="w-3 h-3 text-red-500"/></button>
             </div>
           ))}
-          {(edit.screenshots||[]).length===0 && <div className="col-span-full text-xs text-[#A1A1AA] text-center py-4 border-2 border-dashed border-[#E8E8F1] rounded-lg">No screenshots</div>}
+          {(edit.screenshots||[]).length===0 && uploadingCount===0 && <div className="col-span-full text-xs text-[#A1A1AA] text-center py-4 border-2 border-dashed border-[#E8E8F1] rounded-lg">No screenshots</div>}
+          {Array.from({length: uploadingCount}).map((_,i) => <div key={`u${i}`} className="w-full h-20 rounded-lg border-2 border-dashed border-[#7C3AED]/40 bg-[#F3E8FF]/40 flex items-center justify-center text-[10px] text-[#7C3AED] animate-pulse">Uploading...</div>)}
         </div>
       </div>
     </div>
