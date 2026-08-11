@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate, Link } from "react-router-dom";
-import { LayoutDashboard, PlusCircle, Target, BookOpen, Brain, Settings, LogOut, TrendingUp, Table2, CalendarDays, FileText, NotebookPen, Moon, Sun, Wallet, ArrowUp, ArrowDown, ChevronDown, User } from "lucide-react";
+import { LayoutDashboard, PlusCircle, Target, BookOpen, Activity, Settings, LogOut, TrendingUp, Table2, CalendarDays, FileText, NotebookPen, Moon, Sun, Wallet, ArrowUp, ArrowDown, ChevronDown, User } from "lucide-react";
 import AccountSwitcher from "@/components/AccountSwitcher";
+import CoachWidget from "@/components/CoachWidget";
 import { useAuth } from "@/context/AuthContext";
 import { useAccount } from "@/context/AccountContext";
 import { statsApi } from "@/lib/api";
@@ -105,7 +106,7 @@ const nav = [
   { to: "/add-trade", label: "Add Trade", icon: PlusCircle, testid: "nav-add-trade" },
   { to: "/trades", label: "Trade View", icon: Table2, testid: "nav-trades" },
   { to: "/bias", label: "Bias Center", icon: Target, testid: "nav-bias" },
-  { to: "/psychology", label: "Psychology AI", icon: Brain, testid: "nav-psychology" },
+  { to: "/tracker", label: "Tracker", icon: Activity, testid: "nav-tracker" },
   { to: "/notebook", label: "Notebook", icon: NotebookPen, testid: "nav-notebook" },
   { to: "/records", label: "Records", icon: BookOpen, testid: "nav-records" },
   { to: "/reports", label: "Reports", icon: FileText, testid: "nav-reports" },
@@ -214,6 +215,7 @@ export default function Layout() {
         <Outlet />
       </main>
       <Toaster position="top-right" richColors />
+      <CoachWidget />
     </div>
   );
 }

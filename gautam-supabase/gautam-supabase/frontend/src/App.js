@@ -14,7 +14,7 @@ const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const AddTrade = lazy(() => import("@/pages/AddTrade"));
 const TradeView = lazy(() => import("@/pages/TradeView"));
 const BiasCenter = lazy(() => import("@/pages/BiasCenter"));
-const Psychology = lazy(() => import("@/pages/Psychology"));
+const Tracker = lazy(() => import("@/pages/Tracker"));
 const Settings = lazy(() => import("@/pages/Settings"));
 const Records = lazy(() => import("@/pages/Records"));
 const Reports = lazy(() => import("@/pages/Reports"));
@@ -48,7 +48,7 @@ function AppRouter() {
         <Route path="/add-trade" element={<AddTrade />} />
         <Route path="/trades" element={<TradeView />} />
         <Route path="/bias" element={<BiasCenter />} />
-        <Route path="/psychology" element={<Psychology />} />
+        <Route path="/tracker" element={<Tracker />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/records" element={<Records />} />
         <Route path="/reports" element={<Reports />} />
