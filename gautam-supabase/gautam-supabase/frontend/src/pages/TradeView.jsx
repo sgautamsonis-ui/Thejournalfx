@@ -239,7 +239,7 @@ export default function TradeView() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white to-[#FAFBFF]" data-testid="trade-view-page">
+    <div className="compact-trade-view min-h-screen bg-gradient-to-b from-white to-[#FAFBFF]" data-testid="trade-view-page">
       {/* Header */}
       <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-[#E8E8F1]/50">
         <div className="p-5 max-w-[1500px] mx-auto">

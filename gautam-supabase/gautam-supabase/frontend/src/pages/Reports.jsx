@@ -341,7 +341,7 @@ Recommendations:
   };
 
   return (
-    <div className="min-h-screen bg-[#F6F6FB] p-4 sm:p-6 lg:p-8" data-testid="reports-page">
+    <div className="compact-reports min-h-screen bg-[#F6F6FB] p-4 sm:p-6 lg:p-8" data-testid="reports-page">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* HEADER */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">

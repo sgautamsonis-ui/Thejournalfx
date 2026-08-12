@@ -132,6 +132,57 @@ h1, h2, h3, h4, h5 { font-family: 'Comfortaa', sans-serif; letter-spacing: -0.01
 .animate-in { animation: aIn 300ms ease-out both; }
 @keyframes aIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
+/* Compact workspace rhythm -------------------------------------------------
+   Keep the existing surface, typography and purple accent, while tightening
+   the page rhythm so forms and dashboard sections read as one workspace. */
+.compact-add-trade, .compact-bias-page, .compact-reports { max-width: 1280px; }
+.compact-add-trade, .compact-bias-page, .compact-reports > div { row-gap: 14px !important; }
+.compact-add-trade .tjfx-card, .compact-bias-page .tjfx-card, .compact-reports .tjfx-card { border-radius: 18px; box-shadow: 0 3px 14px rgba(22,21,31,.025); }
+.compact-add-trade .tjfx-card { padding: 1.1rem !important; }
+.compact-bias-page .tjfx-card { padding: 1.15rem !important; }
+.compact-reports { padding-top: 1rem !important; padding-bottom: 1.5rem !important; }
+.compact-reports > div { max-width: 1280px; }
+.compact-reports .grid.lg\:grid-cols-4 { gap: 1rem !important; }
+.compact-reports .tjfx-card { padding: 1rem !important; }
+.compact-reports .space-y-6 { --tw-space-y-reverse: 0; margin-top: 0; }
+
+/* Add Trade: visually link consecutive form blocks and remove excess height. */
+.compact-add-trade > header { margin-bottom: 0 !important; }
+.compact-add-trade > header h1 { font-size: 1.7rem; }
+.compact-add-trade > .grid { gap: 14px !important; }
+.compact-add-trade .space-y-4 > :not([hidden]) ~ :not([hidden]) { margin-top: 14px !important; }
+.compact-add-trade .tjfx-card .mb-4 { margin-bottom: .7rem !important; }
+.compact-add-trade .tjfx-card .mt-4 { margin-top: .7rem !important; }
+.compact-add-trade textarea { min-height: 100px; }
+.compact-add-trade .min-h-\[300px\] { min-height: 220px !important; }
+
+/* Bias: use a deliberate compact narrative editor instead of a tall empty box. */
+.compact-bias-page { padding-top: 1rem !important; padding-bottom: 1.5rem !important; }
+.compact-bias-page > .space-y-4 > :not([hidden]) ~ :not([hidden]) { margin-top: 14px !important; }
+.compact-bias-page .grid.md\:grid-cols-2 { gap: 1rem !important; }
+.compact-bias-page textarea[rows="8"] { min-height: 150px; height: 150px; padding: .9rem !important; }
+.compact-bias-page textarea + div { margin-top: .2rem !important; }
+.compact-bias-page .p-4.rounded-2xl { padding: .8rem !important; }
+
+/* Trade View: compact the header/metrics/filter stack and connect day cards. */
+.compact-trade-view .max-w-\[1500px\] { max-width: 1280px; }
+.compact-trade-view .sticky > .p-5 { padding-top: 1rem !important; padding-bottom: .9rem !important; }
+.compact-trade-view h1 { font-size: 1.75rem; }
+.compact-trade-view .grid.lg\:grid-cols-8 { gap: .65rem !important; }
+.compact-trade-view .grid.lg\:grid-cols-8 .tjfx-card { border-radius: 16px; min-height: 104px; }
+.compact-trade-view > .p-5 { padding-top: 1rem !important; padding-bottom: 1.25rem !important; }
+.compact-trade-view .space-y-4 > :not([hidden]) ~ :not([hidden]) { margin-top: 14px !important; }
+.compact-trade-view .space-y-3 > :not([hidden]) ~ :not([hidden]) { margin-top: 10px !important; }
+.compact-trade-view [data-testid="day-group-toggle"] { padding-top: .8rem !important; padding-bottom: .8rem !important; }
+.compact-trade-view [data-testid="day-group-toggle"] + div { padding: .75rem !important; }
+.compact-trade-view .tjfx-card { border-radius: 18px; }
+
+@media (max-width: 640px) {
+  .compact-add-trade, .compact-bias-page, .compact-reports { padding: .85rem !important; }
+  .compact-trade-view .sticky > .p-5, .compact-trade-view > .p-5 { padding-left: .85rem !important; padding-right: .85rem !important; }
+  .compact-add-trade .tjfx-card, .compact-bias-page .tjfx-card { padding: .9rem !important; }
+}
+
 /* The white interface remains the default.  This theme is used only when the
    header moon toggle is enabled, matching the dark trading workspace design. */
 .dark {

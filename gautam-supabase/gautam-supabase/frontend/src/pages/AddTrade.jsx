@@ -495,7 +495,7 @@ function ChipRow({ label, items, selected, onToggle }) {
 function AddTradeWorkspace({ t, setT, presets, accounts, computed, recommendedLot, htfDraft, setHtfDraft, entryDraft, setEntryDraft, addPairedPreset, removePairedPreset, toggle, saving, save, onFile, uploadingCount }) {
   const chooseStrategy = (strategy) => setT({ ...t, strategy });
   return (
-    <div className="add-trade-page p-4 sm:p-5 lg:p-6 max-w-[1500px] mx-auto space-y-4" data-testid="add-trade-page">
+    <div className="add-trade-page compact-add-trade p-4 sm:p-5 lg:p-6 max-w-[1500px] mx-auto space-y-4" data-testid="add-trade-page">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div><h1 className="font-display text-3xl font-bold">Add New Trade</h1><p className="text-sm text-[#6D6D82] mt-1">Document your trade and build your edge.</p></div>
         <button onClick={save} disabled={saving} className="h-11 px-5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-sm font-semibold disabled:opacity-60">{saving ? "Saving..." : "Save Trade"}</button>
