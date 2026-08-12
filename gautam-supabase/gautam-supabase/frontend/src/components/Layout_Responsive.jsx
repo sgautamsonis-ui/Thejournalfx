@@ -140,12 +140,14 @@ export default function Layout() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  // Close sidebar when navigating
   useEffect(() => {
     setSidebarOpen(false);
   }, [navigate]);
 
   return (
     <div className={`min-h-screen flex flex-col md:flex-row bg-[#F6F6FB] ${theme === "dark" ? "dark" : ""}`}>
+      {/* MOBILE OVERLAY */}
       {sidebarOpen && (
         <div
           className="fixed inset-0 bg-black/40 z-20 md:hidden"
@@ -153,12 +155,14 @@ export default function Layout() {
         />
       )}
 
+      {/* SIDEBAR */}
       <aside
         className={`fixed md:relative inset-y-0 left-0 z-30 w-64 md:w-56 lg:w-64 bg-white border-r border-[#E8E8F1] flex flex-col sticky top-0 h-screen transform transition-transform duration-300 ease-in-out ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
         }`}
         data-testid="sidebar"
       >
+        {/* LOGO */}
         <div className="px-4 sm:px-5 lg:px-6 py-5 sm:py-6 flex items-center gap-3 shrink-0 border-b border-[#E8E8F1]">
           <div className="w-9 sm:w-10 h-9 sm:h-10 rounded-2xl bg-[#7C3AED] flex items-center justify-center shadow-[0_8px_24px_rgba(124,58,237,0.35)]">
             <TrendingUp className="w-5 h-5 text-white" />
@@ -175,6 +179,7 @@ export default function Layout() {
           </button>
         </div>
 
+        {/* NAV */}
         <div className="flex-1 min-h-0 overflow-y-auto">
           <nav className="px-2 sm:px-3 space-y-1 py-3">
             {nav.map(({ to, label, icon: Icon, testid }) => (
@@ -204,6 +209,7 @@ export default function Layout() {
           <AccountOverview />
         </div>
 
+        {/* LOGOUT BUTTON */}
         <button
           data-testid="logout-btn"
           onClick={logout}
@@ -214,8 +220,11 @@ export default function Layout() {
         </button>
       </aside>
 
+      {/* MAIN CONTENT */}
       <main className="flex-1 min-w-0 flex flex-col w-full">
+        {/* HEADER */}
         <div className="sticky top-0 z-20 bg-[#F6F6FB]/85 backdrop-blur border-b border-[#E8E8F1] px-4 sm:px-6 lg:px-8 py-2.5 sm:py-3 flex items-center justify-between gap-3 sm:gap-4">
+          {/* HAMBURGER + GREETING */}
           <div className="flex items-center gap-3 sm:gap-4 min-w-0">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -245,6 +254,7 @@ export default function Layout() {
             </div>
           </div>
 
+          {/* HEADER ACTIONS */}
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <NavLink
               to="/settings"
@@ -315,6 +325,7 @@ export default function Layout() {
           </div>
         </div>
 
+        {/* PAGE CONTENT */}
         <div className="flex-1 overflow-auto">
           <Outlet />
         </div>
