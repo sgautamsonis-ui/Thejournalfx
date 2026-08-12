@@ -1059,7 +1059,10 @@ async def dashboard_stats(account_id: Optional[str] = None, user=Depends(get_cur
 
     today_dt = datetime.now(timezone.utc).date()
     week_start = (today_dt - timedelta(days=today_dt.weekday())).isoformat()
-    daily_drawdown = drawdown_since(today)
+    # A daily risk limit is based on the actual loss booked today.  A
+    # peak-to-trough calculation starts from the first trade and returned zero
+    # for a single losing trade, which made the daily lock ineffective.
+    daily_drawdown = round(min(0, todays_pnl), 2)
     weekly_drawdown = drawdown_since(week_start)
 
     # Monthly / weekly / daily performance buckets (for the "Performance Chart" widget)

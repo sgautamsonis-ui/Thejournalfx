@@ -209,14 +209,6 @@ export default function Layout() {
           <AccountOverview />
         </div>
 
-        <button
-          data-testid="logout-btn"
-          onClick={logout}
-          className="m-2 sm:m-3 mt-0 flex items-center justify-center sm:justify-start gap-2 px-2 sm:px-3 py-2 rounded-lg sm:rounded-xl text-[12px] sm:text-[13px] text-[#6D6D82] border-t border-[#E8E8F1] pt-3 hover:text-red-600 transition-colors shrink-0 w-full"
-        >
-          <LogOut className="w-4 h-4 flex-shrink-0" />
-          <span className="hidden sm:inline">Logout</span>
-        </button>
       </aside>
 
       {showDrawdownAlert && <div className="fixed inset-0 z-[70] bg-black/40 flex items-center justify-center p-4">

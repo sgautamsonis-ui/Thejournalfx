@@ -15,8 +15,6 @@ import {
   Zap,
   Brain,
   Target,
-  ChevronDown,
-  Settings,
 } from "lucide-react";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
@@ -97,8 +95,7 @@ export default function Reports() {
   const [customFrom, setCustomFrom] = useState(toDateStr(new Date()));
   const [customTo, setCustomTo] = useState(toDateStr(new Date()));
   const [style, setStyle] = useState("professional");
-  const [timeFormat24, setTimeFormat24] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
+  const timeFormat24 = user?.settings?.report_time_format === "24h";
   const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
   const [aiSummary, setAiSummary] = useState(null);
   
@@ -483,37 +480,6 @@ Recommendations:
                   ))}
                 </div>
               </div>
-            </div>
-
-            {/* Settings Collapse */}
-            <div className="tjfx-card p-5">
-              <button
-                onClick={() => setShowSettings(!showSettings)}
-                className="w-full flex items-center justify-between text-sm font-semibold text-[#16151F] hover:text-[#7C3AED] transition-colors"
-              >
-                <span className="flex items-center gap-2">
-                  <Settings className="w-4 h-4" /> Settings
-                </span>
-                <ChevronDown
-                  className={`w-4 h-4 transition-transform ${showSettings ? "rotate-180" : ""}`}
-                />
-              </button>
-
-              {showSettings && (
-                <div className="mt-4 pt-4 border-t border-[#E8E8F1] space-y-3">
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={timeFormat24}
-                      onChange={(e) => setTimeFormat24(e.target.checked)}
-                      className="accent-[#7C3AED] w-4 h-4 rounded"
-                    />
-                    <span className="text-sm text-[#16151F]">
-                      24-hour time format
-                    </span>
-                  </label>
-                </div>
-              )}
             </div>
 
             {/* Include Sections */}

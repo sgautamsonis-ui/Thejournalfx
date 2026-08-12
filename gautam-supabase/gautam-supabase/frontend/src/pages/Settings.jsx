@@ -38,7 +38,7 @@ export default function Settings() {
   }, []);
 
   const savePrefs = async () => {
-    try { await settingsApi.update(settings); toast.success("Settings saved"); }
+    try { const merged = await settingsApi.update(settings); setSettings(merged); await refresh(); toast.success("Settings saved"); }
     catch { toast.error("Could not save settings — please try again."); }
   };
 
@@ -124,6 +124,8 @@ export default function Settings() {
                 <Field label="Default Risk %"><input type="number" step="0.1" value={settings.risk_percent||1} onChange={e=>setSettings({...settings,risk_percent:parseFloat(e.target.value)||0})} className="inp"/></Field>
                 <Field label="Default Session"><select value={settings.default_session||"London"} onChange={e=>setSettings({...settings,default_session:e.target.value})} className="inp">{["Asian","London","New York","Overlap"].map(x=><option key={x}>{x}</option>)}</select></Field>
                 <Field label="Timezone"><input value={settings.timezone||"UTC"} onChange={e=>setSettings({...settings,timezone:e.target.value})} className="inp"/></Field>
+                <Field label="Report time format"><select value={settings.report_time_format||"12h"} onChange={e=>setSettings({...settings,report_time_format:e.target.value})} className="inp"><option value="12h">12-hour (AM / PM)</option><option value="24h">24-hour</option></select></Field>
+                <Field label="Report timezone"><select value={settings.report_timezone||"Asia/Kolkata"} onChange={e=>setSettings({...settings,report_timezone:e.target.value})} className="inp"><option value="Asia/Kolkata">India Standard Time (IST)</option><option value="UTC">UTC</option><option value="America/New_York">New York (EST/EDT)</option><option value="Europe/London">London (GMT/BST)</option></select></Field>
               </div>
               <button onClick={savePrefs} className="h-10 px-5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-sm font-semibold" data-testid="save-prefs">Save Preferences</button>
             </div>
