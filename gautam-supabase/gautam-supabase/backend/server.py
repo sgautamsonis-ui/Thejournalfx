@@ -580,6 +580,19 @@ HINGLISH_POINTS_SYSTEM = (
     "bold (**) use mat karo, sirf plain bullet points aur simple headers."
 )
 
+# Used only for the "Ask Your Coach" chat widget — unlike the report-style
+# features, a chat should feel like talking to a person: casual messages get a
+# casual reply, and bullet-point stat dumps only show up when actually asked for.
+COACH_CHAT_SYSTEM = (
+    "Tum ek friendly trading coach ho jo apne trader dost se Roman Hindi (Hinglish) mein baat karte ho — "
+    "trading terms (FVG, POI, liquidity, MSS, session, win rate, P&L, etc.) English mein rakho, baaki "
+    "Hindi mein. Ek normal insaan ki tarah baat karo, jaise koi dost chat kar raha ho — casual greeting "
+    "(hi, hello, kaise ho, thanks) ka reply casual hi do, chhoti si 1-2 line mein, bina kisi stat, number, "
+    "ya bullet-point performance summary ke. Sirf jab user specifically apni trading, performance, ya data "
+    "ke baare mein pooche tabhi us data ka use karo, aur tabhi bullet points ('- ') mein specific numbers do. "
+    "Koi markdown bold (**) use mat karo."
+)
+
 def _data_url_to_gemini_part(data_url: str):
     """Turn a stored `data:image/...;base64,XXXX` screenshot into a Gemini image part.
     Returns None (and is skipped) if the string isn't a valid data URL."""
@@ -719,18 +732,35 @@ async def ai_psychology(payload: Dict[str, Any] = Body(default={}), user=Depends
     by_mood = sorted(group_stats(mood_key), key=lambda x: -x["pnl"])
 
     question = (payload.get("question") or "").strip()
+    history = payload.get("history") or []  # [{role: 'user'|'coach', text}] recent chat turns, oldest first
     if question:
-        prompt = f"""User question: {question}
+        history_block = ""
+        if history:
+            lines = []
+            for h in history[-8:]:
+                who = "User" if h.get("role") == "user" else "Coach"
+                lines.append(f"{who}: {h.get('text','')}")
+            history_block = "Recent conversation so far (for context/continuity only):\n" + "\n".join(lines) + "\n\n"
+        prompt = f"""{history_block}User's new message: "{question}"
 
-Data summary for {total} trades (win rate {wr}%, net P&L {pnl_sum}):
-Sessions: {by_session[:5]}
-Strategies: {by_strategy[:5]}
-Symbols: {by_symbol[:5]}
-Best days: {by_day[:5]}
-Moods: {by_mood[:5]}
-Top mistakes: {top_mistakes}
+Trade data available IF the user's message actually asks about their trading, performance, mistakes, \
+sessions, strategies, moods, or similar (use only what's relevant, don't dump everything):
+- Totals: {total} trades, win rate {wr}%, net P&L {pnl_sum}
+- Sessions: {by_session[:5]}
+- Strategies: {by_strategy[:5]}
+- Symbols: {by_symbol[:5]}
+- Best/worst days: {by_day[:5]}
+- Moods: {by_mood[:5]}
+- Top mistakes: {top_mistakes}
 
-Answer the user's question directly using the data. Be specific and actionable. Under 160 words."""
+IMPORTANT: Talk like a real coach chatting with a friend, not like a report generator.
+- If the message is a greeting, small talk, thanks, or anything casual (e.g. "hello", "kaise ho", \
+"thanks", "ok bhai") — just reply naturally and briefly like a human would. Do NOT mention stats, \
+win rate, P&L, or any numbers, and do NOT dump a performance overview. One or two short casual lines is enough.
+- Only bring in the trade data above when the user is actually asking about their trading, performance, \
+or wants analysis/insight.
+- Never dump the full data summary unprompted — only mention the specific numbers relevant to what was asked.
+- Keep replies conversational, not a formal report. Short and natural."""
     else:
         prompt = f"""Trader has {total} trades (win rate {wr}%, net {pnl_sum}).
 Best sessions: {by_session[:3]}
@@ -744,7 +774,7 @@ Give a diagnostic:
 2) Where the biggest leak is (worst dimension + top mistake).
 3) One specific action for this week.
 Keep under 160 words."""
-    text = await call_ai(prompt)
+    text = await call_ai(prompt, system=COACH_CHAT_SYSTEM)
     return {
         "insight": text, "win_rate": wr, "total": total, "pnl": pnl_sum,
         "top_mistakes": top_mistakes, "by_session": by_session, "by_strategy": by_strategy,

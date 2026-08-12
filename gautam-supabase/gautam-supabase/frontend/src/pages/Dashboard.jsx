@@ -7,7 +7,8 @@ import { useAuth } from "@/context/AuthContext";
 import { useAccount } from "@/context/AccountContext";
 import { 
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, 
-  ResponsiveContainer, XAxis, YAxis, Tooltip, Legend, CartesianGrid 
+  ResponsiveContainer, XAxis, YAxis, Tooltip, Legend, CartesianGrid,
+  AreaChart, Area, ReferenceLine
 } from "recharts";
 import { 
   TrendingUp, Target, Activity, Wallet, Sparkles, Settings2, Eye, EyeOff, 
@@ -23,6 +24,7 @@ import { CSS } from "@dnd-kit/utilities";
 const WIDGETS = [
   { id: "kpis",           label: "KPI Cards",               category: "overview", size: "full" },
   { id: "performance",    label: "Performance Overview",    category: "main", size: "full" },
+  { id: "equity-curve",   label: "Live Equity Curve",       category: "main", size: "full" },
   { id: "positions",      label: "Open Positions & Trades", category: "main", size: "full" },
   { id: "calendar",       label: "Trading Calendar",        category: "analytics", size: "lg" },
   { id: "performance-bar",label: "Performance Chart",       category: "analytics", size: "lg" },
@@ -212,6 +214,23 @@ export default function Dashboard() {
     () => (selectedDay ? allTrades.filter(t => String(t.date || "").slice(0, 10) === selectedDay) : []),
     [selectedDay, allTrades]
   );
+
+  // Live equity curve — running cumulative balance across closed trades, sorted
+  // chronologically, starting from the account's starting balance.
+  const equityCurveData = useMemo(() => {
+    const startBalance = Number(active?.balance ?? 0);
+    const closed = allTrades
+      .filter(t => t && t.date && (t.net_pnl !== undefined && t.net_pnl !== null))
+      .slice()
+      .sort((a, b) => new Date(a.date) - new Date(b.date));
+    let running = startBalance;
+    const points = [{ date: closed[0]?.date || new Date().toISOString(), equity: startBalance, label: "Start" }];
+    for (const t of closed) {
+      running += Number(t.net_pnl) || 0;
+      points.push({ date: t.date, equity: running, pnl: t.net_pnl, symbol: t.symbol });
+    }
+    return { points, startBalance, current: running, hasTrades: closed.length > 0 };
+  }, [allTrades, active]);
 
   // Journaling streak = consecutive days with at least one trade logged.
   const { journalCurrent, journalBest } = useMemo(() => {
@@ -423,6 +442,64 @@ export default function Dashboard() {
             )}
           </div>
         )}
+      </Card>
+    ),
+
+    // Live Equity Curve — smooth cumulative-balance curve across all trades
+    "equity-curve": (
+      <Card data-testid="equity-curve-card">
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center gap-2">
+            <h3 className="font-display text-lg font-bold">Live Equity Curve</h3>
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+          </div>
+          <div className={`tjfx-mono text-sm font-semibold ${equityCurveData.current >= equityCurveData.startBalance ? "text-emerald-600" : "text-red-500"}`}>
+            ${equityCurveData.current.toFixed(2)}
+          </div>
+        </div>
+        <div className="h-[280px] mt-3">
+          {equityCurveData.hasTrades ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={equityCurveData.points} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="equityFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#7C3AED" stopOpacity={0.35} />
+                    <stop offset="100%" stopColor="#7C3AED" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E8E8F1" vertical={false} />
+                <XAxis 
+                  dataKey="date" 
+                  tick={{ fontSize: 11, fill: "#A1A1AA" }} 
+                  tickFormatter={(d) => { const dt = new Date(d); return isNaN(dt) ? d : dt.toLocaleDateString("en-IN", { day: "2-digit", month: "short" }); }}
+                  minTickGap={30}
+                />
+                <YAxis tick={{ fontSize: 11, fill: "#A1A1AA" }} domain={["auto", "auto"]} tickFormatter={(v) => `$${v}`} />
+                <Tooltip 
+                  contentStyle={{ borderRadius: 12, border: "1px solid #E8E8F1", backgroundColor: "#fff" }}
+                  labelFormatter={(d) => { const dt = new Date(d); return isNaN(dt) ? d : dt.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }); }}
+                  formatter={(value, name, props) => [`$${Number(value).toFixed(2)}`, props.payload.symbol ? `Equity (${props.payload.symbol})` : "Equity"]}
+                />
+                <ReferenceLine y={equityCurveData.startBalance} stroke="#C4C4CE" strokeDasharray="4 4" />
+                <Area 
+                  type="monotone" 
+                  dataKey="equity" 
+                  stroke="#7C3AED" 
+                  strokeWidth={2.5} 
+                  fill="url(#equityFill)" 
+                  dot={false}
+                  activeDot={{ r: 4, fill: "#7C3AED" }}
+                  isAnimationActive={true}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          ) : (
+            <EmptyState message="No trades yet. Your live equity curve will appear here as you log trades." />
+          )}
+        </div>
       </Card>
     ),
 

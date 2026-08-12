@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { tradesApi } from "@/lib/api";
 import { useAccount } from "@/context/AccountContext";
 import { useNavigate } from "react-router-dom";
@@ -15,7 +15,11 @@ import {
 import {
   ChevronDown, Smile, LineChart as LineChartIcon, CalendarDays, Clock,
   Trophy, TrendingDown, Target as TargetIcon, Sparkles, Sun, Moon, Globe,
+  Download, Loader2,
 } from "lucide-react";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
+import { toast } from "sonner";
 
 const VIEWS = [
   { id: "mood", label: "Mood Tracker", icon: Smile },
@@ -152,11 +156,62 @@ function ClickableRow({ onClick, color, label, emoji, right }) {
 }
 
 function DrillDialog({ drill, onClose, navigate }) {
+  const [exporting, setExporting] = useState(false);
+  const printRef = useRef(null);
+
+  // Exports a detailed PDF for just this mood/strategy/day/time slice — every
+  // trade in the drill (Date, Pair, Dir, P&L, R) plus each trade's screenshot,
+  // rendered off-screen and captured with html2canvas → jsPDF.
+  const exportPdf = async () => {
+    const node = printRef.current;
+    if (!node || !drill) return;
+    setExporting(true);
+    try {
+      const canvas = await html2canvas(node, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const imgW = pageW;
+      const imgH = (canvas.height * imgW) / canvas.width;
+      let heightLeft = imgH;
+      let position = 0;
+      pdf.addImage(imgData, "PNG", 0, position, imgW, imgH);
+      heightLeft -= pageH;
+      while (heightLeft > 0) {
+        position = heightLeft - imgH;
+        pdf.addPage();
+        pdf.addImage(imgData, "PNG", 0, position, imgW, imgH);
+        heightLeft -= pageH;
+      }
+      const safeTitle = (drill.title || "tracker-report").replace(/[^a-z0-9]+/gi, "_").toLowerCase();
+      pdf.save(`TheJournalFX_${safeTitle}.pdf`);
+      toast.success("PDF downloaded");
+    } catch (e) {
+      toast.error("Export failed");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <Dialog open={!!drill} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-2xl bg-white" data-testid="tracker-drill-dialog">
         <DialogHeader>
-          <DialogTitle>{drill?.title}</DialogTitle>
+          <div className="flex items-center justify-between gap-3 pr-6">
+            <DialogTitle>{drill?.title}</DialogTitle>
+            {(drill?.trades || []).length > 0 && (
+              <button
+                onClick={exportPdf}
+                disabled={exporting}
+                data-testid="tracker-drill-export-pdf"
+                className="h-8 px-3 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs font-semibold flex items-center gap-1.5 disabled:opacity-60 shrink-0"
+              >
+                {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                Export PDF
+              </button>
+            )}
+          </div>
         </DialogHeader>
         {(drill?.trades || []).length > 0 ? (
           <div className="overflow-x-auto scroll-thin max-h-[60vh]">
@@ -195,6 +250,55 @@ function DrillDialog({ drill, onClose, navigate }) {
           <div className="py-8 text-center text-sm text-[#6D6D82]">No trades found.</div>
         )}
       </DialogContent>
+
+      {/* Off-screen printable version used only for the PDF export (detailed rows + screenshots) */}
+      {drill && (
+        <div style={{ position: "fixed", left: -9999, top: 0, width: 800 }}>
+          <div ref={printRef} className="bg-white p-6" style={{ width: 800 }}>
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-9 h-9 rounded-xl bg-[#7C3AED] flex items-center justify-center text-white font-bold">↗</div>
+              <div>
+                <div className="font-bold text-[15px]">TheJournalFX</div>
+                <div className="text-[10px] text-[#6D6D82]">Journal • Analyze • Improve</div>
+              </div>
+            </div>
+            <div className="text-[18px] font-bold mt-4 mb-1">{drill.title}</div>
+            <div className="text-[11px] text-[#6D6D82] mb-4">Generated {new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</div>
+            <div className="space-y-4">
+              {drill.trades.map((trade) => (
+                <div key={trade.id} className="border border-[#E8E8F1] rounded-lg p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <div className="font-semibold text-[13px]">
+                        {trade.symbol} · {trade.direction === "long" ? "Long" : "Short"}
+                      </div>
+                      <div className="text-[11px] text-[#6D6D82]">
+                        {trade.date}{trade.entry_time ? ` · ${trade.entry_time}` : ""}
+                        {trade.r_multiple != null ? ` · ${trade.r_multiple.toFixed(2)}R` : ""}
+                      </div>
+                    </div>
+                    <div className={`text-[13px] font-semibold ${(trade.net_pnl || 0) >= 0 ? "text-[#10B981]" : "text-[#EF4444]"}`}>
+                      {fmtMoney(trade.net_pnl)}
+                    </div>
+                  </div>
+                  {trade.screenshots?.length > 0 && (
+                    <div className="grid grid-cols-3 gap-2 mt-2">
+                      {trade.screenshots.map((s, i) => (
+                        <img key={i} src={s} alt="" crossOrigin="anonymous" className="w-full h-24 object-cover rounded-md border border-[#E8E8F1]" />
+                      ))}
+                    </div>
+                  )}
+                  {trade.notes && (
+                    <div className="text-[11px] text-[#6D6D82] whitespace-pre-wrap border-t border-[#E8E8F1] pt-2 mt-2">
+                      {trade.notes}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </Dialog>
   );
 }

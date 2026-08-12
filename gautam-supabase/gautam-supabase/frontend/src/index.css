@@ -43,19 +43,23 @@
    the entire UI consistently without any font family/style ever changing. */
 html { font-size: 15px; }
 
+/* Site-wide font: Comfortaa, everywhere — body copy, headings, numbers, all of it. */
+body, input, select, textarea, button {
+  font-family: 'Comfortaa', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
 body {
   margin: 0;
-  font-family: 'Satoshi', -apple-system, BlinkMacSystemFont, sans-serif;
   background: var(--tjfx-bg);
   color: var(--tjfx-text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-h1, h2, h3, h4, h5 { font-family: 'Cabinet Grotesk', sans-serif; letter-spacing: -0.02em; }
+h1, h2, h3, h4, h5 { font-family: 'Comfortaa', sans-serif; letter-spacing: -0.01em; }
 
-.font-mono, .tjfx-mono { font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1, "zero" 1; }
-.font-display { font-family: 'Cabinet Grotesk', sans-serif; letter-spacing: -0.02em; }
+.font-mono, .tjfx-mono { font-family: 'Comfortaa', sans-serif; font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1, "zero" 1; }
+.font-display { font-family: 'Comfortaa', sans-serif; font-weight: 700; letter-spacing: -0.01em; }
 
 /* Every number on the site (balances, P&L, stats, tables) uses one simple,
    consistent numeral style so figures never look mismatched from section
@@ -145,18 +149,45 @@ h1, h2, h3, h4, h5 { font-family: 'Cabinet Grotesk', sans-serif; letter-spacing:
 .dark main > div:first-child { background: rgba(5,11,18,.88) !important; border-color: #1a2938 !important; }
 .dark .tjfx-card { background: linear-gradient(145deg, #0d1722, #09111a) !important; border-color: #213042 !important; box-shadow: 0 14px 40px rgba(0,0,0,.22); }
 .dark .add-trade-page, .dark .add-trade-page h1, .dark .add-trade-page h2, .dark .add-trade-page h3, .dark .add-trade-page h4 { color: #f4f7fb; }
-.dark .add-trade-page input, .dark .add-trade-page select, .dark .add-trade-page textarea,
-.dark .dark-input { background: #09111a !important; border-color: #2a3949 !important; color: #eef4fb !important; }
-.dark .add-trade-page input:focus, .dark .add-trade-page select:focus, .dark .add-trade-page textarea:focus { border-color: #8b5cf6 !important; }
-.dark .add-trade-page .bg-\[\#F6F6FB\], .dark .add-trade-page .bg-\[\#F5F3FF\] { background: #101b28 !important; }
-.dark .add-trade-page .border-\[\#E8E8F1\], .dark .add-trade-page .border-\[\#DDD6FE\] { border-color: #293a4d !important; }
-.dark .add-trade-page .text-\[\#6D6D82\], .dark .text-\[\#6D6D82\] { color: #99a8b8 !important; }
-.dark .add-trade-page .text-\[\#A1A1AA\], .dark .text-\[\#A1A1AA\] { color: #7f91a4 !important; }
+
+/* Site-wide form controls — every input/select/textarea gets the dark surface,
+   not just the Add Trade page, so pages like Bias Center, Reports, Notebook,
+   Settings etc. stay fully dark instead of leaving stray white boxes. */
+.dark input, .dark select, .dark textarea, .dark .dark-input {
+  background: #09111a !important;
+  border-color: #2a3949 !important;
+  color: #eef4fb !important;
+}
+.dark input::placeholder, .dark textarea::placeholder { color: #5c6b7e !important; }
+.dark input:focus, .dark select:focus, .dark textarea:focus { border-color: #8b5cf6 !important; }
+.dark input[type="checkbox"], .dark input[type="radio"] { background: transparent !important; }
+
+/* Common light surface / border utility colors used across every page —
+   overridden globally (not just inside .add-trade-page) so nothing is left
+   rendering as a plain white card, panel, or divider in dark mode. */
+.dark .bg-\[\#F6F6FB\], .dark .bg-white, .dark .bg-\[\#F5F3FF\], .dark .bg-\[\#F9F9FC\], .dark .bg-\[\#FAFAFA\] {
+  background-color: #09111a !important;
+}
+.dark .bg-\[\#F3E8FF\] { background-color: rgba(124,58,237,.16) !important; }
+.dark .bg-\[\#F3E8FF\]\/40, .dark .bg-\[\#F3E8FF\]\/50, .dark .bg-\[\#F3E8FF\]\/60 { background-color: rgba(124,58,237,.12) !important; }
+.dark .border-\[\#E8E8F1\], .dark .border-\[\#DDD6FE\] { border-color: #293a4d !important; }
+.dark .text-\[\#6D6D82\] { color: #99a8b8 !important; }
+.dark .text-\[\#A1A1AA\] { color: #7f91a4 !important; }
+.dark .text-\[\#16151F\], .dark .font-display { color: #eef4fb; }
 .dark .chip { background: #101b28; color: #dbe5ef; border-color: #2b3b4d; }
 .dark .chip.active { background: rgba(109,40,217,.28); border-color: rgba(139,92,246,.55); color: #c4b5fd; }
 .dark .add-trade-page [data-testid="lot-size-calculator"] { background: linear-gradient(135deg, rgba(59,28,129,.48), rgba(12,27,39,.9)) !important; border-color: rgba(139,92,246,.5) !important; }
 .dark body, html.dark body { background: #050b12; color: #eef4fb; }
-.dark .bg-\[\#F6F6FB\], .dark .bg-white { background-color: #09111a !important; }
-.dark .border-\[\#E8E8F1\] { border-color: #293a4d !important; }
-.dark .text-\[\#16151F\], .dark .font-display { color: #eef4fb; }
 .dark select option { background: #09111a; color: #eef4fb; }
+
+/* Dialogs/modals (Radix portals render at the end of <body>, still inside
+   <html class="dark">, so these rules reach them) and dropdown menus. */
+.dark [role="dialog"], .dark [data-radix-popper-content-wrapper] > * {
+  background: #0b141e !important;
+  border-color: #213042 !important;
+  color: #eef4fb !important;
+}
+.dark table thead { color: #99a8b8 !important; }
+.dark table tr { border-color: #213042 !important; }
+.dark tbody tr:hover { background: rgba(124,58,237,.08) !important; }
+.dark ::-webkit-scrollbar-thumb { background: #213042 !important; }

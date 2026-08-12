@@ -41,6 +41,30 @@ function startOfWeek(d) {
   return x;
 }
 
+// India follows an Apr–Mar financial year (e.g. "FY 2026-27" runs 1 Apr 2026 → 31 Mar 2027).
+function currentFinancialYear(d = new Date()) {
+  const y = d.getFullYear();
+  const startYear = d.getMonth() >= 3 ? y : y - 1; // month is 0-indexed; April = 3
+  const start = new Date(startYear, 3, 1);
+  const end = new Date(startYear + 1, 2, 31);
+  return { start, end, label: `FY ${String(startYear).slice(2)}-${String(startYear + 1).slice(2)}` };
+}
+
+const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
+// Bank-statement-style quick date presets for the report's date range picker.
+const DATE_MODE_OPTIONS = () => {
+  const now = new Date();
+  const fy = currentFinancialYear(now);
+  return [
+    { value: "current_week", label: "Current Week" },
+    { value: "prev_week", label: "Previous Week" },
+    { value: "current_month", label: `Current Month (${MONTH_NAMES[now.getMonth()]})` },
+    { value: "current_fy", label: `Current Financial Year (${fy.label})` },
+    { value: "custom", label: "Custom Date Range" },
+  ];
+};
+
 function formatTime(date, format24 = false) {
   if (!date) return "—";
   const d = new Date(date);
@@ -64,6 +88,11 @@ export default function Reports() {
   const { user } = useAuth();
   const [type, setType] = useState("daily");
   const [date, setDate] = useState(toDateStr(new Date()));
+  // Bank-style reference date picker: a quick preset dropdown, with a manual
+  // From/To range that only appears when "Custom Date Range" is chosen.
+  const [dateMode, setDateMode] = useState("current_month");
+  const [customFrom, setCustomFrom] = useState(toDateStr(new Date()));
+  const [customTo, setCustomTo] = useState(toDateStr(new Date()));
   const [style, setStyle] = useState("professional");
   const [timeFormat24, setTimeFormat24] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -110,21 +139,33 @@ export default function Reports() {
     })();
   }, []);
 
-  // Calculate date range
+  // Calculate date range from the Reference Date preset dropdown (bank-statement
+  // style: Current Week / Previous Week / Current Month / Current Financial Year,
+  // or a manual Custom Date Range with From/To fields).
   const range = useMemo(() => {
-    const d = new Date(date);
-    if (type === "daily") {
-      return { start: toDateStr(d), end: toDateStr(d) };
-    }
-    if (type === "weekly") {
-      const s = startOfWeek(d);
+    const now = new Date();
+    if (dateMode === "current_week") {
+      const s = startOfWeek(now);
       return { start: toDateStr(s), end: toDateStr(addDays(s, 6)) };
     }
-    // monthly
-    const s = new Date(d.getFullYear(), d.getMonth(), 1);
-    const e = new Date(d.getFullYear(), d.getMonth() + 1, 0);
-    return { start: toDateStr(s), end: toDateStr(e) };
-  }, [date, type]);
+    if (dateMode === "prev_week") {
+      const s = addDays(startOfWeek(now), -7);
+      return { start: toDateStr(s), end: toDateStr(addDays(s, 6)) };
+    }
+    if (dateMode === "current_month") {
+      const s = new Date(now.getFullYear(), now.getMonth(), 1);
+      const e = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      return { start: toDateStr(s), end: toDateStr(e) };
+    }
+    if (dateMode === "current_fy") {
+      const fy = currentFinancialYear(now);
+      return { start: toDateStr(fy.start), end: toDateStr(fy.end) };
+    }
+    // custom
+    const s = customFrom || toDateStr(now);
+    const e = customTo || toDateStr(now);
+    return s <= e ? { start: s, end: e } : { start: e, end: s };
+  }, [dateMode, customFrom, customTo]);
 
   // Filter and calculate metrics
   const filtered = useMemo(() => {
@@ -368,13 +409,44 @@ Recommendations:
                 <label className="text-xs font-semibold text-[#6D6D82] uppercase tracking-wide">
                   Reference Date
                 </label>
-                <input
-                  type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
+                <select
+                  value={dateMode}
+                  onChange={(e) => setDateMode(e.target.value)}
                   className="w-full h-10 px-3 rounded-xl border border-[#E8E8F1] focus:border-[#7C3AED] outline-none text-sm bg-white mt-2"
-                  data-testid="report-date"
-                />
+                  data-testid="report-date-mode"
+                >
+                  {DATE_MODE_OPTIONS().map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+
+                {dateMode === "custom" && (
+                  <div className="grid grid-cols-2 gap-2 mt-2">
+                    <div>
+                      <div className="text-[10px] text-[#6D6D82] font-medium mb-1">From</div>
+                      <input
+                        type="date"
+                        value={customFrom}
+                        onChange={(e) => setCustomFrom(e.target.value)}
+                        max={customTo}
+                        className="w-full h-10 px-3 rounded-xl border border-[#E8E8F1] focus:border-[#7C3AED] outline-none text-sm bg-white"
+                        data-testid="report-date-from"
+                      />
+                    </div>
+                    <div>
+                      <div className="text-[10px] text-[#6D6D82] font-medium mb-1">To</div>
+                      <input
+                        type="date"
+                        value={customTo}
+                        onChange={(e) => setCustomTo(e.target.value)}
+                        min={customFrom}
+                        className="w-full h-10 px-3 rounded-xl border border-[#E8E8F1] focus:border-[#7C3AED] outline-none text-sm bg-white"
+                        data-testid="report-date-to"
+                      />
+                    </div>
+                  </div>
+                )}
+
                 <div className="text-xs text-[#A1A1AA] mt-2 tjfx-mono font-medium">
                   {range.start} → {range.end}
                 </div>
@@ -868,7 +940,7 @@ function ReportBody({
           <div className="space-y-4">
             {data.trades
               .filter((t) => t.screenshots?.length)
-              .slice(0, 5)
+              .slice(0, 10)
               .map((t) => (
                 <div
                   key={t.id}
@@ -891,8 +963,21 @@ function ReportBody({
                       ${(t.net_pnl || 0).toFixed(2)}
                     </div>
                   </div>
+                  {includes.screenshots && t.screenshots?.length > 0 && (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
+                      {t.screenshots.map((s, i) => (
+                        <img
+                          key={i}
+                          src={s}
+                          alt={`${t.symbol} screenshot ${i + 1}`}
+                          className="w-full h-28 object-cover rounded-lg border border-[#E8E8F1]"
+                          crossOrigin="anonymous"
+                        />
+                      ))}
+                    </div>
+                  )}
                   {t.notes && (
-                    <div className="text-[11px] text-[#6D6D82] whitespace-pre-wrap border-t border-[#E8E8F1] pt-2">
+                    <div className="text-[11px] text-[#6D6D82] whitespace-pre-wrap border-t border-[#E8E8F1] pt-2 mt-2">
                       {t.notes}
                     </div>
                   )}

@@ -28,7 +28,8 @@ export default function CoachWidget() {
     setQuestion("");
     setAsking(true);
     try {
-      const r = await aiApi.psychology({ question: text });
+      const history = messages.map((m) => ({ role: m.role === "user" ? "user" : "coach", text: m.text }));
+      const r = await aiApi.psychology({ question: text, history });
       setMessages((m) => [...m, { role: "coach", text: r?.insight || "I couldn't find an answer for that." }]);
     } catch {
       setMessages((m) => [...m, { role: "coach", text: "Sorry, I couldn't reach the AI coach right now. Try again in a bit." }]);

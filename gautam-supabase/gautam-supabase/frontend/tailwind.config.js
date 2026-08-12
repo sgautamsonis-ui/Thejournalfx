@@ -8,9 +8,9 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["Satoshi", "-apple-system", "BlinkMacSystemFont", "sans-serif"],
-        display: ["Cabinet Grotesk", "sans-serif"],
-        mono: ["JetBrains Mono", "monospace"],
+        sans: ["Comfortaa", "-apple-system", "BlinkMacSystemFont", "sans-serif"],
+        display: ["Comfortaa", "sans-serif"],
+        mono: ["Comfortaa", "sans-serif"],
       },
       borderRadius: {
         lg: 'var(--radius)',
