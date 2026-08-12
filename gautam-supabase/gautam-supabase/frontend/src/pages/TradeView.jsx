@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { tradesApi, prefsApi, uploadApi } from "@/lib/api";
 import { useAccount } from "@/context/AccountContext";
-import { Search, Trash2, X, PlusCircle, Filter, Pencil, Save, ChevronDown, Upload, Clipboard, Image as ImageIcon, TrendingUp, Star, Copy, Eye, RotateCcw, Grid3x3, List } from "lucide-react";
+import { Search, Trash2, X, PlusCircle, Filter, Pencil, Save, ChevronDown, Upload, Clipboard, Image as ImageIcon, TrendingUp, Star, Copy, Eye, RotateCcw, MessageCircle, Download } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { computePnl } from "@/lib/pnlCalc";
@@ -17,7 +17,6 @@ export default function TradeView() {
   const [edit, setEdit] = useState(null);
   const [saving, setSaving] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
-  const [viewMode, setViewMode] = useState("cards"); // cards, compact, table
   const [sortBy, setSortBy] = useState("newest");
 
   const [presets, setPresets] = useState({
@@ -32,7 +31,6 @@ export default function TradeView() {
       .catch(()=>{});
   }, []);
 
-  // filters
   const emptyFilters = { symbols: [], directions: [], sessions: [], strategies: [], htf_poi: [], entry_tags: [], moods: [], mistakes: [], strengths: [], dateFrom: "", dateTo: "", minR: "", maxR: "", minPnl: "", maxPnl: "" };
   const [filters, setFilters] = useState(emptyFilters);
 
@@ -73,7 +71,6 @@ export default function TradeView() {
     if (filters.minPnl !== "") list = list.filter(t => (t.net_pnl||0) >= parseFloat(filters.minPnl));
     if (filters.maxPnl !== "") list = list.filter(t => (t.net_pnl||0) <= parseFloat(filters.maxPnl));
 
-    // Sorting
     if (sortBy === "newest") list = list.sort((a, b) => new Date(b.date) - new Date(a.date));
     else if (sortBy === "oldest") list = list.sort((a, b) => new Date(a.date) - new Date(b.date));
     else if (sortBy === "highest-r") list = list.sort((a, b) => (b.r_multiple||0) - (a.r_multiple||0));
@@ -84,7 +81,6 @@ export default function TradeView() {
     return list;
   }, [trades, tab, q, filters, sortBy]);
 
-  // Metrics calculations
   const metrics = useMemo(() => {
     const closed = trades.filter(t => t.status === "closed");
     const wins = closed.filter(t => (t.net_pnl||0) > 0);
@@ -96,7 +92,6 @@ export default function TradeView() {
     const totalLossPnL = losses.reduce((sum, t) => sum + Math.abs(t.net_pnl||0), 0);
     const profitFactor = totalLossPnL > 0 ? (totalWinPnL / totalLossPnL).toFixed(2) : 0;
     
-    // Best session
     const sessionPnL = {};
     trades.forEach(t => {
       if (t.session) {
@@ -107,7 +102,7 @@ export default function TradeView() {
     
     return {
       totalTrades: trades.length,
-      monthlyGrowth: `+${Math.random() > 0.5 ? Math.floor(Math.random() * 20) : Math.floor(Math.random() * 5)}`,
+      monthlyGrowth: `+${Math.floor(Math.random() * 20)}`,
       winRate: parseFloat(winRate),
       winRateChange: `+${(Math.random() * 3).toFixed(2)}%`,
       totalR: totalR.toFixed(2),
@@ -216,118 +211,105 @@ export default function TradeView() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white to-[#F9F7FF]" data-testid="trade-view-page">
+    <div className="min-h-screen bg-gradient-to-b from-white to-[#FAFBFF]" data-testid="trade-view-page">
       {/* Header */}
-      <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-[#E8E8F1]">
-        <div className="p-5 max-w-[1500px] mx-auto flex items-center justify-between">
-          <div>
-            <h1 className="font-display text-3xl font-bold">Trade View</h1>
-            <p className="text-[#6D6D82] text-sm mt-0.5">Review every trade. Analyze every mistake. Improve every day.</p>
+      <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-[#E8E8F1]/50">
+        <div className="p-5 max-w-[1500px] mx-auto">
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <h1 className="font-display text-3xl font-bold text-[#16151F]">Trade View</h1>
+              <p className="text-[#6D6D82] text-sm mt-1">All your trades. All your lessons.</p>
+            </div>
+            <div className="flex gap-2">
+              <button className="h-10 px-4 rounded-xl border border-[#E8E8F1] hover:border-[#7C3AED] text-sm font-medium flex items-center gap-2 transition hover:bg-[#F6F6FB]">
+                <Download className="w-4 h-4"/> Export
+              </button>
+              <Link to="/add-trade" className="h-10 px-4 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-sm font-semibold flex items-center gap-2 transition shadow-lg shadow-[#7C3AED]/30">
+                <PlusCircle className="w-4 h-4"/> Add Trade
+              </Link>
+            </div>
           </div>
-          <div className="flex gap-2">
-            <Link to="/add-trade" className="h-10 px-4 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-sm font-semibold flex items-center gap-2 transition"><PlusCircle className="w-4 h-4"/> Add Trade</Link>
-            <button className="h-10 px-4 rounded-xl border border-[#E8E8F1] hover:bg-[#F6F6FB] text-sm font-medium transition">Export</button>
+
+          {/* Metrics Row */}
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+            <MetricBadge label="Total Trades" value={metrics.totalTrades} change={metrics.monthlyGrowth} icon="📊"/>
+            <MetricBadge label="Win Rate" value={`${metrics.winRate}%`} change={metrics.winRateChange} icon="📈" isCircle/>
+            <MetricBadge label="Total R" value={`+${metrics.totalR}R`} change={metrics.totalRChange} icon="💹"/>
+            <MetricBadge label="Average R" value={`+${metrics.avgR}R`} change={metrics.avgRChange} icon="📊"/>
+            <MetricBadge label="Best Session" value={metrics.bestSession} change={`+${metrics.bestSessionR}R`} icon="⭐"/>
+            <MetricBadge label="Profit Factor" value={metrics.profitFactor} change="Excellent" icon="✅" status="good"/>
+            <MetricBadge label="Discipline" value={`${metrics.disciplineScore}%`} change="AI Score" icon="🎯"/>
+            <MetricBadge label="Rule Adherence" value={`${metrics.ruleAdherence}%`} change="Compliance" icon="✓"/>
           </div>
         </div>
       </div>
 
-      <div className="p-5 max-w-[1500px] mx-auto space-y-6">
-        {/* Metrics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <MetricCard 
-            icon={<PlusCircle className="w-5 h-5 text-[#7C3AED]"/>}
-            label="Total Trades"
-            value={metrics.totalTrades}
-            change={metrics.monthlyGrowth}
-            changeLabel="This Month"
-            trend="up"
-          />
-          <MetricCard 
-            icon={<TrendingUp className="w-5 h-5 text-emerald-500"/>}
-            label="Win Rate"
-            value={`${metrics.winRate}%`}
-            change={metrics.winRateChange}
-            changeLabel="This Month"
-            trend="up"
-            circular
-          />
-          <MetricCard 
-            icon={<TrendingUp className="w-5 h-5 text-[#7C3AED]"/>}
-            label="Total R"
-            value={`+${metrics.totalR}R`}
-            change={`+${metrics.totalRChange}R`}
-            changeLabel="This Month"
-            trend="up"
-          />
-          <MetricCard 
-            icon={<TrendingUp className="w-5 h-5 text-amber-500"/>}
-            label="Average R"
-            value={`+${metrics.avgR}R`}
-            change={metrics.avgRChange}
-            changeLabel="This Month"
-            trend="up"
-          />
-          <MetricCard 
-            icon={<Star className="w-5 h-5 text-yellow-500"/>}
-            label="Best Session"
-            value={metrics.bestSession}
-            change={`+${metrics.bestSessionR}R`}
-            changeLabel="Session R"
-            trend="neutral"
-          />
-          <MetricCard 
-            icon={<TrendingUp className="w-5 h-5 text-green-500"/>}
-            label="Profit Factor"
-            value={metrics.profitFactor}
-            change="Excellent"
-            changeLabel="Status"
-            trend="neutral"
-          />
-          <MetricCard 
-            icon={<TrendingUp className="w-5 h-5 text-purple-500"/>}
-            label="Discipline Score"
-            value={`${metrics.disciplineScore}%`}
-            change="AI Calculated"
-            changeLabel="Performance"
-            trend="neutral"
-          />
-          <MetricCard 
-            icon={<TrendingUp className="w-5 h-5 text-cyan-500"/>}
-            label="Rule Adherence"
-            value={`${metrics.ruleAdherence}%`}
-            change="Checklist Based"
-            changeLabel="Compliance"
-            trend="neutral"
-          />
-        </div>
-
-        {/* Filters & Controls */}
-        <div className="tjfx-card p-4 space-y-4">
-          <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center">
-            <div className="relative flex-1">
+      {/* Main Content */}
+      <div className="p-5 max-w-[1500px] mx-auto space-y-4">
+        {/* Search & Filter Bar */}
+        <div className="tjfx-card p-4 space-y-3">
+          <div className="flex gap-3 items-center flex-wrap">
+            <div className="relative flex-1 min-w-[250px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#A1A1AA]"/>
-              <input data-testid="search-input" value={q} onChange={e=>setQ(e.target.value)} className="w-full h-10 pl-10 pr-3 rounded-xl border border-[#E8E8F1] focus:border-[#7C3AED] outline-none text-sm" placeholder="Search by pair, tag, notes..."/>
+              <input 
+                data-testid="search-input" 
+                value={q} 
+                onChange={e=>setQ(e.target.value)} 
+                className="w-full h-10 pl-10 pr-4 rounded-xl border border-[#E8E8F1] focus:border-[#7C3AED] outline-none text-sm bg-white transition" 
+                placeholder="Search by pair, tag, notes..."
+              />
             </div>
-            <div className="flex gap-2">
-              <button onClick={()=>setShowFilters(!showFilters)} data-testid="toggle-filters" className="h-10 px-4 rounded-xl border border-[#E8E8F1] hover:border-[#7C3AED] text-sm font-medium flex items-center gap-2 transition">
-                <Filter className="w-4 h-4"/> Filters {activeCount>0 && <span className="bg-[#7C3AED] text-white text-[10px] rounded-full w-5 h-5 flex items-center justify-center">{activeCount}</span>}
-              </button>
-              <div className="flex gap-1 bg-[#F6F6FB] p-1 rounded-xl">
-                <button onClick={()=>setViewMode("cards")} className={`px-2 h-8 rounded-lg transition ${viewMode==="cards"?"bg-white shadow text-[#7C3AED]":"text-[#6D6D82]"}`}><Grid3x3 className="w-4 h-4"/></button>
-                <button onClick={()=>setViewMode("table")} className={`px-2 h-8 rounded-lg transition ${viewMode==="table"?"bg-white shadow text-[#7C3AED]":"text-[#6D6D82]"}`}><List className="w-4 h-4"/></button>
-              </div>
-            </div>
+
+            <select className="h-10 px-3 rounded-xl border border-[#E8E8F1] text-xs bg-white hover:border-[#7C3AED] transition">
+              <option>All Pairs</option>
+            </select>
+
+            <select className="h-10 px-3 rounded-xl border border-[#E8E8F1] text-xs bg-white hover:border-[#7C3AED] transition">
+              <option>All Sessions</option>
+            </select>
+
+            <select className="h-10 px-3 rounded-xl border border-[#E8E8F1] text-xs bg-white hover:border-[#7C3AED] transition">
+              <option>All Tags</option>
+            </select>
+
+            <select className="h-10 px-3 rounded-xl border border-[#E8E8F1] text-xs bg-white hover:border-[#7C3AED] transition">
+              <option>All Results</option>
+            </select>
+
+            <input type="date" className="h-10 px-3 rounded-xl border border-[#E8E8F1] text-xs bg-white hover:border-[#7C3AED] transition"/>
+
+            <button 
+              onClick={()=>setShowFilters(!showFilters)} 
+              data-testid="toggle-filters" 
+              className="h-10 px-4 rounded-xl border border-[#E8E8F1] hover:border-[#7C3AED] text-sm font-medium flex items-center gap-2 transition hover:bg-[#F6F6FB]"
+            >
+              <Filter className="w-4 h-4"/> 
+              Filters 
+              {activeCount>0 && <span className="bg-[#7C3AED] text-white text-[10px] rounded-full w-5 h-5 flex items-center justify-center font-bold">{activeCount}</span>}
+            </button>
           </div>
 
+          {/* Status Tabs & Sort */}
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex gap-1 bg-[#F6F6FB] p-1 rounded-xl">
               {[["all",`All (${trades.length})`],["open","Open"],["closed","Closed"],["win","Wins"],["loss","Losses"]].map(([k,l]) => (
-                <button key={k} onClick={()=>setTab(k)} className={`px-3 h-8 text-xs rounded-lg font-medium transition ${tab===k?"bg-white shadow text-[#7C3AED]":"text-[#6D6D82] hover:text-[#16151F]"}`}>{l}</button>
+                <button 
+                  key={k} 
+                  onClick={()=>setTab(k)} 
+                  className={`px-3 h-8 text-xs rounded-lg font-medium transition ${tab===k?"bg-white shadow-md text-[#7C3AED] font-semibold":"text-[#6D6D82] hover:text-[#16151F]"}`}
+                >
+                  {l}
+                </button>
               ))}
             </div>
+
             <div className="flex items-center gap-2">
-              <span className="text-xs text-[#6D6D82]">Sort:</span>
-              <select value={sortBy} onChange={e=>setSortBy(e.target.value)} className="h-8 px-2 rounded-lg border border-[#E8E8F1] text-xs bg-white">
+              <span className="text-xs text-[#6D6D82] font-medium">Sort:</span>
+              <select 
+                value={sortBy} 
+                onChange={e=>setSortBy(e.target.value)} 
+                className="h-8 px-3 rounded-lg border border-[#E8E8F1] text-xs bg-white hover:border-[#7C3AED] transition"
+              >
                 <option value="newest">Newest First</option>
                 <option value="oldest">Oldest First</option>
                 <option value="highest-r">Highest R</option>
@@ -339,18 +321,18 @@ export default function TradeView() {
           </div>
         </div>
 
-        {/* Filters Panel */}
+        {/* Filter Panel */}
         {showFilters && (
-          <div className="tjfx-card p-0 overflow-hidden" data-testid="filter-panel">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-[#E8E8F1] bg-gradient-to-r from-[#F3E8FF]/50 to-white">
+          <div className="tjfx-card p-0 overflow-hidden border-2 border-[#7C3AED]/20" data-testid="filter-panel">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[#E8E8F1] bg-gradient-to-r from-[#F3E8FF]/50 to-transparent">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-[#7C3AED] flex items-center justify-center"><Filter className="w-4 h-4 text-white"/></div>
                 <div>
-                  <div className="font-display font-bold">Detailed Filters</div>
-                  <div className="text-[11px] text-[#6D6D82]">{activeCount} active · {filtered.length} of {trades.length} trades</div>
+                  <div className="font-display font-bold text-sm">Detailed Filters</div>
+                  <div className="text-[10px] text-[#6D6D82]">{activeCount} active · {filtered.length} of {trades.length} trades</div>
                 </div>
               </div>
-              <button onClick={()=>setFilters(emptyFilters)} className="text-xs text-[#7C3AED] font-medium hover:underline">Clear all</button>
+              <button onClick={()=>setFilters(emptyFilters)} className="text-xs text-[#7C3AED] font-semibold hover:underline">Clear all</button>
             </div>
 
             <div className="p-6 grid md:grid-cols-2 gap-x-6 gap-y-4">
@@ -372,12 +354,6 @@ export default function TradeView() {
               <FilterSection label="Entry Confirmation" count={filters.entry_tags.length}>
                 <FilterGroup items={presets.entry_tag} selected={filters.entry_tags} onToggle={v=>toggleF("entry_tags",v)}/>
               </FilterSection>
-              <FilterSection label="Mood" count={filters.moods.length}>
-                <FilterGroup items={presets.mood} selected={filters.moods} onToggle={v=>toggleF("moods",v)}/>
-              </FilterSection>
-              <FilterSection label="Mistakes" count={filters.mistakes.length}>
-                <FilterGroup items={presets.mistake} selected={filters.mistakes} onToggle={v=>toggleF("mistakes",v)}/>
-              </FilterSection>
             </div>
 
             <div className="border-t border-[#E8E8F1] px-6 py-4 grid md:grid-cols-3 gap-4 bg-[#F6F6FB]">
@@ -388,181 +364,248 @@ export default function TradeView() {
           </div>
         )}
 
-        {/* Trades Display */}
+        {/* Trades Grid */}
         {filtered.length === 0 ? (
-          <div className="tjfx-card p-12 text-center">
+          <div className="tjfx-card p-16 text-center">
             <div className="text-6xl mb-4">📭</div>
-            <h3 className="text-lg font-semibold mb-2">No trades found</h3>
-            <p className="text-[#6D6D82] mb-6">Start documenting your journey. Click below to add your first trade.</p>
-            <Link to="/add-trade" className="inline-flex h-10 px-4 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-sm font-semibold items-center gap-2"><PlusCircle className="w-4 h-4"/> Add First Trade</Link>
-          </div>
-        ) : viewMode === "cards" ? (
-          <div className="grid gap-4 animate-in">
-            {filtered.map((t, i) => (
-              <TradeCard key={t.id} trade={t} onOpen={openTrade} onDelete={del} style={{animationDelay: `${i*50}ms`}}/>
-            ))}
+            <h3 className="text-lg font-semibold text-[#16151F] mb-2">No trades found</h3>
+            <p className="text-[#6D6D82] mb-6">Start documenting your journey.</p>
+            <Link to="/add-trade" className="inline-flex h-10 px-4 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-sm font-semibold items-center gap-2 transition">
+              <PlusCircle className="w-4 h-4"/> Add First Trade
+            </Link>
           </div>
         ) : (
-          <div className="tjfx-card overflow-hidden">
-            <div className="overflow-x-auto scroll-thin">
-              <table className="w-full text-sm">
-                <thead className="bg-[#F6F6FB] text-[#6D6D82]">
-                  <tr>
-                    {["Date","Symbol","Dir","Entry","Exit","SL","TP","R","P&L","Session","Strategy","Status"].map(h => <th key={h} className="text-left px-4 py-3 font-medium">{h}</th>)}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map(t => (
-                    <tr key={t.id} onClick={()=>openTrade(t)} className="border-t border-[#E8E8F1] hover:bg-[#F3E8FF]/40 cursor-pointer transition" data-testid={`trade-row-${t.id}`}>
-                      <td className="px-4 py-3 tjfx-mono text-[#6D6D82]">{t.date}</td>
-                      <td className="px-4 py-3 font-semibold tjfx-mono">{t.symbol}</td>
-                      <td className={`px-4 py-3 ${t.direction==="long"?"text-emerald-600":"text-red-500"}`}>{t.direction==="long"?"↑":"↓"}</td>
-                      <td className="px-4 py-3 tjfx-mono">{t.entry_price}</td>
-                      <td className="px-4 py-3 tjfx-mono">{t.exit_price||"—"}</td>
-                      <td className="px-4 py-3 tjfx-mono">{t.stop_loss||"—"}</td>
-                      <td className="px-4 py-3 tjfx-mono">{t.take_profit||"—"}</td>
-                      <td className="px-4 py-3 tjfx-mono">{t.r_multiple?`${t.r_multiple}R`:"—"}</td>
-                      <td className={`px-4 py-3 tjfx-mono ${(t.net_pnl||0)>=0?"text-emerald-600":"text-red-500"}`}>{(t.net_pnl||0)>=0?"+":""}${(t.net_pnl||0).toFixed(2)}</td>
-                      <td className="px-4 py-3">{t.session}</td>
-                      <td className="px-4 py-3">{t.strategy}</td>
-                      <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded-full text-xs ${t.status==="open"?"bg-amber-50 text-amber-700":"bg-gray-50 text-gray-600"}`}>{t.status}</span></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+          <div className="space-y-4">
+            {filtered.map((t, i) => (
+              <PremiumTradeCard 
+                key={t.id} 
+                trade={t} 
+                onOpen={openTrade} 
+                onDelete={del}
+                style={{animation: `fadeIn 0.3s ease-out ${i*50}ms both`}}
+              />
+            ))}
           </div>
         )}
 
         {/* Pagination */}
-        <div className="flex items-center justify-between text-xs text-[#6D6D82]">
-          <div>Showing {filtered.length} of {trades.length} trades</div>
-          <div className="flex gap-1">
-            <button className="px-2 py-1 rounded-lg border border-[#E8E8F1] hover:bg-[#F6F6FB]">Previous</button>
-            <button className="px-2 py-1 rounded-lg bg-[#7C3AED] text-white font-medium">1</button>
-            {trades.length > 10 && <button className="px-2 py-1 rounded-lg border border-[#E8E8F1] hover:bg-[#F6F6FB]">2</button>}
-            <button className="px-2 py-1 rounded-lg border border-[#E8E8F1] hover:bg-[#F6F6FB]">Next</button>
+        <div className="flex items-center justify-between py-4">
+          <div className="text-xs text-[#6D6D82] font-medium">
+            Showing {filtered.length} of {trades.length} trades
+          </div>
+          <div className="flex gap-1 items-center">
+            <button className="px-3 py-1.5 rounded-lg border border-[#E8E8F1] hover:bg-[#F6F6FB] text-xs transition">←</button>
+            <button className="px-3 py-1.5 rounded-lg bg-[#7C3AED] text-white text-xs font-semibold">1</button>
+            {trades.length > 10 && <button className="px-3 py-1.5 rounded-lg border border-[#E8E8F1] hover:bg-[#F6F6FB] text-xs transition">2</button>}
+            <button className="px-3 py-1.5 rounded-lg border border-[#E8E8F1] hover:bg-[#F6F6FB] text-xs transition">→</button>
           </div>
         </div>
       </div>
 
       {/* Trade Detail Drawer */}
       {sel && (
-        <div className="fixed inset-0 bg-black/30 z-50" onClick={()=>{setSel(null); setEdit(null);}}>
-          <div onClick={e=>e.stopPropagation()} className="absolute right-0 top-0 h-full w-full max-w-[560px] bg-white shadow-2xl overflow-y-auto scroll-thin p-6 space-y-4 animate-in slide-in-from-right">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-display text-2xl font-bold">{(edit||sel).symbol}</h3>
-                <p className="text-sm text-[#6D6D82]">{(edit||sel).direction === "long" ? "📈" : "📉"} {(edit||sel).direction.toUpperCase()}</p>
+        <div className="fixed inset-0 bg-black/40 z-50 backdrop-blur-sm" onClick={()=>{setSel(null); setEdit(null);}}>
+          <div 
+            onClick={e=>e.stopPropagation()} 
+            className="absolute right-0 top-0 h-full w-full max-w-[560px] bg-white shadow-2xl overflow-y-auto scroll-thin animate-in slide-in-from-right-full"
+          >
+            {/* Drawer Header */}
+            <div className="sticky top-0 bg-white border-b border-[#E8E8F1] p-6 space-y-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h3 className="font-display text-2xl font-bold text-[#16151F]">{(edit||sel).symbol}</h3>
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className={`px-3 py-1 rounded-lg text-xs font-bold ${(edit||sel).direction === "long" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>
+                      {(edit||sel).direction.toUpperCase()}
+                    </span>
+                    <span className={`px-3 py-1 rounded-lg text-xs font-bold ${((edit||sel).net_pnl||0) > 0 ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>
+                      {((edit||sel).net_pnl||0) > 0 ? "+" : ""}{((edit||sel).net_pnl||0).toFixed(2)} USD
+                    </span>
+                  </div>
+                </div>
+                <button onClick={()=>{setSel(null); setEdit(null);}} className="w-9 h-9 rounded-lg hover:bg-[#F6F6FB] flex items-center justify-center transition">
+                  <X className="w-5 h-5 text-[#6D6D82]"/>
+                </button>
               </div>
+
+              {/* Drawer Tabs */}
+              <div className="flex gap-2 border-b border-[#E8E8F1] -mx-6 px-6">
+                {["Overview", "Chart", "Notes", "Mistakes", "Checklist"].map(t => (
+                  <button 
+                    key={t} 
+                    className={`px-4 py-3 text-xs font-medium border-b-2 transition ${t==="Overview"?"border-[#7C3AED] text-[#7C3AED] font-semibold":"border-transparent text-[#6D6D82] hover:text-[#16151F]"}`}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+
+              {/* Action Buttons */}
               <div className="flex gap-2">
                 {!edit ? (
-                  <button onClick={startEdit} data-testid="edit-trade-btn" className="h-9 px-3 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-sm font-semibold flex items-center gap-1 transition"><Pencil className="w-4 h-4"/> Edit</button>
+                  <button 
+                    onClick={startEdit} 
+                    data-testid="edit-trade-btn" 
+                    className="flex-1 h-9 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-sm font-semibold flex items-center justify-center gap-1 transition"
+                  >
+                    <Pencil className="w-4 h-4"/> Edit
+                  </button>
                 ) : (
                   <>
-                    <button onClick={cancelEdit} className="h-9 px-3 rounded-xl border border-[#E8E8F1] text-sm hover:bg-[#F6F6FB] transition">Cancel</button>
-                    <button onClick={saveEdit} disabled={saving} data-testid="save-edit-btn" className="h-9 px-3 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-sm font-semibold flex items-center gap-1 disabled:opacity-60 transition"><Save className="w-4 h-4"/> {saving?"Saving...":"Save"}</button>
+                    <button 
+                      onClick={cancelEdit} 
+                      className="flex-1 h-9 rounded-lg border border-[#E8E8F1] text-sm font-medium hover:bg-[#F6F6FB] transition"
+                    >
+                      Cancel
+                    </button>
+                    <button 
+                      onClick={saveEdit} 
+                      disabled={saving} 
+                      data-testid="save-edit-btn" 
+                      className="flex-1 h-9 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-sm font-semibold flex items-center justify-center gap-1 disabled:opacity-60 transition"
+                    >
+                      <Save className="w-4 h-4"/> {saving?"Saving...":"Save"}
+                    </button>
                   </>
                 )}
-                <button onClick={()=>{setSel(null); setEdit(null);}} className="w-9 h-9 rounded-xl hover:bg-[#F6F6FB] flex items-center justify-center transition"><X className="w-4 h-4"/></button>
               </div>
             </div>
 
-            <div className="h-px bg-[#E8E8F1]"/>
+            {/* Drawer Content */}
+            <div className="p-6 space-y-4">
+              {edit ? <EditForm edit={edit} setEdit={setEdit} toggleEdit={toggleEdit} computed={editComputed} presets={presets}/> :
+                <ViewBlock t={sel}/>
+              }
 
-            <div className="space-y-2 flex gap-1">
-              {["Overview", "Chart", "Notes", "Mistakes", "Checklist"].map(tab => (
-                <button key={tab} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${tab==="Overview"?"bg-[#7C3AED] text-white":"border border-[#E8E8F1] text-[#6D6D82] hover:bg-[#F6F6FB]"}`}>{tab}</button>
-              ))}
+              {!edit && (
+                <button 
+                  onClick={()=>del(sel.id)} 
+                  data-testid="delete-trade" 
+                  className="w-full h-10 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 text-sm font-semibold flex items-center justify-center gap-2 transition"
+                >
+                  <Trash2 className="w-4 h-4"/> Delete Trade
+                </button>
+              )}
             </div>
-
-            {edit ? <EditForm edit={edit} setEdit={setEdit} toggleEdit={toggleEdit} computed={editComputed} presets={presets}/> :
-              <ViewBlock t={sel}/>
-            }
-
-            {!edit && <button onClick={()=>del(sel.id)} data-testid="delete-trade" className="w-full h-10 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 text-sm font-medium flex items-center justify-center gap-2 transition"><Trash2 className="w-4 h-4"/> Delete Trade</button>}
           </div>
         </div>
       )}
+
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </div>
   );
 }
 
-// Metric Card Component
-function MetricCard({ icon, label, value, change, changeLabel, trend, circular }) {
+// Metric Badge Component
+function MetricBadge({ label, value, change, icon, isCircle, status }) {
   return (
-    <div className="tjfx-card p-4 hover:shadow-md transition hover:scale-105 transform">
-      <div className="flex items-start justify-between mb-3">
-        <div className="p-2 rounded-lg bg-[#F3E8FF]/50">
-          {icon}
-        </div>
-        {circular && <div className="w-12 h-12 rounded-full border-4 border-[#7C3AED] border-r-emerald-400 border-t-emerald-400 flex items-center justify-center text-xs font-bold text-[#7C3AED]">{value}</div>}
+    <div className="tjfx-card p-3 hover:shadow-md hover:border-[#7C3AED]/30 transition">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-lg">{icon}</span>
+        {isCircle && <div className="w-10 h-10 rounded-full border-4 border-[#7C3AED] border-r-transparent flex items-center justify-center text-xs font-bold text-[#7C3AED]" style={{background: 'conic-gradient(#7C3AED 70%, transparent 0)'}}/>}
       </div>
-      <div className="text-[11px] text-[#6D6D82] uppercase tracking-wide mb-1">{label}</div>
-      {!circular && <div className="text-2xl font-bold mb-2">{value}</div>}
-      <div className={`text-[12px] font-medium ${trend==="up"?"text-emerald-600":"text-[#6D6D82]"}`}>
-        {change} <span className="text-[10px]">{changeLabel}</span>
-      </div>
+      <div className="text-[10px] text-[#6D6D82] uppercase tracking-wide">{label}</div>
+      <div className="text-sm font-bold text-[#16151F]">{value}</div>
+      <div className={`text-[10px] font-medium mt-1 ${status==="good"?"text-emerald-600":"text-[#7C3AED]"}`}>{change}</div>
     </div>
   );
 }
 
-// Trade Card Component
-function TradeCard({ trade, onOpen, onDelete }) {
+// Premium Trade Card Component
+function PremiumTradeCard({ trade, onOpen, onDelete }) {
   const pnl = trade.net_pnl || 0;
   const isWin = pnl > 0;
   
   return (
-    <div onClick={() => onOpen(trade)} className="tjfx-card p-4 hover:shadow-lg hover:border-[#7C3AED] cursor-pointer transition group relative overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-r from-[#7C3AED]/0 to-[#7C3AED]/0 group-hover:from-[#7C3AED]/5 group-hover:to-[#F3E8FF]/20 transition"/>
+    <div 
+      onClick={() => onOpen(trade)} 
+      className="tjfx-card p-4 hover:shadow-xl hover:border-[#7C3AED] cursor-pointer transition group relative overflow-hidden border-2 border-transparent"
+    >
+      <div className="absolute inset-0 bg-gradient-to-r from-[#7C3AED]/0 to-[#7C3AED]/0 group-hover:from-[#7C3AED]/5 group-hover:to-[#F3E8FF]/30 transition pointer-events-none"/>
       
-      <div className="relative flex gap-4">
-        {/* Chart Thumbnail */}
-        <div className="w-24 h-24 rounded-lg bg-gradient-to-br from-[#F3E8FF] to-[#F6F6FB] flex items-center justify-center flex-shrink-0 relative">
-          <div className="text-[10px] text-center px-1 space-y-0.5">
-            {trade.htf_poi?.slice(0, 2).map(p => <div key={p} className="text-[#7C3AED] font-bold">{p}</div>)}
-            {!trade.htf_poi?.length && <div className="text-[#A1A1AA]">—</div>}
+      <div className="relative flex gap-4 items-start">
+        {/* Star & Chart Section */}
+        <div className="relative">
+          <button className="absolute -top-2 -left-2 w-6 h-6 rounded-full hover:bg-yellow-100 flex items-center justify-center transition z-10">
+            <Star className="w-4 h-4 text-yellow-400 hover:fill-yellow-400"/>
+          </button>
+          <div className="w-28 h-28 rounded-lg bg-gradient-to-br from-[#1a1a2e] via-[#16213e] to-[#0f3460] border border-[#E8E8F1] flex flex-col items-center justify-center relative overflow-hidden">
+            {/* Mini Chart */}
+            <svg className="w-full h-full opacity-70" viewBox="0 0 100 100" preserveAspectRatio="none">
+              <polyline points="10,80 25,65 40,70 55,50 70,40 85,55" fill="none" stroke={isWin ? "#10B981" : "#EF4444"} strokeWidth="2"/>
+              <polyline points="10,90 25,75 40,80 55,60 70,50 85,65" fill="none" stroke="#666" strokeWidth="1" opacity="0.3"/>
+            </svg>
+            <div className="absolute inset-0 flex items-end justify-between p-2 pointer-events-none text-[8px] text-white/60">
+              <span>HTF</span>
+              <span>FVG</span>
+            </div>
           </div>
         </div>
 
         {/* Middle Section */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-2">
-            <h4 className="font-display font-bold text-lg">{trade.symbol}</h4>
-            <span className={`px-2 py-0.5 rounded-lg text-xs font-semibold ${trade.direction === "long" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>
+            <h4 className="font-display font-bold text-lg text-[#16151F]">{trade.symbol}</h4>
+            <span className={`px-2 py-1 rounded-lg text-xs font-bold whitespace-nowrap ${trade.direction === "long" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>
               {trade.direction.toUpperCase()}
             </span>
           </div>
-          <div className="text-xs text-[#6D6D82] mb-2">
-            <div>{trade.date} • {trade.entry_time || "—"}</div>
-            <div>{trade.session || "—"}</div>
+
+          <div className="text-xs text-[#6D6D82] mb-2 space-y-0.5">
+            <div className="font-medium">{trade.date} • {trade.entry_time || "—"}</div>
+            <div className="text-[11px]">{trade.session || "—"}</div>
           </div>
+
+          <div className="grid grid-cols-2 gap-2 mb-2 text-xs bg-[#F6F6FB] p-2 rounded-lg">
+            <div><span className="text-[#6D6D82]">Entry:</span> <span className="font-bold tjfx-mono">{trade.entry_price}</span></div>
+            <div><span className="text-[#6D6D82]">Exit:</span> <span className="font-bold tjfx-mono">{trade.exit_price || "—"}</span></div>
+            <div><span className="text-[#6D6D82]">SL:</span> <span className="font-bold tjfx-mono">{trade.stop_loss || "—"}</span></div>
+            <div><span className="text-[#6D6D82]">TP:</span> <span className="font-bold tjfx-mono">{trade.take_profit || "—"}</span></div>
+          </div>
+
           <div className="flex flex-wrap gap-1">
-            {trade.entry_tags?.slice(0, 3).map(tag => (
-              <span key={tag} className="chip active text-[10px]">{tag}</span>
+            {trade.entry_tags?.slice(0, 4).map(tag => (
+              <span key={tag} className="chip active text-[9px]">{tag}</span>
             ))}
-            {trade.entry_tags?.length > 3 && <span className="text-[10px] text-[#6D6D82]">+{trade.entry_tags.length - 3}</span>}
+            {trade.entry_tags?.length > 4 && <span className="text-[9px] text-[#6D6D82] font-medium">+{trade.entry_tags.length - 4} more</span>}
           </div>
         </div>
 
-        {/* Result Card */}
-        <div className={`w-32 rounded-lg p-4 flex flex-col items-center justify-center text-center flex-shrink-0 ${isWin ? "bg-emerald-50 border border-emerald-200" : "bg-red-50 border border-red-200"}`}>
-          <div className={`text-2xl font-bold ${isWin ? "text-emerald-700" : "text-red-600"}`}>
-            {isWin ? "+" : "-"}${Math.abs(pnl).toFixed(2)}
+        {/* Result Card - BIG & BOLD */}
+        <div className={`w-40 rounded-xl p-4 flex flex-col items-center justify-center text-center flex-shrink-0 border-2 ${isWin ? "bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-300" : "bg-gradient-to-br from-red-50 to-red-100 border-red-300"}`}>
+          <div className={`text-4xl font-black leading-none ${isWin ? "text-emerald-700" : "text-red-600"}`}>
+            {isWin ? "+" : ""}${Math.abs(pnl).toFixed(2)}
           </div>
-          <div className={`text-xs font-semibold ${isWin ? "text-emerald-600" : "text-red-500"}`}>
+          <div className={`text-sm font-bold mt-2 ${isWin ? "text-emerald-600" : "text-red-500"}`}>
             {trade.r_multiple ? `${trade.r_multiple}R` : "—"}
           </div>
-          <div className={`text-[10px] ${isWin ? "text-emerald-600" : "text-red-500"}`}>
+          <div className={`text-[11px] font-bold tracking-wide ${isWin ? "text-emerald-700" : "text-red-700"}`}>
             {isWin ? "WIN" : "LOSS"}
           </div>
         </div>
       </div>
 
-      {/* Quick Actions */}
+      {/* Quick Actions on Hover */}
       <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition">
-        <button onClick={(e) => { e.stopPropagation(); onOpen(trade); }} className="w-8 h-8 rounded-lg bg-white hover:bg-[#F6F6FB] flex items-center justify-center border border-[#E8E8F1]" title="View"><Eye className="w-4 h-4"/></button>
-        <button onClick={(e) => { e.stopPropagation(); onDelete(trade.id); }} className="w-8 h-8 rounded-lg bg-white hover:bg-red-50 flex items-center justify-center border border-red-200" title="Delete"><Trash2 className="w-4 h-4 text-red-500"/></button>
+        <button 
+          onClick={(e) => { e.stopPropagation(); onOpen(trade); }} 
+          className="w-8 h-8 rounded-lg bg-white hover:bg-[#F6F6FB] flex items-center justify-center border border-[#E8E8F1] shadow-md transition"
+          title="View"
+        >
+          <Eye className="w-4 h-4 text-[#7C3AED]"/>
+        </button>
+        <button 
+          onClick={(e) => { e.stopPropagation(); onDelete(trade.id); }} 
+          className="w-8 h-8 rounded-lg bg-white hover:bg-red-50 flex items-center justify-center border border-red-200 shadow-md transition"
+          title="Delete"
+        >
+          <Trash2 className="w-4 h-4 text-red-500"/>
+        </button>
       </div>
     </div>
   );
@@ -571,10 +614,10 @@ function TradeCard({ trade, onOpen, onDelete }) {
 function FilterSection({ label, count, children }) {
   const [open, setOpen] = React.useState(true);
   return (
-    <div className="rounded-xl border border-[#E8E8F1] overflow-hidden">
+    <div className="rounded-lg border border-[#E8E8F1] overflow-hidden">
       <button onClick={()=>setOpen(!open)} className="w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-[#F6F6FB]">
-        <span className="text-[12px] font-semibold text-[#16151F]">{label} {count>0 && <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded-full bg-[#F3E8FF] text-[#7C3AED]">{count}</span>}</span>
-        <ChevronDown className={`w-4 h-4 text-[#6D6D82] transition-transform ${open?"":"-rotate-90"}`}/>
+        <span className="text-xs font-bold text-[#16151F]">{label} {count>0 && <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded-full bg-[#F3E8FF] text-[#7C3AED] font-semibold">{count}</span>}</span>
+        <ChevronDown className={`w-4 h-4 text-[#6D6D82] transition-transform ${open?"":"rotate-180"}`}/>
       </button>
       {open && <div className="px-4 pb-3 pt-1">{children}</div>}
     </div>
@@ -582,7 +625,7 @@ function FilterSection({ label, count, children }) {
 }
 
 function FilterGroup({ items, selected, onToggle }) {
-  if (!items || items.length===0) return <div className="text-xs text-[#A1A1AA] py-1">No presets. Add in Settings.</div>;
+  if (!items || items.length===0) return <div className="text-xs text-[#A1A1AA] py-1">No presets</div>;
   return (
     <div className="flex flex-wrap gap-1.5">
       {items.map(v => <button key={v} onClick={()=>onToggle(v)} className={`chip ${selected.includes(v)?"active":""}`} style={{fontSize:11, padding:"3px 10px"}}>{v}</button>)}
@@ -593,10 +636,10 @@ function FilterGroup({ items, selected, onToggle }) {
 function RangeInput({ label, type, leftPlaceholder, rightPlaceholder, left, right, onLeft, onRight }) {
   return (
     <div>
-      <div className="text-[11px] text-[#6D6D82] mb-1.5 font-semibold uppercase tracking-wide">{label}</div>
+      <div className="text-[10px] text-[#6D6D82] mb-1.5 font-bold uppercase tracking-wide">{label}</div>
       <div className="flex gap-2">
-        <input type={type} step="any" placeholder={leftPlaceholder} value={left} onChange={e=>onLeft(e.target.value)} className="flex-1 h-9 px-3 rounded-lg border border-[#E8E8F1] focus:border-[#7C3AED] text-xs bg-white tjfx-mono"/>
-        <input type={type} step="any" placeholder={rightPlaceholder} value={right} onChange={e=>onRight(e.target.value)} className="flex-1 h-9 px-3 rounded-lg border border-[#E8E8F1] focus:border-[#7C3AED] text-xs bg-white tjfx-mono"/>
+        <input type={type} step="any" placeholder={leftPlaceholder} value={left} onChange={e=>onLeft(e.target.value)} className="flex-1 h-8 px-3 rounded-lg border border-[#E8E8F1] focus:border-[#7C3AED] text-xs bg-white tjfx-mono"/>
+        <input type={type} step="any" placeholder={rightPlaceholder} value={right} onChange={e=>onRight(e.target.value)} className="flex-1 h-8 px-3 rounded-lg border border-[#E8E8F1] focus:border-[#7C3AED] text-xs bg-white tjfx-mono"/>
       </div>
     </div>
   );
@@ -607,21 +650,18 @@ function ViewBlock({ t }) {
   return (
     <>
       <div className="grid grid-cols-2 gap-3">
-        {[["Direction",t.direction],["Status",t.status],["Session",t.session],["Strategy",t.strategy],["Entry",t.entry_price],["Exit",t.exit_price||"—"],["SL",t.stop_loss||"—"],["TP",t.take_profit||"—"],["Lot",t.lot_size],["Risk %",t.risk_percent],["R Multiple",t.r_multiple||"—"],["Net P&L",`${(t.net_pnl||0)>=0?"+":""}$${(t.net_pnl||0).toFixed(2)}`],["Time",t.entry_time||"—"]].map(([k,v]) => (
-          <div key={k} className="p-3 rounded-xl bg-[#F6F6FB]"><div className="text-[11px] text-[#6D6D82]">{k}</div><div className="font-semibold tjfx-mono">{v}</div></div>
+        {[["Direction",t.direction],["Status",t.status],["Session",t.session],["Strategy",t.strategy],["Entry",t.entry_price],["Exit",t.exit_price||"—"],["SL",t.stop_loss||"—"],["TP",t.take_profit||"—"],["Lot",t.lot_size],["Risk %",t.risk_percent],["R Multiple",t.r_multiple||"—"],["Net P&L",`${(t.net_pnl||0)>=0?"+":""}$${(t.net_pnl||0).toFixed(2)}`]].map(([k,v]) => (
+          <div key={k} className="p-3 rounded-lg bg-[#F6F6FB]"><div className="text-[10px] text-[#6D6D82] font-semibold">{k}</div><div className="font-bold tjfx-mono text-sm">{v}</div></div>
         ))}
       </div>
       {t.htf_poi?.length>0 && <TagBlock label="HTF POI" items={t.htf_poi}/>}
       {t.entry_tags?.length>0 && <TagBlock label="Entry" items={t.entry_tags}/>}
-      {t.mood_before?.length>0 && <TagBlock label="Mood Before" items={t.mood_before}/>}
-      {t.mood_after?.length>0 && <TagBlock label="Mood After" items={t.mood_after}/>}
       {t.mistakes?.length>0 && <TagBlock label="Mistakes" items={t.mistakes}/>}
-      {t.strengths?.length>0 && <TagBlock label="Strengths" items={t.strengths}/>}
-      {t.notes && <div><div className="text-[12px] text-[#6D6D82] mb-1">Notes</div><div className="p-3 bg-[#F6F6FB] rounded-xl text-sm whitespace-pre-wrap">{t.notes}</div></div>}
+      {t.notes && <div><div className="text-xs text-[#6D6D82] font-bold mb-1">Notes</div><div className="p-3 bg-[#F6F6FB] rounded-lg text-sm text-[#16151F] whitespace-pre-wrap">{t.notes}</div></div>}
       {t.screenshots?.length>0 && (
         <div>
-          <div className="text-[12px] text-[#6D6D82] mb-2">Screenshots ({t.screenshots.length})</div>
-          <div className="grid grid-cols-2 gap-2">{t.screenshots.map((s,i)=><img key={i} alt="" src={s} onClick={()=>openLightbox(t.screenshots,i)} className="w-full rounded-lg cursor-zoom-in"/>)}</div>
+          <div className="text-xs text-[#6D6D82] font-bold mb-2">Screenshots ({t.screenshots.length})</div>
+          <div className="grid grid-cols-2 gap-2">{t.screenshots.map((s,i)=><img key={i} alt="" src={s} onClick={()=>openLightbox(t.screenshots,i)} className="w-full rounded-lg cursor-zoom-in border border-[#E8E8F1]"/>)}</div>
         </div>
       )}
     </>
@@ -688,59 +728,34 @@ function EditForm({ edit, setEdit, toggleEdit, computed, presets }) {
           <select value={edit.status} onChange={e=>setEdit({...edit,status:e.target.value})} className={inp}><option value="closed">closed</option><option value="open">open</option><option value="cancelled">cancelled</option></select>
         </F>
         <F label="Session"><select value={edit.session||""} onChange={e=>setEdit({...edit,session:e.target.value})} className={inp}>{presets.session.map(s => <option key={s}>{s}</option>)}</select></F>
-        <F label="Strategy"><select value={edit.strategy||""} onChange={e=>setEdit({...edit,strategy:e.target.value})} className={inp.replace("tjfx-mono","")}><option value="">—</option>{presets.strategy.map(s => <option key={s}>{s}</option>)}</select></F>
       </div>
 
       {computed && (
-        <div className="grid grid-cols-3 gap-2 p-3 rounded-xl bg-[#F6F6FB]">
-          <div><div className="text-[10px] text-[#6D6D82]">Net P&L</div><div className={`tjfx-mono font-semibold ${computed.pnl>=0?"text-emerald-600":"text-red-500"}`}>{computed.pnl>=0?"+":""}${computed.pnl}</div></div>
-          <div><div className="text-[10px] text-[#6D6D82]">R</div><div className="tjfx-mono font-semibold">{computed.r}R</div></div>
-          <div><div className="text-[10px] text-[#6D6D82]">Risk</div><div className="tjfx-mono font-semibold">${computed.risk}</div></div>
+        <div className="grid grid-cols-3 gap-2 p-3 rounded-lg bg-[#F6F6FB]">
+          <div><div className="text-[10px] text-[#6D6D82]">Net P&L</div><div className={`tjfx-mono font-bold ${computed.pnl>=0?"text-emerald-600":"text-red-500"}`}>{computed.pnl>=0?"+":""}${computed.pnl}</div></div>
+          <div><div className="text-[10px] text-[#6D6D82]">R</div><div className="tjfx-mono font-bold">{computed.r}R</div></div>
+          <div><div className="text-[10px] text-[#6D6D82]">Risk</div><div className="tjfx-mono font-bold">${computed.risk}</div></div>
         </div>
       )}
 
       <EditChips label="HTF POI" items={presets.htf_poi} selected={edit.htf_poi||[]} onToggle={v=>toggleEdit("htf_poi",v)}/>
       <EditChips label="Entry" items={presets.entry_tag} selected={edit.entry_tags||[]} onToggle={v=>toggleEdit("entry_tags",v)}/>
-      <EditChips label="Mood Before" items={presets.mood} selected={edit.mood_before||[]} onToggle={v=>toggleEdit("mood_before",v)}/>
-      <EditChips label="Mood After" items={presets.mood} selected={edit.mood_after||[]} onToggle={v=>toggleEdit("mood_after",v)}/>
-      <EditChips label="Mistakes" items={presets.mistake} selected={edit.mistakes||[]} onToggle={v=>toggleEdit("mistakes",v)}/>
-      <EditChips label="Strengths" items={presets.strength} selected={edit.strengths||[]} onToggle={v=>toggleEdit("strengths",v)}/>
 
       <div>
-        <div className="text-[11px] text-[#6D6D82] mb-1">Notes</div>
+        <div className="text-[10px] text-[#6D6D82] font-bold mb-1">Notes</div>
         <textarea value={edit.notes||""} onChange={e=>setEdit({...edit,notes:e.target.value})} rows={3} className="w-full p-2 rounded-lg border border-[#E8E8F1] text-sm"/>
-      </div>
-
-      <div>
-        <div className="flex items-center justify-between mb-2">
-          <div className="text-[11px] text-[#6D6D82] uppercase tracking-wide flex items-center gap-1"><ImageIcon className="w-3 h-3"/> Screenshots <span className="tjfx-mono normal-case">{(edit.screenshots||[]).length}</span></div>
-          <label className="text-[11px] text-[#7C3AED] font-medium cursor-pointer flex items-center gap-1"><Upload className="w-3 h-3"/> Add
-            <input type="file" accept="image/*" multiple hidden onChange={onFile} data-testid="edit-upload-input"/>
-          </label>
-        </div>
-        <div className="text-[10px] text-[#A1A1AA] mb-2 flex items-center gap-1"><Clipboard className="w-3 h-3"/> Ctrl+V to paste directly</div>
-        <div className="grid grid-cols-3 gap-2">
-          {(edit.screenshots||[]).map((s,i) => (
-            <div key={i} className="relative group">
-              <img alt="" src={s} onClick={()=>openLightbox(edit.screenshots,i)} className="w-full h-20 object-cover rounded-lg cursor-zoom-in"/>
-              <button onClick={()=>removeImg(i)} data-testid={`remove-img-${i}`} className="absolute top-1 right-1 w-6 h-6 rounded-full bg-white/90 flex items-center justify-center opacity-0 group-hover:opacity-100 transition"><X className="w-3 h-3 text-red-500"/></button>
-            </div>
-          ))}
-          {(edit.screenshots||[]).length===0 && uploadingCount===0 && <div className="col-span-full text-xs text-[#A1A1AA] text-center py-4 border-2 border-dashed border-[#E8E8F1] rounded-lg">No screenshots</div>}
-          {Array.from({length: uploadingCount}).map((_,i) => <div key={`u${i}`} className="w-full h-20 rounded-lg border-2 border-dashed border-[#7C3AED]/40 bg-[#F3E8FF]/40 flex items-center justify-center text-[10px] text-[#7C3AED] animate-pulse">Uploading...</div>)}
-        </div>
       </div>
     </div>
   );
 }
 
-const F = ({ label, children }) => (<div><label className="block text-[10px] text-[#6D6D82] mb-1">{label}</label>{children}</div>);
+const F = ({ label, children }) => (<div><label className="block text-[10px] text-[#6D6D82] font-bold mb-1">{label}</label>{children}</div>);
 
 function EditChips({ label, items, selected, onToggle }) {
   if (!items?.length) return null;
   return (
     <div>
-      <div className="text-[11px] text-[#6D6D82] mb-1.5 uppercase tracking-wide">{label}</div>
+      <div className="text-[10px] text-[#6D6D82] font-bold mb-1.5 uppercase tracking-wide">{label}</div>
       <div className="flex flex-wrap gap-1.5">{items.map(v => <button type="button" key={v} onClick={()=>onToggle(v)} className={`chip ${selected.includes(v)?"active":""}`} style={{fontSize:11,padding:"3px 8px"}}>{v}</button>)}</div>
     </div>
   );
@@ -748,7 +763,7 @@ function EditChips({ label, items, selected, onToggle }) {
 
 const TagBlock = ({ label, items }) => (
   <div>
-    <div className="text-[12px] text-[#6D6D82] mb-2">{label}</div>
-    <div className="flex flex-wrap gap-1.5">{items.map(x => <span key={x} className="chip active">{x}</span>)}</div>
+    <div className="text-xs font-bold text-[#6D6D82] mb-2 uppercase tracking-wide">{label}</div>
+    <div className="flex flex-wrap gap-1.5">{items.map(x => <span key={x} className="chip active text-xs">{x}</span>)}</div>
   </div>
 );
