@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate, Link } from "react-router-dom";
-import { LayoutDashboard, PlusCircle, Target, BookOpen, Activity, Settings, LogOut, TrendingUp, Table2, FileText, NotebookPen, Moon, Sun, ChevronDown, User, Menu, X } from "lucide-react";
+import { LayoutDashboard, PlusCircle, Target, BookOpen, Activity, Settings, LogOut, TrendingUp, Table2, FileText, NotebookPen, Moon, Sun, ChevronDown, User, Menu, X, AlertTriangle } from "lucide-react";
 import AccountSwitcher from "@/components/AccountSwitcher";
 import CoachWidget from "@/components/CoachWidget";
 import { useAuth } from "@/context/AuthContext";
@@ -39,8 +39,8 @@ function AccountOverview() {
 
   const Row = ({ label, value, positive, limit }) => (
     <div className="flex items-center justify-between py-1.5">
-      <span className="text-[10px] sm:text-[11px] text-[#6D6D82]">{label}</span>
-      <span className={`text-[11px] sm:text-[12px] font-semibold tjfx-mono tjfx-num ${
+      <span className="text-[12px] text-[#6D6D82]">{label}</span>
+      <span className={`text-[12px] sm:text-[13px] font-semibold tjfx-mono tjfx-num ${
         positive === undefined ? "text-[#16151F]" : positive ? "text-emerald-600" : "text-red-500"
       }`}>
         {value}{limit ? <span className="text-[#A1A1AA] font-normal"> / ${limit.toFixed(0)}</span> : ""}
@@ -54,12 +54,12 @@ function AccountOverview() {
     return (
       <div className="py-1.5">
         <div className="flex items-center justify-between mb-1">
-          <span className="text-[10px] sm:text-[11px] text-[#6D6D82]">{label}</span>
-          <span className="text-[10px] sm:text-[11px] font-semibold tjfx-mono text-[#16151F]">
+          <span className="text-[12px] text-[#6D6D82]">{label}</span>
+          <span className="text-[12px] sm:text-[13px] font-semibold tjfx-mono text-[#16151F]">
             ${Math.abs(used).toFixed(0)} <span className="text-[#A1A1AA] font-normal">/ ${limit.toFixed(0)}</span>
           </span>
         </div>
-        <div className="h-2 w-full rounded-full bg-[#E8E8F1] overflow-hidden">
+        <div className="h-2.5 w-full rounded-full bg-[#E8E8F1] overflow-hidden">
           <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
         </div>
       </div>
@@ -67,8 +67,8 @@ function AccountOverview() {
   };
 
   return (
-    <div className="px-3 py-3 border-t border-[#E8E8F1]" data-testid="account-overview">
-      <div className="text-[9px] sm:text-[10px] font-semibold text-[#A1A1AA] uppercase tracking-wide px-1 mb-2">
+    <div className="px-3 py-3 border-t border-[#E8E8F1] bg-white" data-testid="account-overview">
+      <div className="text-[11px] font-semibold text-[#A1A1AA] uppercase tracking-wide px-1 mb-2">
         Account Overview
       </div>
       <div className="px-1">
@@ -95,7 +95,7 @@ function AccountOverview() {
           />
         )}
         {activeId !== "all" && !limits && (
-          <Link to="/settings" className="mt-1 block text-[9px] sm:text-[10px] text-[#7C3AED] hover:underline">
+          <Link to="/settings" className="mt-1 block text-[11px] text-[#7C3AED] hover:underline">
             + Set drawdown limits →
           </Link>
         )}
@@ -122,6 +122,10 @@ export default function Layout() {
   const [theme, setTheme] = useState(() => localStorage.getItem("tjfx-theme") || "light");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const { dailyDrawdownLocked, dailyDrawdownInfo } = useAccount();
+  const [showDrawdownAlert, setShowDrawdownAlert] = useState(false);
+
+  useEffect(() => { if (dailyDrawdownLocked) setShowDrawdownAlert(true); }, [dailyDrawdownLocked]);
 
   useEffect(() => {
     localStorage.setItem("tjfx-theme", theme);
@@ -198,9 +202,10 @@ export default function Layout() {
             ))}
           </nav>
 
-          <div className="px-2 sm:px-3 pt-2 sm:pt-3">
-            <AccountSwitcher />
-          </div>
+        </div>
+
+        <div className="shrink-0 border-t border-[#E8E8F1] bg-white">
+          <div className="px-3 pt-3"><AccountSwitcher /></div>
           <AccountOverview />
         </div>
 
@@ -213,6 +218,14 @@ export default function Layout() {
           <span className="hidden sm:inline">Logout</span>
         </button>
       </aside>
+
+      {showDrawdownAlert && <div className="fixed inset-0 z-[70] bg-black/40 flex items-center justify-center p-4">
+        <div className="w-full max-w-md rounded-2xl bg-white border border-red-200 shadow-2xl p-6">
+          <div className="flex items-start justify-between gap-4"><div className="flex items-center gap-3 text-red-600"><span className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center"><AlertTriangle className="w-5 h-5" /></span><h2 className="font-display text-lg font-bold">Daily drawdown hit</h2></div><button onClick={()=>setShowDrawdownAlert(false)} className="text-[#6D6D82] hover:text-[#16151F]"><X className="w-5 h-5" /></button></div>
+          <p className="mt-4 text-sm leading-6 text-[#6D6D82]">Your daily loss limit of <b className="text-red-600">${Number(dailyDrawdownInfo.limit || 0).toFixed(0)}</b> has been reached. Add Trade is locked for today to prevent overtrading.</p>
+          <button onClick={()=>setShowDrawdownAlert(false)} className="mt-5 w-full h-10 rounded-xl bg-[#7C3AED] text-white text-sm font-semibold">I understand</button>
+        </div>
+      </div>}
 
       <main className="flex-1 min-w-0 flex flex-col w-full">
         <div className="sticky top-0 z-20 bg-[#F6F6FB]/85 backdrop-blur border-b border-[#E8E8F1] px-4 sm:px-6 lg:px-8 py-2.5 sm:py-3 flex items-center justify-between gap-3 sm:gap-4">

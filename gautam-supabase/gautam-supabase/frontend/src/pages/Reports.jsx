@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { tradesApi, biasApi, statsApi } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -85,6 +86,8 @@ function getTimeOfDay(date) {
 }
 
 export default function Reports() {
+  const location = useLocation();
+  const previewOnly = location.pathname === "/reports-preview";
   const { user } = useAuth();
   const [type, setType] = useState("daily");
   const [date, setDate] = useState(toDateStr(new Date()));
@@ -341,7 +344,7 @@ Recommendations:
   };
 
   return (
-    <div className="compact-reports min-h-screen bg-[#F6F6FB] p-4 sm:p-6 lg:p-8" data-testid="reports-page">
+    <div className={`compact-reports ${previewOnly ? "report-preview-only" : "report-config"} min-h-screen bg-[#F6F6FB] p-4 sm:p-6 lg:p-8`} data-testid="reports-page">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* HEADER */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -354,6 +357,13 @@ Recommendations:
             </p>
           </div>
           <div className="flex flex-col sm:flex-row gap-2">
+            {!previewOnly && <button
+              type="button"
+              onClick={() => window.open("/reports-preview", "_blank", "noopener,noreferrer")}
+              className="h-10 px-4 rounded-xl border border-[#7C3AED] text-[#7C3AED] hover:bg-[#F3E8FF] text-sm font-medium flex items-center justify-center gap-2 transition-all"
+            >
+              <FileText className="w-4 h-4" /> Open Preview
+            </button>}
             <button
               onClick={() => window.print()}
               className="h-10 px-4 rounded-xl border border-[#E8E8F1] hover:border-[#7C3AED] text-sm font-medium flex items-center justify-center gap-2 transition-all"
@@ -377,9 +387,9 @@ Recommendations:
         </div>
 
         {/* CONFIG SECTION - RESPONSIVE GRID */}
-        <div className="reports-workspace grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <div className="reports-workspace">
           {/* LEFT PANEL - Controls */}
-          <aside className="reports-sidebar lg:col-span-1 space-y-4">
+          <aside className="reports-sidebar">
             {/* Report Type */}
             <div className="tjfx-card p-5 space-y-4">
               <div>
@@ -569,7 +579,7 @@ Recommendations:
           </aside>
 
           {/* RIGHT PANEL - Preview */}
-          <div className="reports-preview lg:col-span-3">
+          <div className="reports-preview">
             <div className="tjfx-card overflow-hidden flex flex-col h-full">
               {/* Preview Header */}
               <div className="bg-[#F6F6FB] px-4 py-3 text-xs text-[#6D6D82] flex items-center justify-between border-b border-[#E8E8F1]">

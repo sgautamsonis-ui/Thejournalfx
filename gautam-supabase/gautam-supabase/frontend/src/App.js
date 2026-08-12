@@ -43,6 +43,7 @@ function AppRouter() {
     <Suspense fallback={<FullLoader/>}>
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/reports-preview" element={<Protected><Reports /></Protected>} />
       <Route element={<Protected><Layout/></Protected>}>
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/add-trade" element={<AddTrade />} />

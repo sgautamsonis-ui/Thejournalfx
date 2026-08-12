@@ -29,7 +29,7 @@ const inp = "w-full h-10 px-3 rounded-xl border border-[#E8E8F1] focus:border-[#
 
 export default function AddTrade() {
   const nav = useNavigate();
-  const { accounts, activeId, active, reload: reloadAccounts } = useAccount();
+  const { accounts, activeId, active, reload: reloadAccounts, dailyDrawdownLocked, dailyDrawdownInfo } = useAccount();
   const [t, setT] = useState({
     account_id: (activeId && activeId!=="all") ? activeId : (accounts[0]?.id || null),
     symbol: "XAUUSD", direction: "long", order_type: "Market",
@@ -182,6 +182,7 @@ export default function AddTrade() {
   };
 
   const save = async () => {
+    if (dailyDrawdownLocked) { toast.error("Daily drawdown limit reached. Trading is locked for today."); return; }
     if (!t.symbol || !t.entry_price) { toast.error("Symbol and Entry required"); return; }
     setSaving(true);
     try {
@@ -224,7 +225,7 @@ export default function AddTrade() {
   return <AddTradeWorkspace t={t} setT={setT} presets={presets} accounts={accounts} computed={computed} recommendedLot={recommendedLot}
     htfDraft={htfDraft} setHtfDraft={setHtfDraft} entryDraft={entryDraft} setEntryDraft={setEntryDraft}
     addPairedPreset={addPairedPreset} removePairedPreset={removePairedPreset} toggle={toggle}
-    saving={saving} save={save} onFile={onFile} uploadingCount={uploadingCount} />;
+    saving={saving} save={save} onFile={onFile} uploadingCount={uploadingCount} tradeLocked={dailyDrawdownLocked} drawdownInfo={dailyDrawdownInfo} />;
 
   return (
     <div className="p-4 sm:p-5 lg:p-6 max-w-[1400px] mx-auto space-y-4" data-testid="add-trade-page">
@@ -492,16 +493,18 @@ function ChipRow({ label, items, selected, onToggle }) {
   );
 }
 
-function AddTradeWorkspace({ t, setT, presets, accounts, computed, recommendedLot, htfDraft, setHtfDraft, entryDraft, setEntryDraft, addPairedPreset, removePairedPreset, toggle, saving, save, onFile, uploadingCount }) {
+function AddTradeWorkspace({ t, setT, presets, accounts, computed, recommendedLot, htfDraft, setHtfDraft, entryDraft, setEntryDraft, addPairedPreset, removePairedPreset, toggle, saving, save, onFile, uploadingCount, tradeLocked, drawdownInfo }) {
   const chooseStrategy = (strategy) => setT({ ...t, strategy });
   return (
     <div className="add-trade-page compact-add-trade p-4 sm:p-5 lg:p-6 max-w-[1500px] mx-auto space-y-4" data-testid="add-trade-page">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div><h1 className="font-display text-3xl font-bold">Add New Trade</h1><p className="text-sm text-[#6D6D82] mt-1">Document your trade and build your edge.</p></div>
-        <button onClick={save} disabled={saving} className="h-11 px-5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-sm font-semibold disabled:opacity-60">{saving ? "Saving..." : "Save Trade"}</button>
+        <button onClick={save} disabled={saving || tradeLocked} className="h-11 px-5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-sm font-semibold disabled:opacity-60">{tradeLocked ? "Trading locked" : saving ? "Saving..." : "Save Trade"}</button>
       </header>
 
-      <React.Fragment>
+      {tradeLocked && <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 font-medium">Daily drawdown limit of ${Number(drawdownInfo.limit || 0).toFixed(0)} has been reached. New trades are locked until the next trading day.</div>}
+
+      <fieldset disabled={tradeLocked} className={tradeLocked ? "opacity-50 pointer-events-none" : ""}>
           <LinkedBiasCard number="1" />
 
           <section className="tjfx-card p-5"><SectionHeading number="2" title="Strategy" subtitle="Choose or add your trading model" /><select value={t.strategy} onChange={e=>chooseStrategy(e.target.value)} className={inp}><option value="">Select strategy...</option>{presets.strategy.map(x=><option key={x}>{x}</option>)}</select><div className="flex flex-wrap gap-2 mt-4">{presets.strategy.slice(0,6).map(x=><Chip key={x} label={x} active={t.strategy===x} onClick={()=>chooseStrategy(x)}/>)}</div></section>
@@ -542,7 +545,7 @@ function AddTradeWorkspace({ t, setT, presets, accounts, computed, recommendedLo
             <div className="mt-4"><ReviewCard t={t} computed={computed} /></div>
             <button onClick={save} disabled={saving} className="mt-5 h-11 min-w-[220px] rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-sm font-semibold disabled:opacity-60">{saving?"Saving trade...":"Save Trade"}</button>
           </section>
-      </React.Fragment>
+      </fieldset>
     </div>
   );
 }
