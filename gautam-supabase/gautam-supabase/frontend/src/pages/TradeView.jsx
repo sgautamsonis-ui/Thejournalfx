@@ -15,6 +15,7 @@ export default function TradeView() {
   const [tab, setTab] = useState("all");
   const [sel, setSel] = useState(null);
   const [edit, setEdit] = useState(null);
+  const [activeTab, setActiveTab] = useState("Overview");
   const [saving, setSaving] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [sortBy, setSortBy] = useState("newest");
@@ -81,6 +82,24 @@ export default function TradeView() {
     return list;
   }, [trades, tab, q, filters, sortBy]);
 
+  // Group the filtered trades by date so Trade View can show a Zella-style
+  // Day View: a date header that expands/collapses to reveal that day's trades.
+  const groupedByDate = useMemo(() => {
+    const map = new Map();
+    filtered.forEach(t => {
+      const d = t.date || "Unknown date";
+      if (!map.has(d)) map.set(d, []);
+      map.get(d).push(t);
+    });
+    return Array.from(map.entries()).map(([date, dayTrades]) => {
+      const netPnl = dayTrades.reduce((s, t) => s + (t.net_pnl || 0), 0);
+      const closed = dayTrades.filter(t => t.status === "closed");
+      const wins = closed.filter(t => (t.net_pnl || 0) > 0).length;
+      const winRate = closed.length > 0 ? Math.round((wins / closed.length) * 100) : 0;
+      return { date, trades: dayTrades, netPnl, winRate, count: dayTrades.length };
+    });
+  }, [filtered]);
+
   const metrics = useMemo(() => {
     const closed = trades.filter(t => t.status === "closed");
     const wins = closed.filter(t => (t.net_pnl||0) > 0);
@@ -117,10 +136,19 @@ export default function TradeView() {
     };
   }, [trades]);
 
-  const openTrade = (t) => { setSel(t); setEdit(null); };
+  const openTrade = (t) => { setSel(t); setEdit(null); setActiveTab("Overview"); };
+  const closeTrade = () => { setSel(null); setEdit(null); };
   const startEdit = () => setEdit({ ...sel });
   const cancelEdit = () => setEdit(null);
   const toggleEdit = (key, v) => setEdit(p => ({...p, [key]: (p[key]||[]).includes(v) ? p[key].filter(x=>x!==v) : [...(p[key]||[]), v]}));
+
+  // Close the drawer with Escape too, not just the X button / backdrop click
+  useEffect(() => {
+    if (!sel) return;
+    const onKey = (e) => { if (e.key === "Escape") { if (edit) setEdit(null); else closeTrade(); } };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [sel, edit]);
 
   const editComputed = useMemo(() => {
     if (!edit) return null;
@@ -375,14 +403,14 @@ export default function TradeView() {
             </Link>
           </div>
         ) : (
-          <div className="space-y-4">
-            {filtered.map((t, i) => (
-              <PremiumTradeCard 
-                key={t.id} 
-                trade={t} 
+          <div className="space-y-3">
+            {groupedByDate.map((g, gi) => (
+              <DayGroup 
+                key={g.date} 
+                group={g} 
+                defaultOpen={gi === 0} 
                 onOpen={openTrade} 
                 onDelete={del}
-                style={{animation: `fadeIn 0.3s ease-out ${i*50}ms both`}}
               />
             ))}
           </div>
@@ -404,13 +432,13 @@ export default function TradeView() {
 
       {/* Trade Detail Drawer */}
       {sel && (
-        <div className="fixed inset-0 bg-black/40 z-50 backdrop-blur-sm" onClick={()=>{setSel(null); setEdit(null);}}>
+        <div className="fixed inset-0 bg-black/40 z-50 backdrop-blur-sm" onClick={closeTrade}>
           <div 
             onClick={e=>e.stopPropagation()} 
             className="absolute right-0 top-0 h-full w-full max-w-[560px] bg-white shadow-2xl overflow-y-auto scroll-thin animate-in slide-in-from-right-full"
           >
             {/* Drawer Header */}
-            <div className="sticky top-0 bg-white border-b border-[#E8E8F1] p-6 space-y-4">
+            <div className="sticky top-0 z-10 bg-white border-b border-[#E8E8F1] p-6 space-y-4">
               <div className="flex items-start justify-between">
                 <div>
                   <h3 className="font-display text-2xl font-bold text-[#16151F]">{(edit||sel).symbol}</h3>
@@ -423,22 +451,31 @@ export default function TradeView() {
                     </span>
                   </div>
                 </div>
-                <button onClick={()=>{setSel(null); setEdit(null);}} className="w-9 h-9 rounded-lg hover:bg-[#F6F6FB] flex items-center justify-center transition">
+                <button 
+                  onClick={closeTrade} 
+                  data-testid="close-trade-drawer" 
+                  title="Close"
+                  className="w-9 h-9 rounded-lg border border-[#E8E8F1] hover:bg-red-50 hover:border-red-200 flex items-center justify-center transition flex-shrink-0"
+                >
                   <X className="w-5 h-5 text-[#6D6D82]"/>
                 </button>
               </div>
 
               {/* Drawer Tabs */}
-              <div className="flex gap-2 border-b border-[#E8E8F1] -mx-6 px-6">
-                {["Overview", "Chart", "Notes", "Mistakes", "Checklist"].map(t => (
-                  <button 
-                    key={t} 
-                    className={`px-4 py-3 text-xs font-medium border-b-2 transition ${t==="Overview"?"border-[#7C3AED] text-[#7C3AED] font-semibold":"border-transparent text-[#6D6D82] hover:text-[#16151F]"}`}
-                  >
-                    {t}
-                  </button>
-                ))}
-              </div>
+              {!edit && (
+                <div className="flex gap-2 border-b border-[#E8E8F1] -mx-6 px-6">
+                  {["Overview", "Chart", "Notes", "Mistakes", "Checklist"].map(tb => (
+                    <button 
+                      key={tb} 
+                      onClick={()=>setActiveTab(tb)}
+                      data-testid={`tab-${tb.toLowerCase()}`}
+                      className={`px-4 py-3 text-xs font-medium border-b-2 transition ${activeTab===tb?"border-[#7C3AED] text-[#7C3AED] font-semibold":"border-transparent text-[#6D6D82] hover:text-[#16151F]"}`}
+                    >
+                      {tb}
+                    </button>
+                  ))}
+                </div>
+              )}
 
               {/* Action Buttons */}
               <div className="flex gap-2">
@@ -473,8 +510,18 @@ export default function TradeView() {
 
             {/* Drawer Content */}
             <div className="p-6 space-y-4">
+              {/* Big chart screenshot always shown first, before anything else */}
+              {!edit && sel.screenshots?.length > 0 && (
+                <img 
+                  src={sel.screenshots[0]} 
+                  alt="Trade chart" 
+                  onClick={()=>openLightbox(sel.screenshots, 0)}
+                  className="w-full max-h-[340px] object-cover rounded-xl border border-[#E8E8F1] cursor-zoom-in"
+                />
+              )}
+
               {edit ? <EditForm edit={edit} setEdit={setEdit} toggleEdit={toggleEdit} computed={editComputed} presets={presets}/> :
-                <ViewBlock t={sel}/>
+                <ViewBlock t={sel} tab={activeTab}/>
               }
 
               {!edit && (
@@ -516,14 +563,61 @@ function MetricBadge({ label, value, change, icon, isCircle, status }) {
   );
 }
 
+// One collapsible day: a date header (with the day's Net P&L and win rate)
+// that expands below to reveal that day's trades — like TradeZella's Day View.
+function DayGroup({ group, defaultOpen, onOpen, onDelete }) {
+  const [open, setOpen] = React.useState(defaultOpen);
+  const isPos = group.netPnl >= 0;
+  const parsed = new Date(`${group.date}T00:00:00`);
+  const label = isNaN(parsed.getTime())
+    ? group.date
+    : parsed.toLocaleDateString("en-US", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+
+  return (
+    <div className="tjfx-card p-0 overflow-hidden">
+      <button 
+        onClick={() => setOpen(o => !o)} 
+        data-testid="day-group-toggle"
+        className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left hover:bg-[#F6F6FB] transition"
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <ChevronDown className={`w-4 h-4 text-[#6D6D82] flex-shrink-0 transition-transform ${open ? "" : "-rotate-90"}`}/>
+          <div className="min-w-0">
+            <div className="font-display font-bold text-sm text-[#16151F] truncate">{label}</div>
+            <div className="text-[11px] text-[#6D6D82]">{group.count} trade{group.count !== 1 ? "s" : ""} · {group.winRate}% win rate</div>
+          </div>
+        </div>
+        <div className={`text-sm font-bold tjfx-mono flex-shrink-0 ${isPos ? "text-emerald-600" : "text-red-500"}`}>
+          {isPos ? "+" : ""}${group.netPnl.toFixed(2)}
+        </div>
+      </button>
+      {open && (
+        <div className="border-t border-[#E8E8F1] bg-[#FAFBFF] p-4 space-y-3">
+          {group.trades.map((t, i) => (
+            <PremiumTradeCard 
+              key={t.id} 
+              trade={t} 
+              onOpen={onOpen} 
+              onDelete={onDelete}
+              style={{animation: `fadeIn 0.3s ease-out ${i*50}ms both`}}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Premium Trade Card Component
-function PremiumTradeCard({ trade, onOpen, onDelete }) {
+function PremiumTradeCard({ trade, onOpen, onDelete, style }) {
   const pnl = trade.net_pnl || 0;
   const isWin = pnl > 0;
+  const thumb = trade.screenshots?.[0];
   
   return (
     <div 
       onClick={() => onOpen(trade)} 
+      style={style}
       className="tjfx-card p-4 hover:shadow-xl hover:border-[#7C3AED] cursor-pointer transition group relative overflow-hidden border-2 border-transparent"
     >
       <div className="absolute inset-0 bg-gradient-to-r from-[#7C3AED]/0 to-[#7C3AED]/0 group-hover:from-[#7C3AED]/5 group-hover:to-[#F3E8FF]/30 transition pointer-events-none"/>
@@ -531,19 +625,25 @@ function PremiumTradeCard({ trade, onOpen, onDelete }) {
       <div className="relative flex gap-4 items-start">
         {/* Star & Chart Section */}
         <div className="relative">
-          <button className="absolute -top-2 -left-2 w-6 h-6 rounded-full hover:bg-yellow-100 flex items-center justify-center transition z-10">
+          <button onClick={(e)=>e.stopPropagation()} className="absolute -top-2 -left-2 w-6 h-6 rounded-full hover:bg-yellow-100 flex items-center justify-center transition z-10">
             <Star className="w-4 h-4 text-yellow-400 hover:fill-yellow-400"/>
           </button>
           <div className="w-28 h-28 rounded-lg bg-gradient-to-br from-[#1a1a2e] via-[#16213e] to-[#0f3460] border border-[#E8E8F1] flex flex-col items-center justify-center relative overflow-hidden">
-            {/* Mini Chart */}
-            <svg className="w-full h-full opacity-70" viewBox="0 0 100 100" preserveAspectRatio="none">
-              <polyline points="10,80 25,65 40,70 55,50 70,40 85,55" fill="none" stroke={isWin ? "#10B981" : "#EF4444"} strokeWidth="2"/>
-              <polyline points="10,90 25,75 40,80 55,60 70,50 85,65" fill="none" stroke="#666" strokeWidth="1" opacity="0.3"/>
-            </svg>
-            <div className="absolute inset-0 flex items-end justify-between p-2 pointer-events-none text-[8px] text-white/60">
-              <span>HTF</span>
-              <span>FVG</span>
-            </div>
+            {thumb ? (
+              // Show the actual screenshot uploaded in Add Trade instead of a fake chart
+              <img src={thumb} alt="" className="w-full h-full object-cover"/>
+            ) : (
+              <>
+                <svg className="w-full h-full opacity-70" viewBox="0 0 100 100" preserveAspectRatio="none">
+                  <polyline points="10,80 25,65 40,70 55,50 70,40 85,55" fill="none" stroke={isWin ? "#10B981" : "#EF4444"} strokeWidth="2"/>
+                  <polyline points="10,90 25,75 40,80 55,60 70,50 85,65" fill="none" stroke="#666" strokeWidth="1" opacity="0.3"/>
+                </svg>
+                <div className="absolute inset-0 flex items-end justify-between p-2 pointer-events-none text-[8px] text-white/60">
+                  <span>HTF</span>
+                  <span>FVG</span>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
@@ -576,16 +676,16 @@ function PremiumTradeCard({ trade, onOpen, onDelete }) {
           </div>
         </div>
 
-        {/* Result Card - BIG & BOLD */}
-        <div className={`w-40 rounded-xl p-4 flex flex-col items-center justify-center text-center flex-shrink-0 border-2 ${isWin ? "bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-300" : "bg-gradient-to-br from-red-50 to-red-100 border-red-300"}`}>
-          <div className={`text-4xl font-black leading-none ${isWin ? "text-emerald-700" : "text-red-600"}`}>
-            {isWin ? "+" : ""}${Math.abs(pnl).toFixed(2)}
-          </div>
-          <div className={`text-sm font-bold mt-2 ${isWin ? "text-emerald-600" : "text-red-500"}`}>
-            {trade.r_multiple ? `${trade.r_multiple}R` : "—"}
-          </div>
-          <div className={`text-[11px] font-bold tracking-wide ${isWin ? "text-emerald-700" : "text-red-700"}`}>
+        {/* Result badge — compact instead of oversized */}
+        <div className={`w-28 rounded-xl p-3 flex flex-col items-center justify-center text-center flex-shrink-0 border ${isWin ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200"}`}>
+          <div className={`text-[10px] font-bold tracking-wide mb-1 ${isWin ? "text-emerald-600" : "text-red-600"}`}>
             {isWin ? "WIN" : "LOSS"}
+          </div>
+          <div className={`text-xl font-bold leading-none tjfx-mono ${isWin ? "text-emerald-700" : "text-red-600"}`}>
+            {isWin ? "+" : "-"}${Math.abs(pnl).toFixed(2)}
+          </div>
+          <div className={`text-xs font-semibold mt-1 ${isWin ? "text-emerald-600" : "text-red-500"}`}>
+            {trade.r_multiple ? `${trade.r_multiple}R` : "—"}
           </div>
         </div>
       </div>
@@ -645,8 +745,45 @@ function RangeInput({ label, type, leftPlaceholder, rightPlaceholder, left, righ
   );
 }
 
-function ViewBlock({ t }) {
+const EmptyTabState = ({ label }) => (
+  <div className="text-center py-12 text-sm text-[#6D6D82]">{label}</div>
+);
+
+// Renders the drawer body based on which tab is active. Each tab used to be
+// a dead button that always showed the same Overview content — now they
+// actually switch what's displayed.
+function ViewBlock({ t, tab = "Overview" }) {
   const openLightbox = useLightbox();
+
+  if (tab === "Chart") {
+    return t.screenshots?.length > 0 ? (
+      <div className="space-y-3">
+        {t.screenshots.map((s, i) => (
+          <img key={i} alt="" src={s} onClick={() => openLightbox(t.screenshots, i)} className="w-full rounded-lg cursor-zoom-in border border-[#E8E8F1]"/>
+        ))}
+      </div>
+    ) : <EmptyTabState label="No chart screenshots added for this trade."/>;
+  }
+
+  if (tab === "Notes") {
+    return t.notes ? (
+      <div className="p-3 bg-[#F6F6FB] rounded-lg text-sm text-[#16151F] whitespace-pre-wrap">{t.notes}</div>
+    ) : <EmptyTabState label="No notes added for this trade."/>;
+  }
+
+  if (tab === "Mistakes") {
+    return t.mistakes?.length > 0 ? (
+      <TagBlock label="Mistakes" items={t.mistakes}/>
+    ) : <EmptyTabState label="No mistakes tagged on this trade."/>;
+  }
+
+  if (tab === "Checklist") {
+    return t.strengths?.length > 0 ? (
+      <TagBlock label="Rules & checklist followed" items={t.strengths}/>
+    ) : <EmptyTabState label="No checklist items recorded for this trade."/>;
+  }
+
+  // Overview (default)
   return (
     <>
       <div className="grid grid-cols-2 gap-3">
@@ -656,14 +793,6 @@ function ViewBlock({ t }) {
       </div>
       {t.htf_poi?.length>0 && <TagBlock label="HTF POI" items={t.htf_poi}/>}
       {t.entry_tags?.length>0 && <TagBlock label="Entry" items={t.entry_tags}/>}
-      {t.mistakes?.length>0 && <TagBlock label="Mistakes" items={t.mistakes}/>}
-      {t.notes && <div><div className="text-xs text-[#6D6D82] font-bold mb-1">Notes</div><div className="p-3 bg-[#F6F6FB] rounded-lg text-sm text-[#16151F] whitespace-pre-wrap">{t.notes}</div></div>}
-      {t.screenshots?.length>0 && (
-        <div>
-          <div className="text-xs text-[#6D6D82] font-bold mb-2">Screenshots ({t.screenshots.length})</div>
-          <div className="grid grid-cols-2 gap-2">{t.screenshots.map((s,i)=><img key={i} alt="" src={s} onClick={()=>openLightbox(t.screenshots,i)} className="w-full rounded-lg cursor-zoom-in border border-[#E8E8F1]"/>)}</div>
-        </div>
-      )}
     </>
   );
 }
