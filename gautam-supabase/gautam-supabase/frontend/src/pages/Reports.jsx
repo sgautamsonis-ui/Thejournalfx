@@ -377,9 +377,9 @@ Recommendations:
         </div>
 
         {/* CONFIG SECTION - RESPONSIVE GRID */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <div className="reports-workspace grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* LEFT PANEL - Controls */}
-          <div className="lg:col-span-1 space-y-4">
+          <aside className="reports-sidebar lg:col-span-1 space-y-4">
             {/* Report Type */}
             <div className="tjfx-card p-5 space-y-4">
               <div>
@@ -566,10 +566,10 @@ Recommendations:
                 reports with AI insights.
               </p>
             </div>
-          </div>
+          </aside>
 
           {/* RIGHT PANEL - Preview */}
-          <div className="lg:col-span-3">
+          <div className="reports-preview lg:col-span-3">
             <div className="tjfx-card overflow-hidden flex flex-col h-full">
               {/* Preview Header */}
               <div className="bg-[#F6F6FB] px-4 py-3 text-xs text-[#6D6D82] flex items-center justify-between border-b border-[#E8E8F1]">

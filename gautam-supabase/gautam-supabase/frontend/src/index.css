@@ -146,6 +146,37 @@ h1, h2, h3, h4, h5 { font-family: 'Comfortaa', sans-serif; letter-spacing: -0.01
 .compact-reports .tjfx-card { padding: 1rem !important; }
 .compact-reports .space-y-6 { --tw-space-y-reverse: 0; margin-top: 0; }
 
+/* Reports is a two-column workspace: the controls need to feel like one full
+   side panel, not a short stack of unrelated floating cards. */
+.compact-reports .reports-workspace { align-items: stretch; }
+.compact-reports .reports-sidebar {
+  align-self: stretch;
+  min-height: 760px;
+  padding: .9rem !important;
+  border: 1px solid var(--tjfx-border);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 3px 14px rgba(22,21,31,.025);
+}
+.compact-reports .reports-sidebar .tjfx-card {
+  padding: .85rem 0 !important;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.compact-reports .reports-sidebar .tjfx-card + .tjfx-card { border-top: 1px solid var(--tjfx-border); }
+.compact-reports .reports-sidebar > button { margin-top: .15rem; }
+.compact-reports .reports-sidebar > .tjfx-card:last-child {
+  margin-top: auto;
+  padding: .85rem !important;
+  border: 1px solid rgba(124,58,237,.2);
+  border-radius: 14px;
+  background: #F3E8FF;
+}
+.compact-reports .reports-preview { min-width: 0; }
+.compact-reports .reports-preview > .tjfx-card { min-height: 760px; }
+
 /* Add Trade: visually link consecutive form blocks and remove excess height. */
 .compact-add-trade > header { margin-bottom: 0 !important; }
 .compact-add-trade > header h1 { font-size: 1.7rem; }
@@ -181,6 +212,14 @@ h1, h2, h3, h4, h5 { font-family: 'Comfortaa', sans-serif; letter-spacing: -0.01
   .compact-add-trade, .compact-bias-page, .compact-reports { padding: .85rem !important; }
   .compact-trade-view .sticky > .p-5, .compact-trade-view > .p-5 { padding-left: .85rem !important; padding-right: .85rem !important; }
   .compact-add-trade .tjfx-card, .compact-bias-page .tjfx-card { padding: .9rem !important; }
+}
+@media (min-width: 1024px) {
+  .compact-reports .reports-sidebar { position: sticky; top: 5.25rem; max-height: calc(100vh - 6.5rem); overflow-y: auto; }
+}
+@media (max-width: 1023px) {
+  .compact-reports .reports-sidebar { min-height: 0; }
+  .compact-reports .reports-sidebar > .tjfx-card:last-child { margin-top: 0; }
+  .compact-reports .reports-preview > .tjfx-card { min-height: 0; }
 }
 
 /* The white interface remains the default.  This theme is used only when the
