@@ -94,9 +94,8 @@ export default function Reports() {
   const [dateMode, setDateMode] = useState("current_month");
   const [customFrom, setCustomFrom] = useState(toDateStr(new Date()));
   const [customTo, setCustomTo] = useState(toDateStr(new Date()));
-  const [style, setStyle] = useState("professional");
+  const style = "professional";
   const timeFormat24 = user?.settings?.report_time_format === "24h";
-  const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
   const [aiSummary, setAiSummary] = useState(null);
   
   const [includes, setIncludes] = useState({
@@ -268,12 +267,10 @@ export default function Reports() {
     };
   }, [trades, biasList, range]);
 
-  // Generate AI Summary (mock - can be replaced with actual API call)
-  const generateAiSummary = async () => {
-    setAiSummaryLoading(true);
-    try {
-      // Mock AI summary - replace with actual API call
-      setTimeout(() => {
+  // Keep the report insight current automatically; no oversized manual action
+  // is needed in the report toolbar.
+  const generateAiSummary = () => {
+      {
         const summary = `
 Based on your trading data for ${range.start} to ${range.end}:
 
@@ -294,14 +291,13 @@ Recommendations:
 4. Maintain consistency in your trading process
         `;
         setAiSummary(summary);
-        toast.success("AI Summary generated!");
-      }, 1500);
-    } catch (e) {
-      toast.error("Failed to generate AI summary");
-    } finally {
-      setAiSummaryLoading(false);
-    }
+      }
   };
+
+  useEffect(() => {
+    if (includes.aiSummary && filtered.trades.length) generateAiSummary();
+    else setAiSummary(null);
+  }, [includes.aiSummary, filtered, range.start, range.end]);
 
   const reportId = `TJFX-${range.start}-${type[0].toUpperCase()}`;
 
@@ -459,27 +455,6 @@ Recommendations:
                 </div>
               </div>
 
-              {/* Report Style */}
-              <div>
-                <label className="text-xs font-semibold text-[#6D6D82] uppercase tracking-wide">
-                  Report Style
-                </label>
-                <div className="grid grid-cols-3 gap-2 mt-2">
-                  {["compact", "professional", "institutional"].map((s) => (
-                    <button
-                      key={s}
-                      onClick={() => setStyle(s)}
-                      className={`h-10 rounded-xl text-xs font-medium border capitalize transition-all ${
-                        style === s
-                          ? "bg-[#F3E8FF] border-[#7C3AED] text-[#7C3AED]"
-                          : "border-[#E8E8F1] hover:border-[#7C3AED]"
-                      }`}
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              </div>
             </div>
 
             {/* Include Sections */}
@@ -516,32 +491,6 @@ Recommendations:
               </div>
             </div>
 
-            {/* AI Summary Button */}
-            {includes.aiSummary && (
-              <button
-                onClick={generateAiSummary}
-                disabled={aiSummaryLoading || !filtered.trades.length}
-                className="w-full h-10 px-4 rounded-xl bg-gradient-to-r from-[#7C3AED] to-[#6D28D9] hover:from-[#6D28D9] hover:to-[#5b21b6] text-white text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-60 transition-all"
-              >
-                {aiSummaryLoading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Zap className="w-4 h-4" />
-                )}
-                Generate AI Summary
-              </button>
-            )}
-
-            {/* Info Box */}
-            <div className="tjfx-card p-4 bg-[#F3E8FF] border-[#7C3AED]/20">
-              <div className="font-semibold text-[#7C3AED] mb-1 flex items-center gap-2 text-sm">
-                <Zap className="w-4 h-4" /> Pro Tip
-              </div>
-              <p className="text-xs text-[#6D6D82]">
-                Fill your bias, log trades, and psychology data for complete
-                reports with AI insights.
-              </p>
-            </div>
           </aside>
 
           {/* RIGHT PANEL - Preview */}
@@ -557,13 +506,7 @@ Recommendations:
               <div className="flex-1 overflow-auto scroll-thin bg-[#F6F6FB] p-4">
                 <div
                   ref={reportRef}
-                  className={`mx-auto bg-white shadow-sm ${
-                    style === "compact"
-                      ? "text-[12px]"
-                      : style === "institutional"
-                      ? "text-[13px]"
-                      : "text-[13.5px]"
-                  }`}
+                  className="mx-auto bg-white shadow-sm text-[13.5px]"
                   style={{ width: "100%", maxWidth: "800px", minHeight: "1100px", padding: "40px" }}
                 >
                   {loading ? (

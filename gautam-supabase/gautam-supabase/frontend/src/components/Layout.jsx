@@ -121,6 +121,7 @@ export default function Layout() {
   const navigate = useNavigate();
   const [theme, setTheme] = useState(() => localStorage.getItem("tjfx-theme") || "light");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const { dailyDrawdownLocked, dailyDrawdownInfo } = useAccount();
   const [showDrawdownAlert, setShowDrawdownAlert] = useState(false);
@@ -158,7 +159,7 @@ export default function Layout() {
       )}
 
       <aside
-        className={`fixed md:relative inset-y-0 left-0 z-30 w-64 md:w-56 lg:w-64 bg-white border-r border-[#E8E8F1] flex flex-col sticky top-0 h-screen transform transition-transform duration-300 ease-in-out ${
+        className={`fixed md:relative inset-y-0 left-0 z-30 w-64 ${sidebarCollapsed ? "md:w-0 md:border-r-0 md:overflow-hidden" : "md:w-56 lg:w-64"} bg-white border-r border-[#E8E8F1] flex flex-col sticky top-0 h-screen transform transition-transform duration-300 ease-in-out ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
         }`}
         data-testid="sidebar"
@@ -223,8 +224,8 @@ export default function Layout() {
         <div className="sticky top-0 z-20 bg-[#F6F6FB]/85 backdrop-blur border-b border-[#E8E8F1] px-4 sm:px-6 lg:px-8 py-2.5 sm:py-3 flex items-center justify-between gap-3 sm:gap-4">
           <div className="flex items-center gap-3 sm:gap-4 min-w-0">
             <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="md:hidden text-[#6D6D82] hover:text-[#16151F] p-1"
+              onClick={() => isMobile ? setSidebarOpen(!sidebarOpen) : setSidebarCollapsed(!sidebarCollapsed)}
+              className="text-[#6D6D82] hover:text-[#16151F] p-1"
               data-testid="mobile-menu-btn"
             >
               <Menu className="w-5 h-5" />

@@ -151,7 +151,7 @@ h1, h2, h3, h4, h5 { font-family: 'Comfortaa', sans-serif; letter-spacing: -0.01
 .compact-reports .reports-workspace { display: block; }
 .compact-reports .reports-sidebar {
   display: grid;
-  grid-template-columns: minmax(250px, 1.2fr) minmax(220px, .8fr) minmax(360px, 1.7fr) auto minmax(190px, .8fr);
+  grid-template-columns: minmax(270px, 1fr) minmax(310px, 1.15fr);
   align-items: start;
   gap: .75rem;
   padding: .75rem !important;
@@ -167,13 +167,6 @@ h1, h2, h3, h4, h5 { font-family: 'Comfortaa', sans-serif; letter-spacing: -0.01
   box-shadow: none;
 }
 .compact-reports .reports-sidebar .tjfx-card + .tjfx-card { border-top: 1px solid var(--tjfx-border); }
-.compact-reports .reports-sidebar > button { align-self: stretch; min-width: 170px; height: auto; min-height: 44px; margin-top: 0; }
-.compact-reports .reports-sidebar > .tjfx-card:last-child {
-  padding: .85rem !important;
-  border: 1px solid rgba(124,58,237,.2);
-  border-radius: 14px;
-  background: #F3E8FF;
-}
 .report-config .reports-preview { display: none; }
 .report-preview-only { padding: 1rem !important; }
 .report-preview-only > div > .flex { display: none; }

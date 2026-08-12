@@ -218,11 +218,14 @@ export default function Dashboard() {
   // Live equity curve — running cumulative balance across closed trades, sorted
   // chronologically, starting from the account's starting balance.
   const equityCurveData = useMemo(() => {
-    const startBalance = Number(active?.balance ?? 0);
+    const currentBalance = Number(active?.balance ?? 0);
     const closed = allTrades
       .filter(t => t && t.date && (t.net_pnl !== undefined && t.net_pnl !== null))
       .slice()
       .sort((a, b) => new Date(a.date) - new Date(b.date));
+    // Account balance is the current balance, not the opening balance. Reverse
+    // the recorded P&L first so the last plotted point always matches it.
+    const startBalance = currentBalance - closed.reduce((sum, t) => sum + (Number(t.net_pnl) || 0), 0);
     let running = startBalance;
     const points = [{ date: closed[0]?.date || new Date().toISOString(), equity: startBalance, label: "Start" }];
     for (const t of closed) {
