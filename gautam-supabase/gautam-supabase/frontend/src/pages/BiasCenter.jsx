@@ -248,22 +248,22 @@ export default function BiasCenter() {
       </div>
 
       <div className="space-y-4">
-        <div className="tjfx-card p-6">
+        <div className="tjfx-card p-5">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="font-display text-lg font-bold">Chart Gallery <span className="text-xs text-[#6D6D82] font-normal tjfx-mono ml-1">{b.images.length}/{MAX_IMAGES}</span></h3>
+            <h3 className="font-display text-[15px] font-bold">Chart Gallery <span className="text-xs text-[#6D6D82] font-normal tjfx-mono ml-1">{b.images.length}/{MAX_IMAGES}</span></h3>
             <label className="text-sm text-[#7C3AED] font-medium cursor-pointer flex items-center gap-1"><Upload className="w-4 h-4"/> Add<input type="file" multiple accept="image/*" hidden onChange={uploadImg}/></label>
           </div>
           <div className="text-[11px] text-[#6D6D82] mb-3 flex items-center gap-1"><Clipboard className="w-3 h-3"/> Press <kbd className="px-1.5 py-0.5 rounded bg-[#F3E8FF] text-[#7C3AED] text-[10px] mx-1">Ctrl+V</kbd> to paste chart screenshots directly</div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-            {b.images.map((s,i)=><div key={i} className="relative group"><img alt="" src={s} onClick={()=>openLightbox(b.images,i)} className="w-full h-28 object-cover rounded-lg cursor-zoom-in"/><button onClick={()=>removeImage(i)} className="absolute top-1 right-1 w-6 h-6 rounded-full bg-white/90 opacity-0 group-hover:opacity-100"><Trash2 className="w-3 h-3 mx-auto text-red-500"/></button></div>)}
-            {Array.from({length: uploadingCount}).map((_,i)=><div key={`u${i}`} className="w-full h-28 rounded-lg border-2 border-dashed border-[#7C3AED]/40 bg-[#F3E8FF]/40 flex items-center justify-center text-[11px] text-[#7C3AED] animate-pulse">Uploading...</div>)}
+            {b.images.map((s,i)=><div key={i} className="relative group"><img alt="" src={s} onClick={()=>openLightbox(b.images,i)} className="w-full h-24 object-cover rounded-lg cursor-zoom-in"/><button onClick={()=>removeImage(i)} className="absolute top-1 right-1 w-6 h-6 rounded-full bg-white/90 opacity-0 group-hover:opacity-100"><Trash2 className="w-3 h-3 mx-auto text-red-500"/></button></div>)}
+            {Array.from({length: uploadingCount}).map((_,i)=><div key={`u${i}`} className="w-full h-24 rounded-lg border-2 border-dashed border-[#7C3AED]/40 bg-[#F3E8FF]/40 flex items-center justify-center text-[11px] text-[#7C3AED] animate-pulse">Uploading...</div>)}
             {b.images.length===0 && uploadingCount===0 && <div className="col-span-full text-center py-8 text-sm text-[#6D6D82] border-2 border-dashed border-[#E8E8F1] rounded-xl">No chart screenshots yet. Upload or paste from clipboard.</div>}
           </div>
         </div>
 
-        <div className="tjfx-card p-6">
-          <h3 className="font-display text-lg font-bold mb-4">1. Direction & Confidence</h3>
-            <div className="grid md:grid-cols-2 gap-6">
+        <div className="tjfx-card p-5">
+          <h3 className="font-display text-[15px] font-bold mb-3">1. Direction & Confidence</h3>
+            <div className="grid md:grid-cols-2 gap-5">
               <div>
                 <div className="text-[12px] text-[#6D6D82] mb-2">Market Direction</div>
                 <div className="grid grid-cols-3 gap-2">
@@ -273,8 +273,8 @@ export default function BiasCenter() {
                     ["neutral","Neutral",Minus,"gray"],
                   ].map(([k,l,Icon,c]) => (
                     <button key={k} onClick={()=>setB({...b, direction:k})} data-testid={`dir-${k}`}
-                      className={`p-4 rounded-2xl border-2 text-sm font-medium flex flex-col items-center gap-1 ${b.direction===k? (c==="emerald"?"bg-emerald-50 border-emerald-400 text-emerald-700":c==="red"?"bg-red-50 border-red-400 text-red-700":"bg-gray-50 border-gray-400 text-gray-700") : "border-[#E8E8F1]"}`}>
-                      <Icon className="w-5 h-5"/> {l}
+                      className={`h-10 rounded-xl border text-sm font-medium flex items-center justify-center gap-1.5 ${b.direction===k? (c==="emerald"?"bg-emerald-50 border-emerald-400 text-emerald-700":c==="red"?"bg-red-50 border-red-400 text-red-700":"bg-gray-50 border-gray-400 text-gray-700") : "border-[#E8E8F1]"}`}>
+                      <Icon className="w-4 h-4"/> {l}
                     </button>
                   ))}
                 </div>
@@ -287,8 +287,8 @@ export default function BiasCenter() {
             </div>
           </div>
 
-        <div className="tjfx-card p-6">
-          <h3 className="font-display text-lg font-bold mb-3">2. Market Narrative</h3>
+        <div className="tjfx-card p-5">
+          <h3 className="font-display text-[15px] font-bold mb-3">2. Market Narrative</h3>
           <textarea data-testid="narrative-input" value={b.narrative} onChange={e=>setB({...b,narrative:e.target.value})} rows={8} className="w-full p-4 rounded-xl border border-[#E8E8F1] focus:border-[#7C3AED] outline-none text-sm leading-relaxed" placeholder="Write your market narrative..."/>
           <div className="text-[11px] text-[#A1A1AA] text-right mt-1">{b.narrative.split(/\s+/).filter(Boolean).length} words</div>
 
@@ -313,9 +313,9 @@ export default function BiasCenter() {
         </div>
 
         <div className="grid md:grid-cols-2 gap-5">
-            <div className="tjfx-card p-6">
+            <div className="tjfx-card p-5">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="font-display text-lg font-bold">Key Levels</h3>
+                <h3 className="font-display text-[15px] font-bold">Key Levels</h3>
                 <button onClick={()=>addLevel("")} className="text-sm text-[#7C3AED] font-medium">+ Add custom</button>
               </div>
               {keyLevelPresets.length>0 && (
@@ -338,8 +338,8 @@ export default function BiasCenter() {
                 {b.key_levels.length===0 && <div className="text-xs text-[#A1A1AA]">Tap a quick-add chip above or click "+ Add custom"</div>}
               </div>
             </div>
-            <div className="tjfx-card p-6">
-              <div className="flex items-center justify-between mb-3"><h3 className="font-display text-lg font-bold">Targets</h3><button onClick={addTarget} className="text-sm text-[#7C3AED] font-medium">+ Add</button></div>
+            <div className="tjfx-card p-5">
+              <div className="flex items-center justify-between mb-3"><h3 className="font-display text-[15px] font-bold">Targets</h3><button onClick={addTarget} className="text-sm text-[#7C3AED] font-medium">+ Add</button></div>
               <div className="space-y-2">
                 {b.targets.map((tg,i)=>(
                   <div key={i} className="flex gap-2 items-center">
@@ -359,7 +359,7 @@ export default function BiasCenter() {
         </div>
 
         {tab==="daily" && (
-          <div className="tjfx-card p-6" data-testid="bias-session-card">
+          <div className="tjfx-card p-5" data-testid="bias-session-card">
             <div className="text-[12px] text-[#6D6D82] mb-2">Session</div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {(sessionPresets.length?sessionPresets:["Asian","London","New York","Overlap"]).map(s => <button key={s} onClick={()=>setB({...b,session:s})} className={`h-10 rounded-xl text-sm font-medium border ${b.session===s?"bg-[#F3E8FF] border-[#7C3AED] text-[#7C3AED]":"border-[#E8E8F1]"}`}>{s}</button>)}
@@ -368,15 +368,15 @@ export default function BiasCenter() {
         )}
 
         {b.ai_summary && (
-          <div className="tjfx-card p-6 bg-gradient-to-br from-[#F3E8FF] to-white">
-            <h3 className="font-display text-lg font-bold mb-2 flex items-center gap-2"><Sparkles className="w-4 h-4 text-[#7C3AED]"/> AI Summary</h3>
+          <div className="tjfx-card p-5 bg-gradient-to-br from-[#F3E8FF] to-white">
+            <h3 className="font-display text-[15px] font-bold mb-2 flex items-center gap-2"><Sparkles className="w-4 h-4 text-[#7C3AED]"/> AI Summary</h3>
             <p className="text-sm whitespace-pre-wrap leading-relaxed">{b.ai_summary}</p>
             <div className="mt-3 inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-emerald-50 text-emerald-700">AI Confidence: {b.ai_confidence||90}%</div>
           </div>
         )}
 
-        <div className="tjfx-card p-6">
-          <div className="flex items-center justify-between mb-3"><h3 className="font-display text-lg font-bold">Notes & Reminders</h3><button onClick={addNote} className="text-sm text-[#7C3AED] font-medium">+ Add</button></div>
+        <div className="tjfx-card p-5">
+          <div className="flex items-center justify-between mb-3"><h3 className="font-display text-[15px] font-bold">Notes & Reminders</h3><button onClick={addNote} className="text-sm text-[#7C3AED] font-medium">+ Add</button></div>
           <div className="space-y-2">
             {b.notes.map((n,i)=>(
               <div key={i} className="flex gap-2 items-center"><input value={n} onChange={e=>{const c=[...b.notes];c[i]=e.target.value;setB({...b,notes:c});}} className="flex-1 h-9 px-3 rounded-lg border border-[#E8E8F1] text-sm" placeholder="Reminder..."/><button onClick={()=>setB({...b,notes:b.notes.filter((_,j)=>j!==i)})} className="w-9 h-9 rounded-lg text-[#6D6D82] hover:bg-red-50"><Trash2 className="w-4 h-4 mx-auto"/></button></div>
@@ -385,8 +385,8 @@ export default function BiasCenter() {
           </div>
         </div>
 
-        <div className="tjfx-card p-6">
-          <h3 className="font-display text-lg font-bold mb-3">Bias Records</h3>
+        <div className="tjfx-card p-5">
+          <h3 className="font-display text-[15px] font-bold mb-3">Bias Records</h3>
           <div className="grid sm:grid-cols-2 gap-2 max-h-72 overflow-auto scroll-thin">
             {history.length===0 && <div className="text-sm text-[#6D6D82]">No records yet.</div>}
             {history.map(h => (

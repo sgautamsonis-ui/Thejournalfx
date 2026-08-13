@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { settingsApi, accountsApi, prefsApi } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
-import { Trash2, Plus, Pencil, Check, X, Save, CheckCircle2 } from "lucide-react";
+import { Trash2, Plus, Pencil, Check, X, Save, CheckCircle2, ChevronDown } from "lucide-react";
 
 const TABS = ["Profile","Trade Presets","Bias Presets"];
 
@@ -199,7 +199,7 @@ export default function Settings() {
 
           {tab==="Trade Presets" && (
             <div className="space-y-5">
-              {PRESET_KINDS.map(k => <PresetManager key={k.kind} kind={k.kind} label={k.label} hint={k.hint}/>)}
+              {PRESET_KINDS.map((k,i) => <PresetManager key={k.kind} kind={k.kind} label={k.label} hint={k.hint} defaultOpen={i===0}/>)}
             </div>
           )}
 
@@ -368,15 +368,16 @@ function BiasPresetTabs() {
           </button>
         ))}
       </div>
-      <PresetManager kind={active.kind} label={active.label} hint={active.hint}/>
+      <PresetManager kind={active.kind} label={active.label} hint={active.hint} collapsible={false} defaultOpen/>
     </div>
   );
 }
 
-function PresetManager({ kind, label, hint }) {
+function PresetManager({ kind, label, hint, defaultOpen = false, collapsible = true }) {
   const [items, setItems] = useState([]);
   const [val, setVal] = useState("");
   const [edit, setEdit] = useState({ id: null, val: "" });
+  const [open, setOpen] = useState(defaultOpen);
 
   const load = () => prefsApi.list(kind).then(setItems).catch(()=>{});
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [kind]);
@@ -409,35 +410,51 @@ function PresetManager({ kind, label, hint }) {
     catch (error) { toast.error(error?.response?.data?.detail || "Could not delete this item"); }
   };
 
+  const isOpen = !collapsible || open;
+
   return (
-    <div className="tjfx-card p-6" data-testid={`preset-${kind}`}>
-      <div className="flex items-baseline justify-between mb-1">
-        <h3 className="font-display text-lg font-bold">{label}</h3>
-        <span className="text-[11px] text-[#A1A1AA]">{items.length} items</span>
-      </div>
-      <p className="text-xs text-[#6D6D82] mb-4">{hint}</p>
-      <div className="flex gap-2 mb-4">
-        <input value={val} onChange={e=>setVal(e.target.value)} onKeyDown={e=>e.key==="Enter"&&add()} placeholder={`Add new ${label.toLowerCase().slice(0,-1)}`} className="flex-1 h-10 px-3 rounded-xl border border-[#E8E8F1] focus:border-[#7C3AED] outline-none text-sm" data-testid={`preset-input-${kind}`}/>
-        <button onClick={add} className="h-10 px-4 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-sm font-semibold flex items-center gap-1"><Plus className="w-4 h-4"/> Add</button>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {items.map(it => (
-          edit.id===it.id ? (
-            <div key={it.id} className="flex items-center gap-1 h-8 rounded-full border border-[#7C3AED] bg-white px-2">
-              <input value={edit.val} onChange={e=>setEdit({...edit,val:e.target.value})} className="text-sm outline-none w-32"/>
-              <button onClick={saveEdit} className="text-emerald-600"><Check className="w-4 h-4"/></button>
-              <button onClick={()=>setEdit({id:null,val:""})} className="text-[#6D6D82]"><X className="w-4 h-4"/></button>
-            </div>
-          ) : (
-            <div key={it.id} className="chip active flex items-center gap-1.5 pr-1">
-              <span>{it.value}</span>
-              <button onClick={()=>startEdit(it)} className="w-5 h-5 rounded-full hover:bg-white/60 flex items-center justify-center"><Pencil className="w-3 h-3"/></button>
-              <button onClick={()=>del(it.id)} className="w-5 h-5 rounded-full hover:bg-red-100 hover:text-red-600 flex items-center justify-center"><X className="w-3 h-3"/></button>
-            </div>
-          )
-        ))}
-        {items.length===0 && <div className="text-sm text-[#6D6D82]">No items — defaults will seed on next load.</div>}
-      </div>
+    <div className="tjfx-card p-4" data-testid={`preset-${kind}`}>
+      <button
+        type="button"
+        onClick={() => collapsible && setOpen(o => !o)}
+        className={`w-full flex items-center justify-between gap-3 text-left ${collapsible ? "cursor-pointer" : ""}`}
+      >
+        <div className="min-w-0">
+          <h3 className="font-display text-[15px] font-bold truncate">{label}</h3>
+          {isOpen && <p className="text-xs text-[#6D6D82] mt-0.5">{hint}</p>}
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-[11px] text-[#A1A1AA] tjfx-mono">{items.length} items</span>
+          {collapsible && <ChevronDown className={`w-4 h-4 text-[#6D6D82] transition-transform ${open ? "rotate-180" : ""}`}/>}
+        </div>
+      </button>
+
+      {isOpen && (
+        <div className="mt-3 pt-3 border-t border-[#F0F0F5]">
+          <div className="flex gap-2 mb-3">
+            <input value={val} onChange={e=>setVal(e.target.value)} onKeyDown={e=>e.key==="Enter"&&add()} placeholder={`Add new ${label.toLowerCase().slice(0,-1)}`} className="flex-1 h-9 px-3 rounded-xl border border-[#E8E8F1] focus:border-[#7C3AED] outline-none text-sm" data-testid={`preset-input-${kind}`}/>
+            <button onClick={add} className="h-9 px-3 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-sm font-semibold flex items-center gap-1"><Plus className="w-4 h-4"/> Add</button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {items.map(it => (
+              edit.id===it.id ? (
+                <div key={it.id} className="flex items-center gap-1 h-8 rounded-full border border-[#7C3AED] bg-white px-2">
+                  <input value={edit.val} onChange={e=>setEdit({...edit,val:e.target.value})} className="text-sm outline-none w-32"/>
+                  <button onClick={saveEdit} className="text-emerald-600"><Check className="w-4 h-4"/></button>
+                  <button onClick={()=>setEdit({id:null,val:""})} className="text-[#6D6D82]"><X className="w-4 h-4"/></button>
+                </div>
+              ) : (
+                <div key={it.id} className="chip active flex items-center gap-1.5 pr-1">
+                  <span>{it.value}</span>
+                  <button onClick={()=>startEdit(it)} className="w-5 h-5 rounded-full hover:bg-white/60 flex items-center justify-center"><Pencil className="w-3 h-3"/></button>
+                  <button onClick={()=>del(it.id)} className="w-5 h-5 rounded-full hover:bg-red-100 hover:text-red-600 flex items-center justify-center"><X className="w-3 h-3"/></button>
+                </div>
+              )
+            ))}
+            {items.length===0 && <div className="text-sm text-[#6D6D82]">No items — defaults will seed on next load.</div>}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -503,9 +520,15 @@ function AppearanceTab() {
       <textarea rows={3} value={motivation} onChange={e=>setMotivation(e.target.value)} className="w-full p-4 rounded-xl border border-[#E8E8F1] focus:border-[#7C3AED] outline-none text-sm" data-testid="motivation-input" placeholder="Write your own or pick a preset below..."/>
       <div>
         <div className="text-[11px] text-[#6D6D82] uppercase tracking-wide mb-2">Presets</div>
-        <div className="flex flex-wrap gap-2">
-          {QUOTES.map(q => <button key={q} onClick={()=>setMotivation(q)} className={`chip text-left ${motivation===q?"active":""}`} style={{maxWidth:340}}>{q}</button>)}
-        </div>
+        <select
+          value={QUOTES.includes(motivation) ? motivation : ""}
+          onChange={e => e.target.value && setMotivation(e.target.value)}
+          className="inp text-sm"
+          data-testid="motivation-preset-select"
+        >
+          <option value="" disabled>Pick a preset quote...</option>
+          {QUOTES.map(q => <option key={q} value={q}>{q}</option>)}
+        </select>
       </div>
       <SaveButton state={state} idleLabel="Save Motivation" testId="motivation-save" onClick={save}/>
       <div className="pt-4 border-t border-[#E8E8F1]">
