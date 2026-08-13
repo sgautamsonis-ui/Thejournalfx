@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip, LineChart, Line, XAxis, YAxis,
-  CartesianGrid, BarChart, Bar, ScatterChart, Scatter, ZAxis,
+  CartesianGrid, BarChart, Bar, ReferenceLine,
 } from "recharts";
 import {
   ChevronDown, Smile, LineChart as LineChartIcon, CalendarDays, Clock,
@@ -345,7 +345,9 @@ function MoodTracker({ trades, onDrill }) {
     byMood.reduce((s, m) => s + (m.wr - 50) * (m.total / totalTagged), 0) * 2
   )));
 
-  // Trend by day: % of trades that day tagged with a "positive" vs "negative" mood
+  // Trend by day: how many trades that day were tagged with a "positive"
+  // vs "negative" mood — shown as counts (not %) so the chart is readable
+  // even on days with just 1-2 trades.
   const trendByDate = useMemo(() => {
     const map = {};
     trades.forEach(t => {
@@ -359,9 +361,11 @@ function MoodTracker({ trades, onDrill }) {
       if (pos) map[d].pos++;
       if (neg) map[d].neg++;
     });
-    return Object.entries(map).sort(([a], [b]) => a.localeCompare(b)).map(([date, v]) => ({
-      date, positive: Math.round((v.pos / v.total) * 100), negative: Math.round((v.neg / v.total) * 100),
-    }));
+    return Object.entries(map).sort(([a], [b]) => a.localeCompare(b)).map(([date, v]) => {
+      const parsed = new Date(`${date}T00:00:00`);
+      const label = isNaN(parsed.getTime()) ? date : parsed.toLocaleDateString("en-US", { day: "numeric", month: "short" });
+      return { date, label, positive: v.pos, negative: v.neg, neutral: Math.max(0, v.total - v.pos - v.neg) };
+    });
   }, [trades]);
 
   const positiveDays = trendByDate.filter(d => d.positive > d.negative).length;
@@ -444,23 +448,29 @@ function MoodTracker({ trades, onDrill }) {
 
       <div className="grid md:grid-cols-[1.4fr_1fr] gap-5">
         <div className="tjfx-card p-6">
-          <h3 className="font-display text-lg font-bold mb-3">Mood Trends</h3>
+          <h3 className="font-display text-lg font-bold mb-1">Mood Trends</h3>
+          <div className="text-xs text-[#6D6D82] mb-3">Number of trades per day tagged with a positive or negative mood</div>
           <div style={{ width: "100%", height: 220 }}>
             <ResponsiveContainer>
-              <LineChart data={trendByDate}>
+              <BarChart data={trendByDate}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#F0F0F5" />
-                <XAxis dataKey="date" tick={{ fontSize: 10 }} minTickGap={30} />
-                <YAxis tick={{ fontSize: 10 }} domain={[0, 100]} />
-                <Tooltip />
-                <Line type="monotone" dataKey="positive" stroke="#22C55E" strokeWidth={2} dot={false} name="Positive %" />
-                <Line type="monotone" dataKey="negative" stroke="#EF4444" strokeWidth={2} dot={false} name="Negative %" />
-              </LineChart>
+                <XAxis dataKey="label" tick={{ fontSize: 10 }} minTickGap={20} />
+                <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
+                <Tooltip labelFormatter={(_, p) => p?.[0]?.payload?.label || ""} formatter={(v, n) => [v, n === "positive" ? "Positive trades" : "Negative trades"]} />
+                <ReferenceLine y={0} stroke="#16151F" strokeWidth={1.5} />
+                <Bar dataKey="positive" name="positive" fill="#22C55E" radius={[4, 4, 0, 0]} barSize={14} maxBarSize={14} />
+                <Bar dataKey="negative" name="negative" fill="#EF4444" radius={[4, 4, 0, 0]} barSize={14} maxBarSize={14} />
+              </BarChart>
             </ResponsiveContainer>
           </div>
+          <div className="flex gap-4 mt-2 text-xs text-[#6D6D82]">
+            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full inline-block" style={{background:"#22C55E"}}/> Positive trades</span>
+            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full inline-block" style={{background:"#EF4444"}}/> Negative trades</span>
+          </div>
           <div className="flex gap-2 mt-3 text-xs">
-            <div className="flex-1 rounded-lg bg-emerald-50 text-emerald-700 py-2 text-center font-semibold">Positive {positiveDays}</div>
-            <div className="flex-1 rounded-lg bg-[#F6F6FB] text-[#6D6D82] py-2 text-center font-semibold">Neutral {neutralDays}</div>
-            <div className="flex-1 rounded-lg bg-red-50 text-red-600 py-2 text-center font-semibold">Negative {negativeDays}</div>
+            <div className="flex-1 rounded-lg bg-emerald-50 text-emerald-700 py-2 text-center font-semibold">Positive Days {positiveDays}</div>
+            <div className="flex-1 rounded-lg bg-[#F6F6FB] text-[#6D6D82] py-2 text-center font-semibold">Neutral Days {neutralDays}</div>
+            <div className="flex-1 rounded-lg bg-red-50 text-red-600 py-2 text-center font-semibold">Negative Days {negativeDays}</div>
           </div>
         </div>
 
@@ -562,7 +572,7 @@ function StrategyTracker({ trades, onDrill }) {
                 <XAxis dataKey="strategy" tick={{ fontSize: 10 }} interval={0} angle={-15} textAnchor="end" height={50} />
                 <YAxis tick={{ fontSize: 10 }} />
                 <Tooltip />
-                <Bar dataKey="pnl" radius={[6, 6, 0, 0]} cursor="pointer">
+                <Bar dataKey="pnl" radius={[4, 4, 0, 0]} cursor="pointer" barSize={28} maxBarSize={28}>
                   {byStrategy.map((s, i) => <Cell key={i} fill={s.pnl >= 0 ? "#22C55E" : "#EF4444"} />)}
                 </Bar>
               </BarChart>
@@ -571,20 +581,23 @@ function StrategyTracker({ trades, onDrill }) {
         </div>
         <div className="tjfx-card p-6">
           <h3 className="font-display text-lg font-bold mb-1">Win Rate vs Avg RR</h3>
-          <div className="text-xs text-[#6D6D82] mb-2">Bigger bubble = more trades</div>
+          <div className="text-xs text-[#6D6D82] mb-2">Win rate (%) and average R per strategy</div>
           <div style={{ width: "100%", height: 220 }}>
             <ResponsiveContainer>
-              <ScatterChart>
+              <BarChart data={byStrategy} onClick={(e) => e?.activePayload?.[0] && openStrategy(e.activePayload[0].payload)}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#F0F0F5" />
-                <XAxis type="number" dataKey="wr" name="Win Rate" unit="%" tick={{ fontSize: 10 }} domain={[0, 100]} />
-                <YAxis type="number" dataKey="avgRR" name="Avg RR" tick={{ fontSize: 10 }} />
-                <ZAxis type="number" dataKey="total" range={[80, 400]} />
-                <Tooltip cursor={{ strokeDasharray: "3 3" }} formatter={(v, n) => [v, n]} labelFormatter={() => ""} />
-                <Scatter data={byStrategy} onClick={(d) => openStrategy(d)} cursor="pointer">
-                  {byStrategy.map((s, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
-                </Scatter>
-              </ScatterChart>
+                <XAxis dataKey="strategy" tick={{ fontSize: 10 }} interval={0} angle={-15} textAnchor="end" height={50} />
+                <YAxis yAxisId="left" tick={{ fontSize: 10 }} domain={[0, 100]} />
+                <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} />
+                <Tooltip formatter={(v, n) => [n === "wr" ? `${v}%` : `${v}R`, n === "wr" ? "Win Rate" : "Avg RR"]} labelFormatter={() => ""} />
+                <Bar yAxisId="left" dataKey="wr" name="wr" fill="#7C3AED" radius={[4, 4, 0, 0]} cursor="pointer" barSize={14} maxBarSize={14} />
+                <Bar yAxisId="right" dataKey="avgRR" name="avgRR" fill="#F59E0B" radius={[4, 4, 0, 0]} cursor="pointer" barSize={14} maxBarSize={14} />
+              </BarChart>
             </ResponsiveContainer>
+          </div>
+          <div className="flex gap-4 mt-2 text-xs text-[#6D6D82]">
+            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full inline-block" style={{background:"#7C3AED"}}/> Win Rate %</span>
+            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full inline-block" style={{background:"#F59E0B"}}/> Avg RR</span>
           </div>
         </div>
       </div>
@@ -726,6 +739,13 @@ function DayTracker({ trades, onDrill }) {
   );
 }
 
+function hour12Label(h) {
+  const period = h < 12 ? "am" : "pm";
+  let hr = h % 12;
+  if (hr === 0) hr = 12;
+  return `${hr}${period}`;
+}
+
 /* ---------------- Best Time (24h + sessions) ---------------- */
 
 function TimeTracker({ trades, onDrill }) {
@@ -739,7 +759,7 @@ function TimeTracker({ trades, onDrill }) {
       if (isNaN(hr)) return;
       map[hr].push(t);
     });
-    return Array.from({ length: 24 }, (_, h) => ({ hour: h, label: `${String(h).padStart(2, "0")}:00`, ...statsFor(map[h]), list: map[h] }));
+    return Array.from({ length: 24 }, (_, h) => ({ hour: h, label: `${String(h).padStart(2, "0")}:00`, label12: hour12Label(h), ...statsFor(map[h]), list: map[h] }));
   }, [trades]);
 
   const withTrades = byHour.filter(h => h.total > 0);
@@ -789,33 +809,20 @@ function TimeTracker({ trades, onDrill }) {
 
       <div className="tjfx-card p-6">
         <h3 className="font-display text-lg font-bold mb-1">24-Hour Performance</h3>
-        <div className="text-xs text-[#6D6D82] mb-3">Click an hour to see its trades</div>
-        <div style={{ width: "100%", height: 240 }}>
+        <div className="text-xs text-[#6D6D82] mb-3">Click a bar to see its trades</div>
+        <div style={{ width: "100%", height: 260 }}>
           <ResponsiveContainer>
             <BarChart data={byHour} onClick={(e) => e?.activePayload?.[0]?.payload?.total > 0 && openHour(e.activePayload[0].payload)}>
               <CartesianGrid strokeDasharray="3 3" stroke="#F0F0F5" />
-              <XAxis dataKey="label" tick={{ fontSize: 9 }} interval={1} />
+              <XAxis dataKey="label12" tick={{ fontSize: 9 }} interval={1} />
               <YAxis tick={{ fontSize: 10 }} />
-              <Tooltip />
-              <Bar dataKey="pnl" radius={[4, 4, 0, 0]} cursor="pointer">
+              <Tooltip labelFormatter={(_, p) => p?.[0]?.payload?.label12 || ""} />
+              <ReferenceLine y={0} stroke="#16151F" strokeWidth={1.5} />
+              <Bar dataKey="pnl" radius={[4, 4, 0, 0]} cursor="pointer" barSize={16} maxBarSize={16}>
                 {byHour.map((h, i) => <Cell key={i} fill={h.total === 0 ? "#E8E8F1" : h.pnl >= 0 ? "#22C55E" : "#EF4444"} fillOpacity={h.total ? 0.4 + 0.6 * (Math.abs(h.pnl) / maxAbs) : 1} />)}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
-        </div>
-        {/* Hour grid, clickable */}
-        <div className="grid grid-cols-6 md:grid-cols-8 gap-2 mt-4">
-          {byHour.map((h, i) => (
-            <button
-              key={h.hour}
-              onClick={() => h.total > 0 && openHour(h)}
-              disabled={h.total === 0}
-              className={`rounded-lg px-2 py-2 text-center border ${h.total === 0 ? "border-[#F0F0F5] text-[#C7C7D1]" : h.pnl >= 0 ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100" : "border-red-200 bg-red-50 text-red-600 hover:bg-red-100"}`}
-            >
-              <div className="tjfx-mono text-[11px] font-semibold">{h.label}</div>
-              <div className="text-[10px]">{h.total ? `${h.wr}%` : "—"}</div>
-            </button>
-          ))}
         </div>
       </div>
 
