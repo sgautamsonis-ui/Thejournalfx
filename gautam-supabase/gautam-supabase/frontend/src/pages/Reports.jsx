@@ -83,21 +83,45 @@ function getTimeOfDay(date) {
   return "Late (6+)";
 }
 
+// The "Open Preview" button opens the report in a brand-new browser tab
+// (window.open), which mounts a fresh instance of this component with no
+// shared React state. To keep the preview in sync with whatever the user
+// configured in the editor tab (report type, reference date, custom range,
+// included sections), we serialize that config into the URL query string
+// when opening the preview, and read it back out here on mount.
+function readConfigFromSearch(search) {
+  try {
+    const params = new URLSearchParams(search);
+    const cfg = {};
+    if (params.has("type")) cfg.type = params.get("type");
+    if (params.has("dateMode")) cfg.dateMode = params.get("dateMode");
+    if (params.has("from")) cfg.customFrom = params.get("from");
+    if (params.has("to")) cfg.customTo = params.get("to");
+    if (params.has("includes")) {
+      cfg.includes = JSON.parse(params.get("includes"));
+    }
+    return cfg;
+  } catch {
+    return {};
+  }
+}
+
 export default function Reports() {
   const location = useLocation();
   const previewOnly = location.pathname === "/reports-preview";
   const { user } = useAuth();
-  const [type, setType] = useState("daily");
+  const initialConfig = useMemo(() => readConfigFromSearch(location.search), []); // eslint-disable-line react-hooks/exhaustive-deps
+  const [type, setType] = useState(initialConfig.type || "daily");
   const [date, setDate] = useState(toDateStr(new Date()));
   // Bank-style reference date picker: a quick preset dropdown, with a manual
   // From/To range that only appears when "Custom Date Range" is chosen.
-  const [dateMode, setDateMode] = useState("current_month");
-  const [customFrom, setCustomFrom] = useState(toDateStr(new Date()));
-  const [customTo, setCustomTo] = useState(toDateStr(new Date()));
+  const [dateMode, setDateMode] = useState(initialConfig.dateMode || "current_month");
+  const [customFrom, setCustomFrom] = useState(initialConfig.customFrom || toDateStr(new Date()));
+  const [customTo, setCustomTo] = useState(initialConfig.customTo || toDateStr(new Date()));
   const style = "professional";
   const timeFormat24 = user?.settings?.report_time_format === "24h";
   const [aiSummary, setAiSummary] = useState(null);
-  
+
   const [includes, setIncludes] = useState({
     weeklyBias: true,
     dailyBias: true,
@@ -110,6 +134,7 @@ export default function Reports() {
     riskMetrics: true,
     aiSummary: true,
     tradeAnalysis: true,
+    ...(initialConfig.includes || {}),
   });
 
   const [trades, setTrades] = useState([]);
@@ -352,7 +377,19 @@ Recommendations:
           <div className="flex flex-col sm:flex-row gap-2">
             {!previewOnly && <button
               type="button"
-              onClick={() => window.open("/reports-preview", "_blank", "noopener,noreferrer")}
+              onClick={() => {
+                // Carry the current report config (type, reference date /
+                // custom range, included sections) over to the preview tab
+                // via the URL, since window.open starts a fresh component
+                // instance with no shared state.
+                const params = new URLSearchParams();
+                params.set("type", type);
+                params.set("dateMode", dateMode);
+                params.set("from", customFrom);
+                params.set("to", customTo);
+                params.set("includes", JSON.stringify(includes));
+                window.open(`/reports-preview?${params.toString()}`, "_blank", "noopener,noreferrer");
+              }}
               className="h-10 px-4 rounded-xl border border-[#7C3AED] text-[#7C3AED] hover:bg-[#F3E8FF] text-sm font-medium flex items-center justify-center gap-2 transition-all"
             >
               <FileText className="w-4 h-4" /> Open Preview
