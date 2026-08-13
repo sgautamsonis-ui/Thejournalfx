@@ -64,19 +64,38 @@ const DATE_MODE_OPTIONS = () => {
   ];
 };
 
-function formatTime(date, format24 = false) {
-  if (!date) return "—";
-  const d = new Date(date);
+// entry_time is stored as a plain "HH:MM" string (no date/timezone attached),
+// so this only reformats the displayed hour style — it never shifts the
+// actual time, which would require a timezone we don't have.
+function formatTime(hhmm, format24 = false) {
+  if (!hhmm) return "—";
+  const m = /^(\d{1,2}):(\d{2})/.exec(hhmm);
+  if (!m) return hhmm;
+  let h = parseInt(m[1], 10);
+  const min = m[2];
   if (format24) {
-    return d.toLocaleString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
+    return `${String(h).padStart(2, "0")}:${min}`;
   }
-  return d.toLocaleString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true });
+  const suffix = h >= 12 ? "PM" : "AM";
+  h = h % 12;
+  if (h === 0) h = 12;
+  return `${h}:${min} ${suffix}`;
 }
 
-function getTimeOfDay(date) {
-  if (!date) return "Unknown";
-  const d = new Date(date);
-  const hour = d.getHours();
+const REPORT_TIMEZONE_LABELS = {
+  "Asia/Kolkata": "India Standard Time (IST)",
+  "UTC": "UTC",
+  "America/New_York": "New York (EST/EDT)",
+  "Europe/London": "London (GMT/BST)",
+};
+
+function getTimeOfDay(entryTimeOrDate) {
+  if (!entryTimeOrDate) return "Unknown";
+  // entry_time is "HH:MM"; fall back to parsing a full date string only if
+  // that's what was actually passed in (e.g. trade.date).
+  const hhmm = /^(\d{1,2}):(\d{2})/.exec(entryTimeOrDate);
+  const hour = hhmm ? parseInt(hhmm[1], 10) : new Date(entryTimeOrDate).getHours();
+  if (Number.isNaN(hour)) return "Unknown";
   if (hour < 12) return "Morning (9-12)";
   if (hour < 15) return "Afternoon (12-3)";
   if (hour < 18) return "Evening (3-6)";
@@ -562,6 +581,7 @@ Recommendations:
                       includes={includes}
                       style={style}
                       timeFormat24={timeFormat24}
+                      reportTimezone={user?.settings?.report_timezone || "Asia/Kolkata"}
                       aiSummary={aiSummary}
                     />
                   )}
@@ -585,6 +605,7 @@ function ReportBody({
   includes,
   style,
   timeFormat24,
+  reportTimezone,
   aiSummary,
 }) {
   return (
@@ -608,6 +629,9 @@ function ReportBody({
             {range.start} → {range.end}
           </div>
           <div className="text-[10px] text-[#A1A1AA] tjfx-mono mt-1">{reportId}</div>
+          <div className="text-[10px] text-[#A1A1AA] mt-1">
+            Times shown in: {REPORT_TIMEZONE_LABELS[reportTimezone] || reportTimezone}
+          </div>
         </div>
       </div>
 
@@ -829,7 +853,7 @@ function ReportBody({
               <table className="w-full text-[11px]">
                 <thead className="bg-[#F6F6FB] text-[#6D6D82]">
                   <tr>
-                    {["Date", "Symbol", "Dir", "Entry", "Exit", "SL", "TP", "R", "P&L", "Status"].map(
+                    {["Date", "Time", "Symbol", "Dir", "Entry", "Exit", "SL", "TP", "R", "P&L", "Status"].map(
                       (h) => (
                         <th
                           key={h}
@@ -850,6 +874,9 @@ function ReportBody({
                       }`}
                     >
                       <td className="px-2 py-2 tjfx-mono text-[#6D6D82]">{t.date}</td>
+                      <td className="px-2 py-2 tjfx-mono text-[#6D6D82]">
+                        {formatTime(t.entry_time, timeFormat24)}
+                      </td>
                       <td className="px-2 py-2 font-semibold tjfx-mono">{t.symbol}</td>
                       <td
                         className={`px-2 py-2 ${

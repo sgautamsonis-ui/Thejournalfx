@@ -2,9 +2,49 @@ import React, { useEffect, useState } from "react";
 import { settingsApi, accountsApi, prefsApi } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
-import { Trash2, Plus, Pencil, Check, X, Save } from "lucide-react";
+import { Trash2, Plus, Pencil, Check, X, Save, CheckCircle2 } from "lucide-react";
 
-const TABS = ["Profile","Accounts","Preferences","Trade Presets","Bias Presets","Appearance"];
+const TABS = ["Profile","Trade Presets","Bias Presets"];
+
+// Small reusable hook that shows a "Saved ✓" confirmation on a save button
+// for a couple seconds after a successful save, instead of the button just
+// silently reverting back to its idle label with no feedback.
+function useSaveFeedback() {
+  const [state, setState] = useState("idle"); // idle | saving | saved
+  const run = async (fn) => {
+    setState("saving");
+    try {
+      await fn();
+      setState("saved");
+      setTimeout(() => setState("idle"), 1800);
+    } catch (e) {
+      setState("idle");
+      throw e;
+    }
+  };
+  return [state, run];
+}
+
+function SaveButton({ state, onClick, idleLabel, testId }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={state === "saving"}
+      data-testid={testId}
+      className="h-10 px-5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-sm font-semibold disabled:opacity-60 flex items-center gap-2"
+    >
+      {state === "saved" && <CheckCircle2 className="w-4 h-4" />}
+      {state === "saving" ? "Saving..." : state === "saved" ? "Saved" : idleLabel}
+    </button>
+  );
+}
+
+const PROP_FIRM_TYPES = ["1 Step", "2 Step", "Instant"];
+const PROP_FIRM_PRESETS = {
+  "1 Step": { maxDrawdown: 10, profitTarget: 8 },
+  "2 Step": { maxDrawdown: 10, profitTarget: 8 },
+  "Instant": { maxDrawdown: 6, profitTarget: 10 },
+};
 
 const PRESET_KINDS = [
   { kind: "strategy", label: "Strategies", hint: "Dropdown in Add Trade → Strategy" },
@@ -24,12 +64,14 @@ const BIAS_KINDS = [
   { kind: "key_level_daily", label: "Daily Key Levels", hint: "Preset names shown in Bias Center → Daily tab" },
 ];
 
+const EMPTY_NEW_ACC = { name: "", broker: "", account_type: "Live", balance: 10000, currency: "USD", dailyLimit: "", weeklyLimit: "", propFirmType: "", maxDrawdown: "", profitTarget: "" };
+
 export default function Settings() {
   const { refresh } = useAuth();
-  const [tab, setTab] = useState("Trade Presets");
+  const [tab, setTab] = useState("Profile");
   const [settings, setSettings] = useState({});
   const [accounts, setAccounts] = useState([]);
-  const [newAcc, setNewAcc] = useState({ name: "", broker: "", account_type: "Live", balance: 10000, currency: "USD", dailyLimit: "", weeklyLimit: "" });
+  const [newAcc, setNewAcc] = useState(EMPTY_NEW_ACC);
   const [editAcc, setEditAcc] = useState(null);
 
   useEffect(() => {
@@ -37,18 +79,29 @@ export default function Settings() {
     accountsApi.list().then(setAccounts).catch(()=>{});
   }, []);
 
+  // Persists whatever is currently in `settings` (risk %, report time
+  // format, report timezone, account drawdown/prop-firm limits, ...).
+  // Different cards below share this one function since they all just
+  // read/write into the same `settings` object.
   const savePrefs = async () => {
-    try { const merged = await settingsApi.update(settings); setSettings(merged); await refresh(); toast.success("Settings saved"); }
-    catch { toast.error("Could not save settings — please try again."); }
+    const merged = await settingsApi.update(settings);
+    setSettings(merged);
+    await refresh();
   };
 
-  const saveAccountLimits = async (accountId, dailyLimit, weeklyLimit) => {
+  // Per-account extras (daily/weekly DD limits + prop firm type/DD/target)
+  // are stored inside settings.account_limits[accountId], the same place
+  // the daily/weekly limits already lived — no database migration needed.
+  const saveAccountLimits = async (accountId, extra) => {
     const nextLimits = { ...(settings.account_limits || {}) };
-    if (dailyLimit || weeklyLimit) {
-      nextLimits[accountId] = {
-        daily: dailyLimit ? parseFloat(dailyLimit) : undefined,
-        weekly: weeklyLimit ? parseFloat(weeklyLimit) : undefined,
-      };
+    const clean = {};
+    if (extra.dailyLimit) clean.daily = parseFloat(extra.dailyLimit);
+    if (extra.weeklyLimit) clean.weekly = parseFloat(extra.weeklyLimit);
+    if (extra.propFirmType) clean.propFirmType = extra.propFirmType;
+    if (extra.maxDrawdown) clean.maxDrawdown = parseFloat(extra.maxDrawdown);
+    if (extra.profitTarget) clean.profitTarget = parseFloat(extra.profitTarget);
+    if (Object.keys(clean).length) {
+      nextLimits[accountId] = clean;
     } else {
       delete nextLimits[accountId];
     }
@@ -57,18 +110,20 @@ export default function Settings() {
       setSettings(merged);
       await refresh();
     } catch {
-      toast.error("Could not save drawdown limits — please try again.");
+      toast.error("Could not save account limits — please try again.");
     }
   };
 
   const addAccount = async () => {
     if (!newAcc.name) { toast.error("Account name is required"); return; }
     try {
-      const { dailyLimit, weeklyLimit, ...accPayload } = newAcc;
+      const { dailyLimit, weeklyLimit, propFirmType, maxDrawdown, profitTarget, ...accPayload } = newAcc;
       const a = await accountsApi.create(accPayload);
       setAccounts(prev => [...prev, a]);
-      if (dailyLimit || weeklyLimit) await saveAccountLimits(a.id, dailyLimit, weeklyLimit);
-      setNewAcc({ name: "", broker: "", account_type: "Live", balance: 10000, currency: "USD", dailyLimit: "", weeklyLimit: "" });
+      if (dailyLimit || weeklyLimit || propFirmType || maxDrawdown || profitTarget) {
+        await saveAccountLimits(a.id, { dailyLimit, weeklyLimit, propFirmType, maxDrawdown, profitTarget });
+      }
+      setNewAcc(EMPTY_NEW_ACC);
       toast.success("Account added");
     } catch {
       toast.error("Could not add account — please try again.");
@@ -85,15 +140,16 @@ export default function Settings() {
       id: a.id, name: a.name, broker: a.broker || "", account_type: a.account_type || "Live",
       balance: a.balance, currency: a.currency || "USD",
       dailyLimit: limits.daily ?? "", weeklyLimit: limits.weekly ?? "",
+      propFirmType: limits.propFirmType ?? "", maxDrawdown: limits.maxDrawdown ?? "", profitTarget: limits.profitTarget ?? "",
     });
   };
   const saveEditAcc = async () => {
     if (!editAcc?.name) { toast.error("Account name is required"); return; }
     try {
-      const { id, dailyLimit, weeklyLimit, ...accPayload } = editAcc;
+      const { id, dailyLimit, weeklyLimit, propFirmType, maxDrawdown, profitTarget, ...accPayload } = editAcc;
       const updated = await accountsApi.update(id, { ...accPayload, balance: parseFloat(accPayload.balance) || 0 });
       setAccounts(prev => prev.map(a => a.id === id ? updated : a));
-      await saveAccountLimits(id, dailyLimit, weeklyLimit);
+      await saveAccountLimits(id, { dailyLimit, weeklyLimit, propFirmType, maxDrawdown, profitTarget });
       setEditAcc(null);
       toast.success("Account updated");
     } catch {
@@ -116,18 +172,28 @@ export default function Settings() {
         </div>
 
         <div className="col-span-12 md:col-span-9 space-y-4">
-          {tab==="Preferences" && (
-            <div className="tjfx-card p-6 space-y-4">
-              <h3 className="font-display text-lg font-bold">Trading Preferences</h3>
-              <div className="grid md:grid-cols-2 gap-4">
-                <Field label="Currency"><select value={settings.currency||"USD"} onChange={e=>setSettings({...settings,currency:e.target.value})} className="inp">{["USD","INR","EUR","GBP"].map(x=><option key={x}>{x}</option>)}</select></Field>
-                <Field label="Default Risk %"><input type="number" step="0.1" value={settings.risk_percent||1} onChange={e=>setSettings({...settings,risk_percent:parseFloat(e.target.value)||0})} className="inp"/></Field>
-                <Field label="Default Session"><select value={settings.default_session||"London"} onChange={e=>setSettings({...settings,default_session:e.target.value})} className="inp">{["Asian","London","New York","Overlap"].map(x=><option key={x}>{x}</option>)}</select></Field>
-                <Field label="Timezone"><input value={settings.timezone||"UTC"} onChange={e=>setSettings({...settings,timezone:e.target.value})} className="inp"/></Field>
-                <Field label="Report time format"><select value={settings.report_time_format||"12h"} onChange={e=>setSettings({...settings,report_time_format:e.target.value})} className="inp"><option value="12h">12-hour (AM / PM)</option><option value="24h">24-hour</option></select></Field>
-                <Field label="Report timezone"><select value={settings.report_timezone||"Asia/Kolkata"} onChange={e=>setSettings({...settings,report_timezone:e.target.value})} className="inp"><option value="Asia/Kolkata">India Standard Time (IST)</option><option value="UTC">UTC</option><option value="America/New_York">New York (EST/EDT)</option><option value="Europe/London">London (GMT/BST)</option></select></Field>
-              </div>
-              <button onClick={savePrefs} className="h-10 px-5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-sm font-semibold" data-testid="save-prefs">Save Preferences</button>
+          {tab==="Profile" && (
+            <div className="space-y-5">
+              <ProfileTab/>
+
+              {/* TRADING DEFAULTS — just Risk %, the only Preferences field that was actually wired up anywhere (AddTrade / TradeView). */}
+              <RiskSection settings={settings} setSettings={setSettings} savePrefs={savePrefs}/>
+
+              {/* TIME — report time format actually reformats the Trades table in
+                  Reports now; report timezone is shown as a label on the report
+                  header (entry times are stored as plain "HH:MM" with no source
+                  timezone, so a real conversion isn't reliable). */}
+              <TimeSection settings={settings} setSettings={setSettings} savePrefs={savePrefs}/>
+
+              <AppearanceTab/>
+
+              <AccountsSection
+                settings={settings} accounts={accounts}
+                newAcc={newAcc} setNewAcc={setNewAcc}
+                editAcc={editAcc} setEditAcc={setEditAcc}
+                addAccount={addAccount} delAcc={delAcc}
+                startEditAcc={startEditAcc} saveEditAcc={saveEditAcc}
+              />
             </div>
           )}
 
@@ -142,9 +208,84 @@ export default function Settings() {
               <BiasPresetTabs/>
             </div>
           )}
+        </div>
+      </div>
 
-          {tab==="Accounts" && (
-            <div className="tjfx-card p-6">
+      <style>{`.inp{width:100%;height:40px;padding:0 12px;border:1px solid #E8E8F1;border-radius:12px;outline:none;font-size:14px;background:#fff}.inp:focus{border-color:#7C3AED}`}</style>
+    </div>
+  );
+}
+
+function RiskSection({ settings, setSettings, savePrefs }) {
+  const [state, run] = useSaveFeedback();
+  return (
+    <div className="tjfx-card p-6 space-y-4" data-testid="risk-section">
+      <div>
+        <h3 className="font-display text-lg font-bold">Trading Defaults</h3>
+        <p className="text-sm text-[#6D6D82]">Used to size positions in Add Trade.</p>
+      </div>
+      <div className="max-w-xs">
+        <Field label="Default Risk % per trade">
+          <input type="number" step="0.1" value={settings.risk_percent ?? 1} onChange={e=>setSettings({...settings,risk_percent:parseFloat(e.target.value)||0})} className="inp" data-testid="risk-percent-input"/>
+        </Field>
+      </div>
+      <SaveButton state={state} idleLabel="Save Trading Defaults" testId="save-risk" onClick={()=>run(async()=>{ await savePrefs(); toast.success("Trading defaults saved"); }).catch(()=>toast.error("Could not save — please try again."))}/>
+    </div>
+  );
+}
+
+function TimeSection({ settings, setSettings, savePrefs }) {
+  const [state, run] = useSaveFeedback();
+  return (
+    <div className="tjfx-card p-6 space-y-4" data-testid="time-section">
+      <div>
+        <h3 className="font-display text-lg font-bold">Time</h3>
+        <p className="text-sm text-[#6D6D82]">Controls how times are displayed in your exported Reports.</p>
+      </div>
+      <div className="grid md:grid-cols-2 gap-4">
+        <Field label="Report time format">
+          <select value={settings.report_time_format||"12h"} onChange={e=>setSettings({...settings,report_time_format:e.target.value})} className="inp" data-testid="report-time-format-input">
+            <option value="12h">12-hour (AM / PM)</option>
+            <option value="24h">24-hour</option>
+          </select>
+        </Field>
+        <Field label="Report timezone">
+          <select value={settings.report_timezone||"Asia/Kolkata"} onChange={e=>setSettings({...settings,report_timezone:e.target.value})} className="inp" data-testid="report-timezone-input">
+            <option value="Asia/Kolkata">India Standard Time (IST)</option>
+            <option value="UTC">UTC</option>
+            <option value="America/New_York">New York (EST/EDT)</option>
+            <option value="Europe/London">London (GMT/BST)</option>
+          </select>
+        </Field>
+      </div>
+      <SaveButton state={state} idleLabel="Save Time Settings" testId="save-time" onClick={()=>run(async()=>{ await savePrefs(); toast.success("Time settings saved"); }).catch(()=>toast.error("Could not save — please try again."))}/>
+    </div>
+  );
+}
+
+function AccountsSection({ settings, accounts, newAcc, setNewAcc, editAcc, setEditAcc, addAccount, delAcc, startEditAcc, saveEditAcc }) {
+  const onPropFirmType = (t, setter, current) => {
+    const preset = PROP_FIRM_PRESETS[t] || {};
+    setter({
+      ...current,
+      propFirmType: t,
+      maxDrawdown: current.maxDrawdown || (preset.maxDrawdown ?? ""),
+      profitTarget: current.profitTarget || (preset.profitTarget ?? ""),
+    });
+  };
+  const limitBadge = (a) => {
+    const l = settings.account_limits?.[a.id];
+    if (!l) return null;
+    const parts = [];
+    if (l.propFirmType) parts.push(l.propFirmType);
+    if (l.maxDrawdown) parts.push(`Max DD ${l.maxDrawdown}%`);
+    if (l.profitTarget) parts.push(`Target ${l.profitTarget}%`);
+    if (l.daily) parts.push(`Daily limit $${l.daily}`);
+    if (l.weekly) parts.push(`Weekly limit $${l.weekly}`);
+    return parts.length ? <span className="ml-2 text-[#7C3AED]">{parts.join(" • ")}</span> : null;
+  };
+  return (
+            <div className="tjfx-card p-6" data-testid="accounts-section">
               <h3 className="font-display text-lg font-bold mb-1">Trading Accounts</h3>
               <p className="text-xs text-[#6D6D82] mb-4">Optionally set Daily / Weekly Drawdown Limits per account — they'll show next to your actual drawdown in the sidebar.</p>
               <div className="grid md:grid-cols-6 gap-2 mb-2">
@@ -155,6 +296,16 @@ export default function Settings() {
                 <input type="number" value={newAcc.dailyLimit} onChange={e=>setNewAcc({...newAcc,dailyLimit:e.target.value})} placeholder="Daily DD limit" className="inp"/>
                 <input type="number" value={newAcc.weeklyLimit} onChange={e=>setNewAcc({...newAcc,weeklyLimit:e.target.value})} placeholder="Weekly DD limit" className="inp"/>
               </div>
+              {newAcc.account_type === "Prop Firm" && (
+                <div className="grid md:grid-cols-3 gap-2 mb-2 p-3 rounded-xl bg-[#F3E8FF]/40 border border-[#7C3AED]/20" data-testid="new-acc-prop-firm-fields">
+                  <select value={newAcc.propFirmType} onChange={e=>onPropFirmType(e.target.value, setNewAcc, newAcc)} className="inp" data-testid="new-acc-prop-firm-type">
+                    <option value="">Prop Firm Type</option>
+                    {PROP_FIRM_TYPES.map(x=><option key={x} value={x}>{x}</option>)}
+                  </select>
+                  <input type="number" value={newAcc.maxDrawdown} onChange={e=>setNewAcc({...newAcc,maxDrawdown:e.target.value})} placeholder="Max Drawdown %" className="inp" data-testid="new-acc-max-dd"/>
+                  <input type="number" value={newAcc.profitTarget} onChange={e=>setNewAcc({...newAcc,profitTarget:e.target.value})} placeholder="Profit Target %" className="inp" data-testid="new-acc-profit-target"/>
+                </div>
+              )}
               <button onClick={addAccount} className="h-10 px-5 mb-4 rounded-xl bg-[#7C3AED] text-white font-semibold">+ Add Account</button>
               <div className="space-y-2">
                 {accounts.map(a => editAcc?.id === a.id ? (
@@ -167,6 +318,16 @@ export default function Settings() {
                       <input type="number" value={editAcc.dailyLimit} onChange={e=>setEditAcc({...editAcc,dailyLimit:e.target.value})} placeholder="Daily DD limit" className="inp"/>
                       <input type="number" value={editAcc.weeklyLimit} onChange={e=>setEditAcc({...editAcc,weeklyLimit:e.target.value})} placeholder="Weekly DD limit" className="inp"/>
                     </div>
+                    {editAcc.account_type === "Prop Firm" && (
+                      <div className="grid md:grid-cols-3 gap-2 p-3 rounded-xl bg-[#F3E8FF]/40 border border-[#7C3AED]/20" data-testid={`account-edit-prop-firm-${a.id}`}>
+                        <select value={editAcc.propFirmType} onChange={e=>onPropFirmType(e.target.value, setEditAcc, editAcc)} className="inp">
+                          <option value="">Prop Firm Type</option>
+                          {PROP_FIRM_TYPES.map(x=><option key={x} value={x}>{x}</option>)}
+                        </select>
+                        <input type="number" value={editAcc.maxDrawdown} onChange={e=>setEditAcc({...editAcc,maxDrawdown:e.target.value})} placeholder="Max Drawdown %" className="inp"/>
+                        <input type="number" value={editAcc.profitTarget} onChange={e=>setEditAcc({...editAcc,profitTarget:e.target.value})} placeholder="Profit Target %" className="inp"/>
+                      </div>
+                    )}
                     <div className="flex gap-2">
                       <button onClick={saveEditAcc} className="h-9 px-4 rounded-lg bg-[#7C3AED] text-white text-sm font-semibold flex items-center gap-1.5"><Save className="w-3.5 h-3.5"/> Save</button>
                       <button onClick={()=>setEditAcc(null)} className="h-9 px-4 rounded-lg border border-[#E8E8F1] text-sm font-medium text-[#6D6D82]">Cancel</button>
@@ -178,13 +339,7 @@ export default function Settings() {
                       <div className="font-semibold">{a.name}</div>
                       <div className="text-xs text-[#6D6D82]">
                         {a.broker} • {a.account_type}
-                        {settings.account_limits?.[a.id] && (
-                          <span className="ml-2 text-[#7C3AED]">
-                            {settings.account_limits[a.id].daily ? `Daily limit $${settings.account_limits[a.id].daily}` : ""}
-                            {settings.account_limits[a.id].daily && settings.account_limits[a.id].weekly ? " • " : ""}
-                            {settings.account_limits[a.id].weekly ? `Weekly limit $${settings.account_limits[a.id].weekly}` : ""}
-                          </span>
-                        )}
+                        {limitBadge(a)}
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
@@ -197,16 +352,6 @@ export default function Settings() {
                 {accounts.length===0 && <div className="text-sm text-[#6D6D82]">No accounts yet.</div>}
               </div>
             </div>
-          )}
-
-          {tab==="Profile" && <ProfileTab/>}
-
-          {tab==="Appearance" && <AppearanceTab/>}
-        </div>
-      </div>
-
-      <style>{`.inp{width:100%;height:40px;padding:0 12px;border:1px solid #E8E8F1;border-radius:12px;outline:none;font-size:14px;background:#fff}.inp:focus{border-color:#7C3AED}`}</style>
-    </div>
   );
 }
 
@@ -304,12 +449,12 @@ const Field = ({ label, children }) => (
 function ProfileTab() {
   const { user, refresh } = useAuth();
   const [name, setName] = React.useState(user?.settings?.display_name || user?.name || "");
-  const [saving, setSaving] = React.useState(false);
-  const save = async () => {
-    setSaving(true);
-    try { await settingsApi.update({ display_name: name.trim() }); await refresh(); toast.success("Profile updated"); }
-    catch { toast.error("Save failed"); } finally { setSaving(false); }
-  };
+  const [state, run] = useSaveFeedback();
+  const save = () => run(async () => {
+    await settingsApi.update({ display_name: name.trim() });
+    await refresh();
+    toast.success("Profile updated");
+  }).catch(() => toast.error("Save failed"));
   return (
     <div className="tjfx-card p-6 space-y-5" data-testid="profile-tab">
       <div className="flex items-center gap-4">
@@ -324,9 +469,7 @@ function ProfileTab() {
       <Field label="Display name (shown across the app)">
         <input value={name} onChange={e=>setName(e.target.value)} className="inp" data-testid="profile-display-name" placeholder="How would you like to be called?"/>
       </Field>
-      <button onClick={save} disabled={saving} data-testid="profile-save" className="h-10 px-5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-sm font-semibold disabled:opacity-60">
-        {saving?"Saving...":"Save Profile"}
-      </button>
+      <SaveButton state={state} idleLabel="Save Profile" testId="profile-save" onClick={save}/>
     </div>
   );
 }
@@ -345,12 +488,12 @@ const QUOTES = [
 function AppearanceTab() {
   const { user, refresh } = useAuth();
   const [motivation, setMotivation] = React.useState(user?.settings?.motivation || QUOTES[0]);
-  const [saving, setSaving] = React.useState(false);
-  const save = async () => {
-    setSaving(true);
-    try { await settingsApi.update({ motivation: motivation.trim() }); await refresh(); toast.success("Motivation updated"); }
-    catch { toast.error("Save failed"); } finally { setSaving(false); }
-  };
+  const [state, run] = useSaveFeedback();
+  const save = () => run(async () => {
+    await settingsApi.update({ motivation: motivation.trim() });
+    await refresh();
+    toast.success("Motivation updated");
+  }).catch(() => toast.error("Save failed"));
   return (
     <div className="tjfx-card p-6 space-y-5" data-testid="appearance-tab">
       <div>
@@ -364,9 +507,7 @@ function AppearanceTab() {
           {QUOTES.map(q => <button key={q} onClick={()=>setMotivation(q)} className={`chip text-left ${motivation===q?"active":""}`} style={{maxWidth:340}}>{q}</button>)}
         </div>
       </div>
-      <button onClick={save} disabled={saving} data-testid="motivation-save" className="h-10 px-5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-sm font-semibold disabled:opacity-60">
-        {saving?"Saving...":"Save Motivation"}
-      </button>
+      <SaveButton state={state} idleLabel="Save Motivation" testId="motivation-save" onClick={save}/>
       <div className="pt-4 border-t border-[#E8E8F1]">
         <div className="text-sm text-[#6D6D82]">Theme: Light with purple accent. Dark mode coming soon.</div>
       </div>
