@@ -57,6 +57,7 @@ export default function AddTrade() {
   });
   const [htfDraft, setHtfDraft] = useState({ timeframe: "", type: "" });
   const [entryDraft, setEntryDraft] = useState({ timeframe: "", type: "" });
+  const [moodDraft, setMoodDraft] = useState({ before: "", during: "", after: "" });
 
   useEffect(() => {
     const kinds = ["symbol","strategy","session","mood","mistake","strength","setup_tag","htf_poi_type","htf_timeframe","entry_confirmation_type","entry_timeframe"];
@@ -224,6 +225,7 @@ export default function AddTrade() {
 
   return <AddTradeWorkspace t={t} setT={setT} presets={presets} accounts={accounts} computed={computed} recommendedLot={recommendedLot}
     htfDraft={htfDraft} setHtfDraft={setHtfDraft} entryDraft={entryDraft} setEntryDraft={setEntryDraft}
+    moodDraft={moodDraft} setMoodDraft={setMoodDraft}
     addPairedPreset={addPairedPreset} removePairedPreset={removePairedPreset} toggle={toggle}
     saving={saving} save={save} onFile={onFile} uploadingCount={uploadingCount} tradeLocked={dailyDrawdownLocked} drawdownInfo={dailyDrawdownInfo} />;
 
@@ -482,6 +484,31 @@ function ChipBlock({ title, items, selected, onToggle }) {
   );
 }
 
+function MoodPresetPicker({ label, items, draft, onDraftChange, selected, onAdd, onRemove, testid }) {
+  return (
+    <div>
+      <div className="text-[12px] text-[#6D6D82] mb-1.5">{label}</div>
+      <div className="flex flex-col sm:flex-row gap-2">
+        <select value={draft} onChange={e=>onDraftChange(e.target.value)} className={inp} data-testid={`${testid}-select`}>
+          <option value="">Select mood...</option>
+          {items.map(v => <option key={v} value={v}>{v}</option>)}
+        </select>
+        <button type="button" onClick={onAdd} data-testid={`${testid}-add`} className="h-10 px-4 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-sm font-semibold shrink-0 sm:w-auto">+ Add</button>
+      </div>
+      {selected.length > 0 ? (
+        <div className="flex flex-wrap gap-2 mt-3">
+          {selected.map(v => (
+            <span key={v} className="chip active inline-flex items-center gap-1.5 pr-1">
+              {v}
+              <button type="button" onClick={()=>onRemove(v)} aria-label={`Remove ${v}`} className="w-5 h-5 rounded-full hover:bg-white/60 flex items-center justify-center"><X className="w-3 h-3"/></button>
+            </span>
+          ))}
+        </div>
+      ) : <div className="mt-3 text-xs text-[#A1A1AA]">No selections yet.</div>}
+    </div>
+  );
+}
+
 function ChipRow({ label, items, selected, onToggle }) {
   return (
     <div>
@@ -493,7 +520,7 @@ function ChipRow({ label, items, selected, onToggle }) {
   );
 }
 
-function AddTradeWorkspace({ t, setT, presets, accounts, computed, recommendedLot, htfDraft, setHtfDraft, entryDraft, setEntryDraft, addPairedPreset, removePairedPreset, toggle, saving, save, onFile, uploadingCount, tradeLocked, drawdownInfo }) {
+function AddTradeWorkspace({ t, setT, presets, accounts, computed, recommendedLot, htfDraft, setHtfDraft, entryDraft, setEntryDraft, moodDraft, setMoodDraft, addPairedPreset, removePairedPreset, toggle, saving, save, onFile, uploadingCount, tradeLocked, drawdownInfo }) {
   const chooseStrategy = (strategy) => setT({ ...t, strategy });
   return (
     <div className="add-trade-page compact-add-trade p-4 sm:p-5 lg:p-6 max-w-[1500px] mx-auto space-y-4" data-testid="add-trade-page">
@@ -515,12 +542,27 @@ function AddTradeWorkspace({ t, setT, presets, accounts, computed, recommendedLo
 
           <section className="tjfx-card p-6 space-y-5">
             <SectionHeading number="5" title="Psychology & Mood" subtitle="Record your state before, during and after the trade" />
-            <ChipRow label="Mood Before" items={presets.mood} selected={t.mood_before} onToggle={x=>toggle("mood_before",x)}/>
+            <MoodPresetPicker
+              label="Mood Before" items={presets.mood} draft={moodDraft.before}
+              onDraftChange={v=>setMoodDraft({...moodDraft, before:v})} selected={t.mood_before}
+              onAdd={()=>{ if (moodDraft.before && !t.mood_before.includes(moodDraft.before)) toggle("mood_before", moodDraft.before); setMoodDraft({...moodDraft, before:""}); }}
+              onRemove={v=>toggle("mood_before", v)} testid="mood-before"
+            />
             <div>
-              <ChipRow label="Mood During" items={presets.mood} selected={t.mood_during} onToggle={x=>toggle("mood_during",x)}/>
+              <MoodPresetPicker
+                label="Mood During" items={presets.mood} draft={moodDraft.during}
+                onDraftChange={v=>setMoodDraft({...moodDraft, during:v})} selected={t.mood_during}
+                onAdd={()=>{ if (moodDraft.during && !t.mood_during.includes(moodDraft.during)) toggle("mood_during", moodDraft.during); setMoodDraft({...moodDraft, during:""}); }}
+                onRemove={v=>toggle("mood_during", v)} testid="mood-during"
+              />
               <textarea value={t.mood_during_notes} onChange={e=>setT({...t,mood_during_notes:e.target.value})} rows={3} className="w-full mt-2.5 p-3 rounded-xl border border-[#E8E8F1] focus:border-[#7C3AED] outline-none text-sm" placeholder="What were you thinking/feeling while the trade was running?"/>
             </div>
-            <ChipRow label="Mood After" items={presets.mood} selected={t.mood_after} onToggle={x=>toggle("mood_after",x)}/>
+            <MoodPresetPicker
+              label="Mood After" items={presets.mood} draft={moodDraft.after}
+              onDraftChange={v=>setMoodDraft({...moodDraft, after:v})} selected={t.mood_after}
+              onAdd={()=>{ if (moodDraft.after && !t.mood_after.includes(moodDraft.after)) toggle("mood_after", moodDraft.after); setMoodDraft({...moodDraft, after:""}); }}
+              onRemove={v=>toggle("mood_after", v)} testid="mood-after"
+            />
             <div><ChipRow label="Setup Tags" items={presets.setup_tag} selected={t.setup_tags} onToggle={x=>toggle("setup_tags",x)}/></div>
             <div>
               <div className="text-[12px] text-[#6D6D82] mb-2">Notes</div>
