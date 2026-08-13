@@ -322,7 +322,7 @@ function MoodTracker({ trades, onDrill }) {
   const byMood = useMemo(() => {
     const map = {};
     trades.forEach(t => {
-      const moods = new Set([...(t.mood_before || []), ...(t.mood_after || [])]);
+      const moods = new Set([...(t.mood_before || []), ...(t.mood_during || []), ...(t.mood_after || [])]);
       moods.forEach(m => {
         if (!map[m]) map[m] = [];
         map[m].push(t);
@@ -351,7 +351,7 @@ function MoodTracker({ trades, onDrill }) {
     trades.forEach(t => {
       const d = t.date;
       if (!d) return;
-      const moods = new Set([...(t.mood_before || []), ...(t.mood_after || [])]);
+      const moods = new Set([...(t.mood_before || []), ...(t.mood_during || []), ...(t.mood_after || [])]);
       const pos = [...moods].some(m => POSITIVE_MOODS.has(m));
       const neg = [...moods].some(m => NEGATIVE_MOODS.has(m));
       if (!map[d]) map[d] = { pos: 0, neg: 0, total: 0 };

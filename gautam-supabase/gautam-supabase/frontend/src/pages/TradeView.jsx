@@ -21,18 +21,18 @@ export default function TradeView() {
   const [sortBy, setSortBy] = useState("newest");
 
   const [presets, setPresets] = useState({
-    symbol: [], strategy: [], session: [], htf_poi: [], entry_tag: [], mood: [], mistake: [], strength: [],
+    symbol: [], strategy: [], session: [], htf_poi: [], entry_tag: [], mood: [], mistake: [], strength: [], setup_tag: [],
   });
 
   const load = () => tradesApi.list().then(setTrades).catch(()=>{});
   useEffect(() => {
     load();
-    prefsApi.listMany(["symbol","strategy","session","htf_poi","entry_tag","mood","mistake","strength"])
+    prefsApi.listMany(["symbol","strategy","session","htf_poi","entry_tag","mood","mistake","strength","setup_tag"])
       .then(prefData => setPresets(p => ({ ...p, ...Object.fromEntries(Object.entries(prefData).map(([k, v]) => [k, v.map(x => x.value)])) })))
       .catch(()=>{});
   }, []);
 
-  const emptyFilters = { symbols: [], directions: [], sessions: [], strategies: [], htf_poi: [], entry_tags: [], moods: [], mistakes: [], strengths: [], dateFrom: "", dateTo: "", minR: "", maxR: "", minPnl: "", maxPnl: "" };
+  const emptyFilters = { symbols: [], directions: [], sessions: [], strategies: [], htf_poi: [], entry_tags: [], moods: [], mistakes: [], strengths: [], setup_tags: [], result: "", dateFrom: "", dateTo: "", minR: "", maxR: "", minPnl: "", maxPnl: "" };
   const [filters, setFilters] = useState(emptyFilters);
 
   const setF = (key, val) => setFilters(p => ({...p, [key]: val}));
@@ -40,8 +40,8 @@ export default function TradeView() {
 
   const activeCount = useMemo(() => {
     let n = 0;
-    ["symbols","directions","sessions","strategies","htf_poi","entry_tags","moods","mistakes","strengths"].forEach(k => n += filters[k].length);
-    ["dateFrom","dateTo","minR","maxR","minPnl","maxPnl"].forEach(k => { if (filters[k]) n++; });
+    ["symbols","directions","sessions","strategies","htf_poi","entry_tags","moods","mistakes","strengths","setup_tags"].forEach(k => n += filters[k].length);
+    ["dateFrom","dateTo","minR","maxR","minPnl","maxPnl","result"].forEach(k => { if (filters[k]) n++; });
     return n;
   }, [filters]);
 
@@ -62,9 +62,13 @@ export default function TradeView() {
     if (filters.strategies.length) list = list.filter(t => filters.strategies.includes(t.strategy));
     if (filters.htf_poi.length) list = list.filter(t => (t.htf_poi||[]).some(x => filters.htf_poi.includes(x)));
     if (filters.entry_tags.length) list = list.filter(t => (t.entry_tags||[]).some(x => filters.entry_tags.includes(x)));
-    if (filters.moods.length) list = list.filter(t => (t.mood_before||[]).some(x => filters.moods.includes(x)) || (t.mood_after||[]).some(x => filters.moods.includes(x)));
+    if (filters.moods.length) list = list.filter(t => (t.mood_before||[]).some(x => filters.moods.includes(x)) || (t.mood_during||[]).some(x => filters.moods.includes(x)) || (t.mood_after||[]).some(x => filters.moods.includes(x)));
     if (filters.mistakes.length) list = list.filter(t => (t.mistakes||[]).some(x => filters.mistakes.includes(x)));
     if (filters.strengths.length) list = list.filter(t => (t.strengths||[]).some(x => filters.strengths.includes(x)));
+    if (filters.setup_tags.length) list = list.filter(t => (t.setup_tags||[]).some(x => filters.setup_tags.includes(x)));
+    if (filters.result === "win") list = list.filter(t => (t.net_pnl||0) > 0);
+    else if (filters.result === "loss") list = list.filter(t => (t.net_pnl||0) < 0);
+    else if (filters.result === "breakeven") list = list.filter(t => (t.net_pnl||0) === 0);
     if (filters.dateFrom) list = list.filter(t => (t.date||"") >= filters.dateFrom);
     if (filters.dateTo) list = list.filter(t => (t.date||"") <= filters.dateTo);
     if (filters.minR !== "") list = list.filter(t => (t.r_multiple||0) >= parseFloat(filters.minR));
@@ -99,6 +103,21 @@ export default function TradeView() {
       return { date, trades: dayTrades, netPnl, winRate, count: dayTrades.length };
     });
   }, [filtered]);
+
+  // Fallback option lists built from the trades themselves, in case the
+  // presets haven't been configured yet in Settings → Trade Presets.
+  const pairOptions = useMemo(() => {
+    const set = new Set([...(presets.symbol||[]), ...trades.map(t => t.symbol).filter(Boolean)]);
+    return Array.from(set);
+  }, [presets.symbol, trades]);
+  const sessionOptions = useMemo(() => {
+    const set = new Set([...(presets.session||[]), ...trades.map(t => t.session).filter(Boolean)]);
+    return Array.from(set);
+  }, [presets.session, trades]);
+  const tagOptions = useMemo(() => {
+    const set = new Set([...(presets.setup_tag||[]), ...trades.flatMap(t => t.setup_tags||[])]);
+    return Array.from(set);
+  }, [presets.setup_tag, trades]);
 
   const metrics = useMemo(() => {
     const closed = trades.filter(t => t.status === "closed");
@@ -288,23 +307,50 @@ export default function TradeView() {
               />
             </div>
 
-            <select className="h-10 px-3 rounded-xl border border-[#E8E8F1] text-xs bg-white hover:border-[#7C3AED] transition">
-              <option>All Pairs</option>
+            <select
+              value={filters.symbols[0] || ""}
+              onChange={e => setF("symbols", e.target.value ? [e.target.value] : [])}
+              className="h-10 px-3 rounded-xl border border-[#E8E8F1] text-xs bg-white hover:border-[#7C3AED] transition"
+            >
+              <option value="">All Pairs</option>
+              {pairOptions.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
 
-            <select className="h-10 px-3 rounded-xl border border-[#E8E8F1] text-xs bg-white hover:border-[#7C3AED] transition">
-              <option>All Sessions</option>
+            <select
+              value={filters.sessions[0] || ""}
+              onChange={e => setF("sessions", e.target.value ? [e.target.value] : [])}
+              className="h-10 px-3 rounded-xl border border-[#E8E8F1] text-xs bg-white hover:border-[#7C3AED] transition"
+            >
+              <option value="">All Sessions</option>
+              {sessionOptions.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
 
-            <select className="h-10 px-3 rounded-xl border border-[#E8E8F1] text-xs bg-white hover:border-[#7C3AED] transition">
-              <option>All Tags</option>
+            <select
+              value={filters.setup_tags[0] || ""}
+              onChange={e => setF("setup_tags", e.target.value ? [e.target.value] : [])}
+              className="h-10 px-3 rounded-xl border border-[#E8E8F1] text-xs bg-white hover:border-[#7C3AED] transition"
+            >
+              <option value="">All Tags</option>
+              {tagOptions.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
 
-            <select className="h-10 px-3 rounded-xl border border-[#E8E8F1] text-xs bg-white hover:border-[#7C3AED] transition">
-              <option>All Results</option>
+            <select
+              value={filters.result}
+              onChange={e => setF("result", e.target.value)}
+              className="h-10 px-3 rounded-xl border border-[#E8E8F1] text-xs bg-white hover:border-[#7C3AED] transition"
+            >
+              <option value="">All Results</option>
+              <option value="win">Wins</option>
+              <option value="loss">Losses</option>
+              <option value="breakeven">Breakeven</option>
             </select>
 
-            <input type="date" className="h-10 px-3 rounded-xl border border-[#E8E8F1] text-xs bg-white hover:border-[#7C3AED] transition"/>
+            <input
+              type="date"
+              value={filters.dateFrom && filters.dateFrom === filters.dateTo ? filters.dateFrom : ""}
+              onChange={e => { setF("dateFrom", e.target.value); setF("dateTo", e.target.value); }}
+              className="h-10 px-3 rounded-xl border border-[#E8E8F1] text-xs bg-white hover:border-[#7C3AED] transition"
+            />
 
             <button 
               onClick={()=>setShowFilters(!showFilters)} 
@@ -381,6 +427,12 @@ export default function TradeView() {
               </FilterSection>
               <FilterSection label="Entry Confirmation" count={filters.entry_tags.length}>
                 <FilterGroup items={presets.entry_tag} selected={filters.entry_tags} onToggle={v=>toggleF("entry_tags",v)}/>
+              </FilterSection>
+              <FilterSection label="Setup Tags" count={filters.setup_tags.length}>
+                <FilterGroup items={presets.setup_tag} selected={filters.setup_tags} onToggle={v=>toggleF("setup_tags",v)}/>
+              </FilterSection>
+              <FilterSection label="Mood" count={filters.moods.length}>
+                <FilterGroup items={presets.mood} selected={filters.moods} onToggle={v=>toggleF("moods",v)}/>
               </FilterSection>
             </div>
 
@@ -628,7 +680,7 @@ function PremiumTradeCard({ trade, onOpen, onDelete, style }) {
           <button onClick={(e)=>e.stopPropagation()} className="absolute -top-2 -left-2 w-6 h-6 rounded-full hover:bg-yellow-100 flex items-center justify-center transition z-10">
             <Star className="w-4 h-4 text-yellow-400 hover:fill-yellow-400"/>
           </button>
-          <div className="w-28 h-28 rounded-lg bg-gradient-to-br from-[#1a1a2e] via-[#16213e] to-[#0f3460] border border-[#E8E8F1] flex flex-col items-center justify-center relative overflow-hidden">
+          <div className="w-44 h-44 rounded-lg bg-gradient-to-br from-[#1a1a2e] via-[#16213e] to-[#0f3460] border border-[#E8E8F1] flex flex-col items-center justify-center relative overflow-hidden">
             {thumb ? (
               // Show the actual screenshot uploaded in Add Trade instead of a fake chart
               <img src={thumb} alt="" className="w-full h-full object-cover"/>

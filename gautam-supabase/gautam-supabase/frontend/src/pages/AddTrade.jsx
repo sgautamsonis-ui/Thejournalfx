@@ -38,8 +38,8 @@ export default function AddTrade() {
     session: "London", strategy: "", status: "closed",
     date: new Date().toISOString().slice(0,10),
     entry_time: new Date().toTimeString().slice(0,5),
-    htf_poi: [], entry_tags: [], setup_tags: [], mood_before: [], mood_after: [], mistakes: [], strengths: [],
-    rating: 4, notes: "", screenshots: [],
+    htf_poi: [], entry_tags: [], setup_tags: [], mood_before: [], mood_during: [], mood_after: [], mistakes: [], strengths: [],
+    rating: 4, notes: "", mood_during_notes: "", screenshots: [],
   });
   const [saving, setSaving] = useState(false);
   const [aiReview, setAiReview] = useState("");
@@ -513,7 +513,20 @@ function AddTradeWorkspace({ t, setT, presets, accounts, computed, recommendedLo
 
           <PairedPresetBuilder number="4" title="Entry Confirmations" description="Log the confirmation that triggered the entry." timeframeLabel="Entry Timeframe" typeLabel="Confirmation Type" timeframes={presets.entry_timeframe} types={presets.entry_confirmation_type} draft={entryDraft} onDraftChange={setEntryDraft} items={t.entry_tags} onAdd={()=>addPairedPreset("entry_tags",entryDraft,setEntryDraft,"entry confirmation")} onRemove={value=>removePairedPreset("entry_tags",value)} testid="entry-confirmation"/>
 
-          <section className="tjfx-card p-6"><SectionHeading number="5" title="Psychology & Mood" subtitle="Record your state before and after the trade" /><ChipRow label="Mood Before" items={presets.mood} selected={t.mood_before} onToggle={x=>toggle("mood_before",x)}/><div className="mt-4"><ChipRow label="Setup Tags" items={presets.setup_tag} selected={t.setup_tags} onToggle={x=>toggle("setup_tags",x)}/></div><textarea value={t.notes} onChange={e=>setT({...t,notes:e.target.value})} rows={5} className="w-full mt-5 p-3 rounded-xl border border-[#E8E8F1] focus:border-[#7C3AED] outline-none text-sm" placeholder="Notes (pre-trade mindset, execution and lessons)"/></section>
+          <section className="tjfx-card p-6 space-y-5">
+            <SectionHeading number="5" title="Psychology & Mood" subtitle="Record your state before, during and after the trade" />
+            <ChipRow label="Mood Before" items={presets.mood} selected={t.mood_before} onToggle={x=>toggle("mood_before",x)}/>
+            <div>
+              <ChipRow label="Mood During" items={presets.mood} selected={t.mood_during} onToggle={x=>toggle("mood_during",x)}/>
+              <textarea value={t.mood_during_notes} onChange={e=>setT({...t,mood_during_notes:e.target.value})} rows={3} className="w-full mt-2.5 p-3 rounded-xl border border-[#E8E8F1] focus:border-[#7C3AED] outline-none text-sm" placeholder="What were you thinking/feeling while the trade was running?"/>
+            </div>
+            <ChipRow label="Mood After" items={presets.mood} selected={t.mood_after} onToggle={x=>toggle("mood_after",x)}/>
+            <div><ChipRow label="Setup Tags" items={presets.setup_tag} selected={t.setup_tags} onToggle={x=>toggle("setup_tags",x)}/></div>
+            <div>
+              <div className="text-[12px] text-[#6D6D82] mb-2">Notes</div>
+              <textarea value={t.notes} onChange={e=>setT({...t,notes:e.target.value})} rows={4} className="w-full p-3 rounded-xl border border-[#E8E8F1] focus:border-[#7C3AED] outline-none text-sm" placeholder="Notes (pre-trade mindset, execution and lessons)"/>
+            </div>
+          </section>
 
           <section className="tjfx-card p-5 sm:p-6">
             <SectionHeading number="6" title="Trade Details" subtitle="Execution, risk and account information" />

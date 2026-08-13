@@ -249,7 +249,9 @@ class Trade(BaseModel):
     entry_tags: List[str] = []
     setup_tags: List[str] = []
     mood_before: List[str] = []
+    mood_during: List[str] = []
     mood_after: List[str] = []
+    mood_during_notes: str = ""
     mistakes: List[str] = []
     strengths: List[str] = []
     rating: int = 0
@@ -680,7 +682,7 @@ async def ai_psychology(payload: Dict[str, Any] = Body(default={}), user=Depends
         if filters.get("sessions") and t.get("session") not in filters["sessions"]: return False
         if filters.get("strategies") and t.get("strategy") not in filters["strategies"]: return False
         if filters.get("moods"):
-            m = set((t.get("mood_before") or []) + (t.get("mood_after") or []))
+            m = set((t.get("mood_before") or []) + (t.get("mood_during") or []) + (t.get("mood_after") or []))
             if not m & set(filters["moods"]): return False
         if filters.get("days"):
             try:
@@ -1174,7 +1176,7 @@ async def dashboard_stats(account_id: Optional[str] = None, user=Depends(get_cur
     # Mood vs performance
     mood_map = defaultdict(lambda: {"pnl": 0.0, "count": 0, "wins": 0, "r_sum": 0.0, "r_count": 0})
     for t in closed:
-        moods = set((t.get("mood_before") or []) + (t.get("mood_after") or []))
+        moods = set((t.get("mood_before") or []) + (t.get("mood_during") or []) + (t.get("mood_after") or []))
         pnl = t.get("net_pnl") or 0
         for m in moods:
             d = mood_map[m]

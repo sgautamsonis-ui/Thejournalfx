@@ -913,6 +913,12 @@ function ReportBody({
               (t.mood_before || []).forEach(
                 (m) => (moods[m] = (moods[m] || 0) + 1)
               );
+              (t.mood_during || []).forEach(
+                (m) => (moods[m] = (moods[m] || 0) + 1)
+              );
+              (t.mood_after || []).forEach(
+                (m) => (moods[m] = (moods[m] || 0) + 1)
+              );
               (t.mistakes || []).forEach(
                 (m) => (mistakes[m] = (mistakes[m] || 0) + 1)
               );
