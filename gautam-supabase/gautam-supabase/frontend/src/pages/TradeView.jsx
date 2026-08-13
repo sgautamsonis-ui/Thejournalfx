@@ -17,7 +17,6 @@ export default function TradeView() {
   const [edit, setEdit] = useState(null);
   const [activeTab, setActiveTab] = useState("Overview");
   const [saving, setSaving] = useState(false);
-  const [showFilters, setShowFilters] = useState(false);
   const [sortBy, setSortBy] = useState("newest");
 
   const [presets, setPresets] = useState({
@@ -351,16 +350,6 @@ export default function TradeView() {
               onChange={e => { setF("dateFrom", e.target.value); setF("dateTo", e.target.value); }}
               className="h-10 px-3 rounded-xl border border-[#E8E8F1] text-xs bg-white hover:border-[#7C3AED] transition"
             />
-
-            <button 
-              onClick={()=>setShowFilters(!showFilters)} 
-              data-testid="toggle-filters" 
-              className="h-10 px-4 rounded-xl border border-[#E8E8F1] hover:border-[#7C3AED] text-sm font-medium flex items-center gap-2 transition hover:bg-[#F6F6FB]"
-            >
-              <Filter className="w-4 h-4"/> 
-              Filters 
-              {activeCount>0 && <span className="bg-[#7C3AED] text-white text-[10px] rounded-full w-5 h-5 flex items-center justify-center font-bold">{activeCount}</span>}
-            </button>
           </div>
 
           {/* Status Tabs & Sort */}
@@ -394,55 +383,6 @@ export default function TradeView() {
             </div>
           </div>
         </div>
-
-        {/* Filter Panel */}
-        {showFilters && (
-          <div className="tjfx-card p-0 overflow-hidden border-2 border-[#7C3AED]/20" data-testid="filter-panel">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-[#E8E8F1] bg-gradient-to-r from-[#F3E8FF]/50 to-transparent">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-[#7C3AED] flex items-center justify-center"><Filter className="w-4 h-4 text-white"/></div>
-                <div>
-                  <div className="font-display font-bold text-sm">Detailed Filters</div>
-                  <div className="text-[10px] text-[#6D6D82]">{activeCount} active · {filtered.length} of {trades.length} trades</div>
-                </div>
-              </div>
-              <button onClick={()=>setFilters(emptyFilters)} className="text-xs text-[#7C3AED] font-semibold hover:underline">Clear all</button>
-            </div>
-
-            <div className="p-6 grid md:grid-cols-2 gap-x-6 gap-y-4">
-              <FilterSection label="Symbols" count={filters.symbols.length}>
-                <FilterGroup items={presets.symbol} selected={filters.symbols} onToggle={v=>toggleF("symbols",v)}/>
-              </FilterSection>
-              <FilterSection label="Direction" count={filters.directions.length}>
-                <FilterGroup items={["long","short"]} selected={filters.directions} onToggle={v=>toggleF("directions",v)}/>
-              </FilterSection>
-              <FilterSection label="Session" count={filters.sessions.length}>
-                <FilterGroup items={presets.session} selected={filters.sessions} onToggle={v=>toggleF("sessions",v)}/>
-              </FilterSection>
-              <FilterSection label="Strategy" count={filters.strategies.length}>
-                <FilterGroup items={presets.strategy} selected={filters.strategies} onToggle={v=>toggleF("strategies",v)}/>
-              </FilterSection>
-              <FilterSection label="HTF POI" count={filters.htf_poi.length}>
-                <FilterGroup items={presets.htf_poi} selected={filters.htf_poi} onToggle={v=>toggleF("htf_poi",v)}/>
-              </FilterSection>
-              <FilterSection label="Entry Confirmation" count={filters.entry_tags.length}>
-                <FilterGroup items={presets.entry_tag} selected={filters.entry_tags} onToggle={v=>toggleF("entry_tags",v)}/>
-              </FilterSection>
-              <FilterSection label="Setup Tags" count={filters.setup_tags.length}>
-                <FilterGroup items={presets.setup_tag} selected={filters.setup_tags} onToggle={v=>toggleF("setup_tags",v)}/>
-              </FilterSection>
-              <FilterSection label="Mood" count={filters.moods.length}>
-                <FilterGroup items={presets.mood} selected={filters.moods} onToggle={v=>toggleF("moods",v)}/>
-              </FilterSection>
-            </div>
-
-            <div className="border-t border-[#E8E8F1] px-6 py-4 grid md:grid-cols-3 gap-4 bg-[#F6F6FB]">
-              <RangeInput label="Date" leftPlaceholder="From" rightPlaceholder="To" type="date" left={filters.dateFrom} right={filters.dateTo} onLeft={v=>setF("dateFrom",v)} onRight={v=>setF("dateTo",v)}/>
-              <RangeInput label="R multiple" leftPlaceholder="min" rightPlaceholder="max" type="number" left={filters.minR} right={filters.maxR} onLeft={v=>setF("minR",v)} onRight={v=>setF("maxR",v)}/>
-              <RangeInput label="Net P&L ($)" leftPlaceholder="min" rightPlaceholder="max" type="number" left={filters.minPnl} right={filters.maxPnl} onLeft={v=>setF("minPnl",v)} onRight={v=>setF("maxPnl",v)}/>
-            </div>
-          </div>
-        )}
 
         {/* Trades Grid */}
         {filtered.length === 0 ? (
