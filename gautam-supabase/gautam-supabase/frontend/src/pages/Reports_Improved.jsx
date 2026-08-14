@@ -1,1075 +1,219 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { tradesApi, biasApi, statsApi } from "@/lib/api";
-import { useAuth } from "@/context/AuthContext";
-import {
-  Download,
-  FileText,
-  Printer,
-  Loader2,
-  TrendingUp,
-  TrendingDown,
-  Award,
-  AlertCircle,
-  Clock,
-  Zap,
-  Brain,
-  Target,
-  ChevronDown,
-  Settings,
-} from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import { biasApi, prefsApi, aiApi, uploadApi } from "@/lib/api";
 import { toast } from "sonner";
-import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
+import { X, Pencil, Save, Trash2, Upload, Clipboard, Sparkles, TrendingUp, TrendingDown, Minus, Search } from "lucide-react";
+import { useLightbox } from "@/components/ImageLightbox";
+import { compressImage } from "@/lib/imageUtils";
 
-// Utility Functions
-function toDateStr(d) {
-  return d.toISOString().slice(0, 10);
-}
+export default function Records() {
+  const openLightbox = useLightbox();
+  const [items, setItems] = useState([]);
+  const [type, setType] = useState("all");
+  const [q, setQ] = useState("");
+  const [sel, setSel] = useState(null);
+  const [edit, setEdit] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [htfPresets, setHtfPresets] = useState([]);
 
-function addDays(d, n) {
-  const x = new Date(d);
-  x.setDate(x.getDate() + n);
-  return x;
-}
+  const load = () => biasApi.list().then(setItems).catch(()=>{});
+  useEffect(() => { load(); prefsApi.list("htf_poi").then(l => setHtfPresets(l.map(x=>x.value))).catch(()=>{}); }, []);
 
-function startOfWeek(d) {
-  const x = new Date(d);
-  const day = x.getDay();
-  // Start on Monday (1), not Sunday
-  const diff = day === 0 ? -6 : 1 - day;
-  x.setDate(x.getDate() + diff);
-  return x;
-}
+  const filtered = useMemo(() => {
+    let list = items;
+    if (type!=="all") list = list.filter(x => x.type===type);
+    if (q) { const s = q.toLowerCase(); list = list.filter(x => (x.narrative||"").toLowerCase().includes(s) || (x.direction||"").toLowerCase().includes(s) || (x.session||"").toLowerCase().includes(s)); }
+    return list;
+  }, [items, type, q]);
 
-function formatTime(date, format24 = false) {
-  if (!date) return "—";
-  const d = new Date(date);
-  if (format24) {
-    return d.toLocaleString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
-  }
-  return d.toLocaleString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true });
-}
+  const openRec = (b) => {
+    setSel(b); // show the lightweight version instantly
+    setEdit(null);
+    biasApi.get(b.id).then(setSel).catch(() => {}); // then fill in images
+  };
+  const startEdit = () => setEdit({...sel});
+  const cancelEdit = () => setEdit(null);
+  const toggleP = (k, v) => setEdit(p => ({...p, [k]: (p[k]||[]).includes(v) ? p[k].filter(x=>x!==v) : [...(p[k]||[]), v]}));
 
-function getTimeOfDay(date) {
-  if (!date) return "Unknown";
-  const d = new Date(date);
-  const hour = d.getHours();
-  if (hour < 12) return "Morning (9-12)";
-  if (hour < 15) return "Afternoon (12-3)";
-  if (hour < 18) return "Evening (3-6)";
-  return "Late (6+)";
-}
+  const saveEdit = async () => {
+    setSaving(true);
+    try { const updated = await biasApi.update(edit.id, edit); setSel(updated); setEdit(null); toast.success("Bias updated"); load(); }
+    catch { toast.error("Save failed"); } finally { setSaving(false); }
+  };
+  const del = async () => { if (!confirm("Delete this bias record?")) return; await biasApi.delete(sel.id); toast.success("Deleted"); setSel(null); load(); };
 
-export default function Reports() {
-  const { user } = useAuth();
-  const [type, setType] = useState("daily");
-  const [date, setDate] = useState(toDateStr(new Date()));
-  const [style, setStyle] = useState("professional");
-  const [timeFormat24, setTimeFormat24] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
-  const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
-  const [aiSummary, setAiSummary] = useState(null);
-  
-  const [includes, setIncludes] = useState({
-    weeklyBias: true,
-    dailyBias: true,
-    trades: true,
-    screenshots: true,
-    psychology: true,
-    stats: true,
-    notes: true,
-    performanceBreakdown: true,
-    riskMetrics: true,
-    aiSummary: true,
-    tradeAnalysis: true,
+  const [uploadingCount, setUploadingCount] = useState(0);
+  const addImg = async (data) => {
+    setUploadingCount(c => c + 1);
+    try {
+      const { url } = await uploadApi.image(data);
+      setEdit(p => ({...p, images: [...(p.images||[]), url]}));
+    } catch { toast.error("Image upload failed"); }
+    finally { setUploadingCount(c => c - 1); }
+  };
+  const onFile = (e) => Array.from(e.target.files||[]).forEach(f => {
+    compressImage(f).then(addImg).catch(() => { const r = new FileReader(); r.onload=()=>addImg(r.result); r.readAsDataURL(f); });
   });
 
-  const [trades, setTrades] = useState([]);
-  const [biasList, setBiasList] = useState([]);
-  const [stats, setStats] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [exporting, setExporting] = useState(false);
-  const reportRef = useRef(null);
-
-  // Load data
   useEffect(() => {
-    (async () => {
-      setLoading(true);
-      try {
-        const [t, b, s] = await Promise.all([
-          tradesApi.list(),
-          biasApi.list(),
-          statsApi.dashboard(),
-        ]);
-        setTrades(t);
-        setBiasList(b);
-        setStats(s);
-      } finally {
-        setLoading(false);
+    if (!edit) return;
+    const onPaste = (e) => {
+      const items = e.clipboardData?.items || [];
+      for (const it of items) {
+        if (it.type?.startsWith("image/")) {
+          const f = it.getAsFile();
+          if (f) {
+            compressImage(f).then(addImg).catch(() => { const r = new FileReader(); r.onload=()=>addImg(r.result); r.readAsDataURL(f); });
+            toast.success("Chart pasted");
+          }
+        }
       }
-    })();
-  }, []);
-
-  // Calculate date range
-  const range = useMemo(() => {
-    const d = new Date(date);
-    if (type === "daily") {
-      return { start: toDateStr(d), end: toDateStr(d) };
-    }
-    if (type === "weekly") {
-      const s = startOfWeek(d);
-      return { start: toDateStr(s), end: toDateStr(addDays(s, 6)) };
-    }
-    // monthly
-    const s = new Date(d.getFullYear(), d.getMonth(), 1);
-    const e = new Date(d.getFullYear(), d.getMonth() + 1, 0);
-    return { start: toDateStr(s), end: toDateStr(e) };
-  }, [date, type]);
-
-  // Filter and calculate metrics
-  const filtered = useMemo(() => {
-    const inRange = (dStr) => dStr && dStr >= range.start && dStr <= range.end;
-    const t = trades.filter((x) => inRange(x.date));
-    const weekly = biasList
-      .filter((x) => x.type === "weekly" && inRange(x.date))
-      .sort((a, b) => b.date.localeCompare(a.date))[0];
-    const daily = biasList
-      .filter((x) => x.type === "daily" && inRange(x.date))
-      .sort((a, b) => b.date.localeCompare(a.date))[0];
-
-    const closed = t.filter((x) => x.status === "closed");
-    const wins = closed.filter((x) => (x.net_pnl || 0) > 0);
-    const losses = closed.filter((x) => (x.net_pnl || 0) < 0);
-    const pnl = closed.reduce((s, x) => s + (x.net_pnl || 0), 0);
-    const gw = wins.reduce((s, x) => s + (x.net_pnl || 0), 0);
-    const gl = Math.abs(losses.reduce((s, x) => s + (x.net_pnl || 0), 0)) || 1;
-
-    // Strategy breakdown
-    const strategyMap = {};
-    t.forEach((trade) => {
-      const st = trade.strategy || "Unspecified";
-      if (!strategyMap[st]) {
-        strategyMap[st] = { total: 0, wins: 0, pnl: 0, trades: [] };
-      }
-      strategyMap[st].total++;
-      strategyMap[st].trades.push(trade);
-      if ((trade.net_pnl || 0) > 0) strategyMap[st].wins++;
-      strategyMap[st].pnl += trade.net_pnl || 0;
-    });
-
-    // Symbol breakdown
-    const symbolMap = {};
-    t.forEach((trade) => {
-      const sym = trade.symbol || "Unknown";
-      if (!symbolMap[sym]) {
-        symbolMap[sym] = { total: 0, wins: 0, pnl: 0 };
-      }
-      symbolMap[sym].total++;
-      if ((trade.net_pnl || 0) > 0) symbolMap[sym].wins++;
-      symbolMap[sym].pnl += trade.net_pnl || 0;
-    });
-
-    // Time of day breakdown
-    const timeMap = {};
-    t.forEach((trade) => {
-      const tod = getTimeOfDay(trade.entry_time || trade.date);
-      if (!timeMap[tod]) {
-        timeMap[tod] = { total: 0, wins: 0, pnl: 0 };
-      }
-      timeMap[tod].total++;
-      if ((trade.net_pnl || 0) > 0) timeMap[tod].wins++;
-      timeMap[tod].pnl += trade.net_pnl || 0;
-    });
-
-    // Best and worst trades
-    const sortedByPnl = [...closed].sort((a, b) => (b.net_pnl || 0) - (a.net_pnl || 0));
-    const bestTrade = sortedByPnl[0];
-    const worstTrade = sortedByPnl[sortedByPnl.length - 1];
-
-    // Win streaks
-    let currentWinStreak = 0;
-    let maxWinStreak = 0;
-    let currentLossStreak = 0;
-    let maxLossStreak = 0;
-    closed.forEach((trade) => {
-      if ((trade.net_pnl || 0) > 0) {
-        currentWinStreak++;
-        maxWinStreak = Math.max(maxWinStreak, currentWinStreak);
-        currentLossStreak = 0;
-      } else {
-        currentLossStreak++;
-        maxLossStreak = Math.max(maxLossStreak, currentLossStreak);
-        currentWinStreak = 0;
-      }
-    });
-
-    return {
-      trades: t,
-      weekly,
-      daily,
-      metrics: {
-        total: t.length,
-        wins: wins.length,
-        losses: losses.length,
-        wr: closed.length ? Math.round((wins.length / closed.length) * 100) : 0,
-        pf: gl ? (gw / gl).toFixed(2) : "—",
-        pnl: pnl.toFixed(2),
-        avgWin: wins.length ? (gw / wins.length).toFixed(2) : 0,
-        avgLoss: losses.length ? (Math.abs(gl) / losses.length).toFixed(2) : 0,
-      },
-      strategyMap,
-      symbolMap,
-      timeMap,
-      bestTrade,
-      worstTrade,
-      maxWinStreak,
-      maxLossStreak,
     };
-  }, [trades, biasList, range]);
-
-  // Generate AI Summary (mock - can be replaced with actual API call)
-  const generateAiSummary = async () => {
-    setAiSummaryLoading(true);
-    try {
-      // Mock AI summary - replace with actual API call
-      setTimeout(() => {
-        const summary = `
-Based on your trading data for ${range.start} to ${range.end}:
-
-Performance Overview:
-You took ${filtered.trades.length} trades with a win rate of ${filtered.metrics.wr}%. Your net P&L was $${filtered.metrics.pnl}, which represents a solid ${parseFloat(filtered.metrics.pnl) > 0 ? "profitable" : "challenging"} period.
-
-Key Insights:
-• Best performing strategy: ${Object.entries(filtered.strategyMap).sort((a, b) => parseFloat(b[1].pnl) - parseFloat(a[1].pnl))[0]?.[0] || "N/A"}
-• Best trading time: ${Object.entries(filtered.timeMap).sort((a, b) => b[1].wins / b[1].total - a[1].wins / a[1].total)[0]?.[0] || "N/A"}
-• Average win: $${filtered.metrics.avgWin}, Average loss: $${filtered.metrics.avgLoss}
-• Longest winning streak: ${filtered.maxWinStreak} trades
-• Longest losing streak: ${filtered.maxLossStreak} trades
-
-Recommendations:
-1. Focus on your best performing strategy
-2. Trade more during your peak performance hours
-3. Work on risk management for losing trades
-4. Maintain consistency in your trading process
-        `;
-        setAiSummary(summary);
-        toast.success("AI Summary generated!");
-      }, 1500);
-    } catch (e) {
-      toast.error("Failed to generate AI summary");
-    } finally {
-      setAiSummaryLoading(false);
-    }
-  };
-
-  const reportId = `TJFX-${range.start}-${type[0].toUpperCase()}`;
-
-  const downloadPDF = async () => {
-    const node = reportRef.current;
-    if (!node) return;
-    setExporting(true);
-    try {
-      const canvas = await html2canvas(node, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: "#ffffff",
-      });
-      const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF("p", "mm", "a4");
-      const pageW = pdf.internal.pageSize.getWidth();
-      const pageH = pdf.internal.pageSize.getHeight();
-      const imgW = pageW;
-      const imgH = (canvas.height * imgW) / canvas.width;
-      let heightLeft = imgH;
-      let position = 0;
-      pdf.addImage(imgData, "PNG", 0, position, imgW, imgH);
-      heightLeft -= pageH;
-      while (heightLeft > 0) {
-        position = heightLeft - imgH;
-        pdf.addPage();
-        pdf.addImage(imgData, "PNG", 0, position, imgW, imgH);
-        heightLeft -= pageH;
-      }
-      pdf.save(`TheJournalFX_${type}_${range.start}.pdf`);
-      toast.success("PDF downloaded");
-    } catch (e) {
-      toast.error("Export failed");
-    } finally {
-      setExporting(false);
-    }
-  };
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+    // eslint-disable-next-line
+  }, [edit]);
 
   return (
-    <div className="min-h-screen bg-[#F6F6FB] p-4 sm:p-6 lg:p-8" data-testid="reports-page">
-      <div className="max-w-7xl mx-auto space-y-6">
-        {/* HEADER */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="font-display text-2xl sm:text-3xl font-bold text-[#16151F]">
-              Reports & Export
-            </h1>
-            <p className="text-[#6D6D82] mt-1 text-sm sm:text-base">
-              Generate comprehensive trading reports with AI insights
-            </p>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-2">
-            <button
-              onClick={() => window.print()}
-              className="h-10 px-4 rounded-xl border border-[#E8E8F1] hover:border-[#7C3AED] text-sm font-medium flex items-center justify-center gap-2 transition-all"
-            >
-              <Printer className="w-4 h-4" /> Print
-            </button>
-            <button
-              data-testid="download-pdf-btn"
-              onClick={downloadPDF}
-              disabled={exporting}
-              className="h-10 px-5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-60 transition-all"
-            >
-              {exporting ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Download className="w-4 h-4" />
-              )}
-              {exporting ? "Exporting..." : "Download PDF"}
-            </button>
-          </div>
-        </div>
-
-        {/* CONFIG SECTION - RESPONSIVE GRID */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* LEFT PANEL - Controls */}
-          <div className="lg:col-span-1 space-y-4">
-            {/* Report Type */}
-            <div className="tjfx-card p-5 space-y-4">
-              <div>
-                <label className="text-xs font-semibold text-[#6D6D82] uppercase tracking-wide">
-                  Report Type
-                </label>
-                <div className="grid grid-cols-3 gap-2 mt-2">
-                  {["daily", "weekly", "monthly"].map((t) => (
-                    <button
-                      key={t}
-                      onClick={() => setType(t)}
-                      data-testid={`report-type-${t}`}
-                      className={`h-10 rounded-xl text-xs sm:text-sm font-medium border capitalize transition-all ${
-                        type === t
-                          ? "bg-[#F3E8FF] border-[#7C3AED] text-[#7C3AED]"
-                          : "border-[#E8E8F1] hover:border-[#7C3AED]"
-                      }`}
-                    >
-                      {t}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Date Picker */}
-              <div>
-                <label className="text-xs font-semibold text-[#6D6D82] uppercase tracking-wide">
-                  Reference Date
-                </label>
-                <input
-                  type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  className="w-full h-10 px-3 rounded-xl border border-[#E8E8F1] focus:border-[#7C3AED] outline-none text-sm bg-white mt-2"
-                  data-testid="report-date"
-                />
-                <div className="text-xs text-[#A1A1AA] mt-2 tjfx-mono font-medium">
-                  {range.start} → {range.end}
-                </div>
-              </div>
-
-              {/* Report Style */}
-              <div>
-                <label className="text-xs font-semibold text-[#6D6D82] uppercase tracking-wide">
-                  Report Style
-                </label>
-                <div className="grid grid-cols-3 gap-2 mt-2">
-                  {["compact", "professional", "institutional"].map((s) => (
-                    <button
-                      key={s}
-                      onClick={() => setStyle(s)}
-                      className={`h-10 rounded-xl text-xs font-medium border capitalize transition-all ${
-                        style === s
-                          ? "bg-[#F3E8FF] border-[#7C3AED] text-[#7C3AED]"
-                          : "border-[#E8E8F1] hover:border-[#7C3AED]"
-                      }`}
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Settings Collapse */}
-            <div className="tjfx-card p-5">
-              <button
-                onClick={() => setShowSettings(!showSettings)}
-                className="w-full flex items-center justify-between text-sm font-semibold text-[#16151F] hover:text-[#7C3AED] transition-colors"
-              >
-                <span className="flex items-center gap-2">
-                  <Settings className="w-4 h-4" /> Settings
-                </span>
-                <ChevronDown
-                  className={`w-4 h-4 transition-transform ${showSettings ? "rotate-180" : ""}`}
-                />
-              </button>
-
-              {showSettings && (
-                <div className="mt-4 pt-4 border-t border-[#E8E8F1] space-y-3">
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={timeFormat24}
-                      onChange={(e) => setTimeFormat24(e.target.checked)}
-                      className="accent-[#7C3AED] w-4 h-4 rounded"
-                    />
-                    <span className="text-sm text-[#16151F]">
-                      24-hour time format
-                    </span>
-                  </label>
-                </div>
-              )}
-            </div>
-
-            {/* Include Sections */}
-            <div className="tjfx-card p-5">
-              <label className="text-xs font-semibold text-[#6D6D82] uppercase tracking-wide block mb-3">
-                Include Sections
-              </label>
-              <div className="space-y-2 text-sm">
-                {[
-                  ["weeklyBias", "Weekly Bias"],
-                  ["dailyBias", "Daily Bias"],
-                  ["stats", "Performance Stats"],
-                  ["performanceBreakdown", "Performance Breakdown"],
-                  ["riskMetrics", "Risk Metrics"],
-                  ["trades", "Trades Table"],
-                  ["tradeAnalysis", "Trade Analysis"],
-                  ["screenshots", "Trade Screenshots"],
-                  ["psychology", "Psychology Review"],
-                  ["aiSummary", "AI Summary"],
-                  ["notes", "Notes"],
-                ].map(([k, l]) => (
-                  <label key={k} className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={includes[k]}
-                      onChange={(e) =>
-                        setIncludes({ ...includes, [k]: e.target.checked })
-                      }
-                      className="accent-[#7C3AED] w-4 h-4 rounded"
-                    />
-                    <span className="text-[#16151F]">{l}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* AI Summary Button */}
-            {includes.aiSummary && (
-              <button
-                onClick={generateAiSummary}
-                disabled={aiSummaryLoading || !filtered.trades.length}
-                className="w-full h-10 px-4 rounded-xl bg-gradient-to-r from-[#7C3AED] to-[#6D28D9] hover:from-[#6D28D9] hover:to-[#5b21b6] text-white text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-60 transition-all"
-              >
-                {aiSummaryLoading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Zap className="w-4 h-4" />
-                )}
-                Generate AI Summary
-              </button>
-            )}
-
-            {/* Info Box */}
-            <div className="tjfx-card p-4 bg-[#F3E8FF] border-[#7C3AED]/20">
-              <div className="font-semibold text-[#7C3AED] mb-1 flex items-center gap-2 text-sm">
-                <Zap className="w-4 h-4" /> Pro Tip
-              </div>
-              <p className="text-xs text-[#6D6D82]">
-                Fill your bias, log trades, and psychology data for complete
-                reports with AI insights.
-              </p>
-            </div>
-          </div>
-
-          {/* RIGHT PANEL - Preview */}
-          <div className="lg:col-span-3">
-            <div className="tjfx-card overflow-hidden flex flex-col h-full">
-              {/* Preview Header */}
-              <div className="bg-[#F6F6FB] px-4 py-3 text-xs text-[#6D6D82] flex items-center justify-between border-b border-[#E8E8F1]">
-                <span className="font-medium">PDF Preview · A4</span>
-                <span className="tjfx-mono text-[11px]">{reportId}</span>
-              </div>
-
-              {/* Preview Content */}
-              <div className="flex-1 overflow-auto scroll-thin bg-[#F6F6FB] p-4">
-                <div
-                  ref={reportRef}
-                  className={`mx-auto bg-white shadow-sm ${
-                    style === "compact"
-                      ? "text-[12px]"
-                      : style === "institutional"
-                      ? "text-[13px]"
-                      : "text-[13.5px]"
-                  }`}
-                  style={{ width: "100%", maxWidth: "800px", minHeight: "1100px", padding: "40px" }}
-                >
-                  {loading ? (
-                    <div className="flex items-center justify-center py-24 text-[#6D6D82]">
-                      <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                      Loading data...
-                    </div>
-                  ) : (
-                    <ReportBody
-                      user={user}
-                      type={type}
-                      range={range}
-                      reportId={reportId}
-                      data={filtered}
-                      stats={stats}
-                      includes={includes}
-                      style={style}
-                      timeFormat24={timeFormat24}
-                      aiSummary={aiSummary}
-                    />
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+    <div className="p-5 max-w-[1300px] mx-auto space-y-3" data-testid="records-page">
+      <div>
+        <h1 className="font-display text-3xl font-bold">Bias Records</h1>
+        <p className="text-[#6D6D82] mt-1">Every plan you've written. Click any record to view or edit.</p>
       </div>
-    </div>
-  );
-}
 
-function ReportBody({
-  user,
-  type,
-  range,
-  reportId,
-  data,
-  stats,
-  includes,
-  style,
-  timeFormat24,
-  aiSummary,
-}) {
-  return (
-    <div className="space-y-6" style={{ color: "#16151F", fontFamily: "'Satoshi', sans-serif" }}>
-      {/* HEADER */}
-      <div className="flex items-center justify-between pb-5 border-b-2 border-[#E8E8F1]">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#7C3AED] to-[#6D28D9] flex items-center justify-center">
-            <TrendingUp className="w-6 h-6 text-white" />
-          </div>
-          <div>
-            <div className="font-display text-xl font-bold">TheJournalFX</div>
-            <div className="text-[11px] text-[#6D6D82]">Journal • Analyze • Improve</div>
-          </div>
+      <div className="tjfx-card p-4 flex flex-col md:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#A1A1AA]"/>
+          <input value={q} onChange={e=>setQ(e.target.value)} className="w-full h-10 pl-10 pr-3 rounded-xl border border-[#E8E8F1] focus:border-[#7C3AED] outline-none text-sm" placeholder="Search narrative, direction, session..."/>
         </div>
-        <div className="text-right">
-          <div className="font-display font-bold text-lg uppercase tracking-wide">
-            {type} Report
-          </div>
-          <div className="text-[11px] text-[#6D6D82] tjfx-mono">
-            {range.start} → {range.end}
-          </div>
-          <div className="text-[10px] text-[#A1A1AA] tjfx-mono mt-1">{reportId}</div>
+        <div className="flex gap-1 bg-[#F6F6FB] p-1 rounded-xl">
+          {[["all","All"],["weekly","Weekly"],["daily","Daily"]].map(([k,l]) => (
+            <button key={k} onClick={()=>setType(k)} className={`px-4 h-8 text-xs rounded-lg font-medium ${type===k?"bg-white shadow text-[#7C3AED]":"text-[#6D6D82]"}`}>{l}</button>
+          ))}
         </div>
       </div>
 
-      {/* TRADER INFO */}
-      <div className="grid grid-cols-2 gap-4 text-[12px]">
-        <div>
-          <div className="text-[#6D6D82] font-medium mb-1">Trader</div>
-          <div className="text-[#16151F] font-semibold">{user?.name || "Trader"}</div>
-        </div>
-        <div>
-          <div className="text-[#6D6D82] font-medium mb-1">Email</div>
-          <div className="text-[#16151F] tjfx-mono">{user?.email || "—"}</div>
-        </div>
-      </div>
-
-      {/* EXECUTIVE SUMMARY */}
-      {includes.stats && (
-        <Section title="1. Executive Summary">
-          <div className="grid grid-cols-5 gap-3">
-            <Metric label="Trades" value={data.metrics.total} />
-            <Metric label="Wins" value={data.metrics.wins} color="#10B981" />
-            <Metric label="Losses" value={data.metrics.losses} color="#EF4444" />
-            <Metric label="Win Rate" value={`${data.metrics.wr}%`} color="#7C3AED" />
-            <Metric label="Profit Factor" value={data.metrics.pf} color="#7C3AED" />
-          </div>
-          <div className="mt-4 p-4 rounded-xl bg-gradient-to-r from-[#F3E8FF] to-[#F6F6FB] border border-[#E8E8F1] flex items-center justify-between">
-            <div className="text-[12px] text-[#6D6D82] font-medium">Net P&L</div>
-            <div
-              className={`tjfx-mono text-2xl font-bold ${
-                parseFloat(data.metrics.pnl) >= 0 ? "text-[#10B981]" : "text-[#EF4444]"
-              }`}
-            >
-              ${data.metrics.pnl}
+      <div className="space-y-3">
+        {filtered.length===0 && <div className="tjfx-card p-8 text-center text-[#6D6D82]">No records match.</div>}
+        {filtered.map(b => (
+          <button key={b.id} onClick={()=>openRec(b)} data-testid={`record-card-${b.id}`}
+            className="tjfx-card w-full p-4 text-left tjfx-card-hover flex items-center gap-4 flex-wrap md:flex-nowrap">
+            <div className="flex flex-col items-start gap-0.5 shrink-0 w-24">
+              <div className="text-[11px] uppercase tracking-wide text-[#7C3AED] font-semibold">{b.type}</div>
+              <div className="tjfx-mono text-sm text-[#16151F] font-semibold">{b.date}</div>
             </div>
-          </div>
-        </Section>
-      )}
-
-      {/* WEEKLY BIAS */}
-      {includes.weeklyBias && data.weekly && (
-        <Section title="2. Weekly Bias">
-          <BiasBlock b={data.weekly} />
-        </Section>
-      )}
-
-      {/* DAILY BIAS */}
-      {includes.dailyBias && data.daily && (
-        <Section title="3. Daily Bias">
-          <BiasBlock b={data.daily} />
-        </Section>
-      )}
-
-      {/* PERFORMANCE BREAKDOWN */}
-      {includes.performanceBreakdown && (
-        <Section title="4. Performance Breakdown">
-          <div className="space-y-4">
-            {/* By Strategy */}
-            {Object.keys(data.strategyMap).length > 0 && (
-              <div>
-                <div className="text-[12px] font-semibold text-[#6D6D82] mb-2">By Strategy</div>
-                <div className="space-y-2">
-                  {Object.entries(data.strategyMap)
-                    .sort((a, b) => b[1].pnl - a[1].pnl)
-                    .map(([strategy, stats]) => (
-                      <div
-                        key={strategy}
-                        className="p-2 rounded-lg bg-[#F6F6FB] flex items-center justify-between"
-                      >
-                        <div className="text-[11px]">
-                          <span className="font-semibold">{strategy}</span>
-                          <span className="text-[#6D6D82] mx-2">•</span>
-                          <span className="text-[#6D6D82]">
-                            {stats.total} trades, {stats.wins}/{stats.total} wins
-                          </span>
-                        </div>
-                        <div
-                          className={`tjfx-mono font-semibold text-[11px] ${
-                            stats.pnl >= 0 ? "text-[#10B981]" : "text-[#EF4444]"
-                          }`}
-                        >
-                          ${stats.pnl.toFixed(2)}
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              </div>
-            )}
-
-            {/* By Symbol */}
-            {Object.keys(data.symbolMap).length > 0 && (
-              <div>
-                <div className="text-[12px] font-semibold text-[#6D6D82] mb-2">By Symbol</div>
-                <div className="space-y-2">
-                  {Object.entries(data.symbolMap)
-                    .sort((a, b) => b[1].pnl - a[1].pnl)
-                    .slice(0, 5)
-                    .map(([symbol, stats]) => (
-                      <div
-                        key={symbol}
-                        className="p-2 rounded-lg bg-[#F6F6FB] flex items-center justify-between"
-                      >
-                        <div className="text-[11px]">
-                          <span className="font-semibold tjfx-mono">{symbol}</span>
-                          <span className="text-[#6D6D82] mx-2">•</span>
-                          <span className="text-[#6D6D82]">
-                            {stats.total} trades, {stats.wins}/{stats.total} wins
-                          </span>
-                        </div>
-                        <div
-                          className={`tjfx-mono font-semibold text-[11px] ${
-                            stats.pnl >= 0 ? "text-[#10B981]" : "text-[#EF4444]"
-                          }`}
-                        >
-                          ${stats.pnl.toFixed(2)}
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              </div>
-            )}
-
-            {/* By Time of Day */}
-            {Object.keys(data.timeMap).length > 0 && (
-              <div>
-                <div className="text-[12px] font-semibold text-[#6D6D82] mb-2">By Time of Day</div>
-                <div className="space-y-2">
-                  {Object.entries(data.timeMap)
-                    .sort((a, b) => b[1].pnl - a[1].pnl)
-                    .map(([timeOfDay, stats]) => (
-                      <div
-                        key={timeOfDay}
-                        className="p-2 rounded-lg bg-[#F6F6FB] flex items-center justify-between"
-                      >
-                        <div className="text-[11px]">
-                          <span className="font-semibold">{timeOfDay}</span>
-                          <span className="text-[#6D6D82] mx-2">•</span>
-                          <span className="text-[#6D6D82]">
-                            {stats.total} trades, {stats.wins}/{stats.total} wins
-                          </span>
-                        </div>
-                        <div
-                          className={`tjfx-mono font-semibold text-[11px] ${
-                            stats.pnl >= 0 ? "text-[#10B981]" : "text-[#EF4444]"
-                          }`}
-                        >
-                          ${stats.pnl.toFixed(2)}
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </Section>
-      )}
-
-      {/* RISK METRICS */}
-      {includes.riskMetrics && (
-        <Section title="5. Risk Metrics">
-          <div className="grid grid-cols-3 gap-3">
-            <Metric
-              label="Avg Win"
-              value={`$${data.metrics.avgWin}`}
-              color="#10B981"
-            />
-            <Metric
-              label="Avg Loss"
-              value={`-$${data.metrics.avgLoss}`}
-              color="#EF4444"
-            />
-            <Metric
-              label="Max Streak"
-              value={`${data.maxWinStreak}W`}
-              color="#7C3AED"
-            />
-          </div>
-          {data.bestTrade && (
-            <div className="mt-3 p-3 rounded-lg bg-[#ECFDF5] border border-[#10B981]/20">
-              <div className="text-[11px] text-[#059669] font-semibold mb-1">Best Trade</div>
-              <div className="text-[11px]">
-                <span className="tjfx-mono font-semibold">{data.bestTrade.symbol}</span>
-                <span className="text-[#6D6D82] mx-1">•</span>
-                <span className="text-[#6D6D82]">{data.bestTrade.date}</span>
-                <span className="text-[#6D6D82] mx-1">•</span>
-                <span className="tjfx-mono font-semibold text-[#10B981]">
-                  +${(data.bestTrade.net_pnl || 0).toFixed(2)}
-                </span>
-              </div>
+            <div className={`shrink-0 text-xs px-2 py-0.5 rounded-full ${b.direction==="bullish"?"bg-emerald-50 text-emerald-700":b.direction==="bearish"?"bg-red-50 text-red-700":"bg-gray-50 text-gray-600"}`}>{b.direction}</div>
+            <div className="flex-1 min-w-0 text-xs text-[#6D6D82] truncate">{b.narrative || "—"}</div>
+            <div className="shrink-0 flex items-center gap-4 text-[11px] text-[#6D6D82] ml-auto">
+              <span>Confidence <span className="tjfx-mono font-semibold text-[#16151F]">{b.confidence}%</span></span>
+              {b.images?.length>0 && <span>{b.images.length} chart{b.images.length>1?"s":""}</span>}
             </div>
-          )}
-          {data.worstTrade && (
-            <div className="mt-2 p-3 rounded-lg bg-[#FEF2F2] border border-[#EF4444]/20">
-              <div className="text-[11px] text-[#DC2626] font-semibold mb-1">
-                Worst Trade
-              </div>
-              <div className="text-[11px]">
-                <span className="tjfx-mono font-semibold">{data.worstTrade.symbol}</span>
-                <span className="text-[#6D6D82] mx-1">•</span>
-                <span className="text-[#6D6D82]">{data.worstTrade.date}</span>
-                <span className="text-[#6D6D82] mx-1">•</span>
-                <span className="tjfx-mono font-semibold text-[#EF4444]">
-                  ${(data.worstTrade.net_pnl || 0).toFixed(2)}
-                </span>
-              </div>
-            </div>
-          )}
-        </Section>
-      )}
-
-      {/* TRADES TABLE */}
-      {includes.trades && (
-        <Section title="6. Detailed Trades">
-          {data.trades.length === 0 ? (
-            <div className="text-[#6D6D82] text-[12px] p-3 bg-[#F6F6FB] rounded-lg">
-              No trades in this period.
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-[11px]">
-                <thead className="bg-[#F6F6FB] text-[#6D6D82]">
-                  <tr>
-                    {["Date", "Symbol", "Dir", "Entry", "Exit", "SL", "TP", "R", "P&L", "Status"].map(
-                      (h) => (
-                        <th
-                          key={h}
-                          className="text-left px-2 py-2 font-semibold whitespace-nowrap"
-                        >
-                          {h}
-                        </th>
-                      )
-                    )}
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.trades.map((t) => (
-                    <tr
-                      key={t.id}
-                      className={`border-t border-[#E8E8F1] ${
-                        (t.net_pnl || 0) > 0 ? "bg-[#ECFDF5]/30" : (t.net_pnl || 0) < 0 ? "bg-[#FEF2F2]/30" : ""
-                      }`}
-                    >
-                      <td className="px-2 py-2 tjfx-mono text-[#6D6D82]">{t.date}</td>
-                      <td className="px-2 py-2 font-semibold tjfx-mono">{t.symbol}</td>
-                      <td
-                        className={`px-2 py-2 ${
-                          t.direction === "long"
-                            ? "text-[#10B981] font-semibold"
-                            : "text-[#EF4444] font-semibold"
-                        }`}
-                      >
-                        {t.direction === "long" ? "L" : "S"}
-                      </td>
-                      <td className="px-2 py-2 tjfx-mono">{t.entry_price}</td>
-                      <td className="px-2 py-2 tjfx-mono">{t.exit_price || "—"}</td>
-                      <td className="px-2 py-2 tjfx-mono text-[#6D6D82]">
-                        {t.stop_loss || "—"}
-                      </td>
-                      <td className="px-2 py-2 tjfx-mono text-[#6D6D82]">
-                        {t.take_profit || "—"}
-                      </td>
-                      <td className="px-2 py-2 tjfx-mono font-medium">
-                        {t.r_multiple ? `${t.r_multiple}R` : "—"}
-                      </td>
-                      <td
-                        className={`px-2 py-2 tjfx-mono font-semibold ${
-                          (t.net_pnl || 0) >= 0
-                            ? "text-[#10B981]"
-                            : "text-[#EF4444]"
-                        }`}
-                      >
-                        ${(t.net_pnl || 0).toFixed(2)}
-                      </td>
-                      <td className="px-2 py-2 text-[#6D6D82] capitalize">{t.status}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Section>
-      )}
-
-      {/* TRADE ANALYSIS */}
-      {includes.tradeAnalysis && data.trades.some((t) => t.screenshots?.length) && (
-        <Section title="7. Trade Analysis">
-          <div className="space-y-4">
-            {data.trades
-              .filter((t) => t.screenshots?.length)
-              .slice(0, 5)
-              .map((t) => (
-                <div
-                  key={t.id}
-                  className="border border-[#E8E8F1] rounded-lg p-3 bg-[#F9F9FC]"
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <div>
-                      <div className="font-semibold tjfx-mono text-[12px]">
-                        {t.symbol} · {t.direction === "long" ? "Long" : "Short"}
-                      </div>
-                      <div className="text-[11px] text-[#6D6D82]">{t.date}</div>
-                    </div>
-                    <div
-                      className={`text-[12px] tjfx-mono font-semibold ${
-                        (t.net_pnl || 0) >= 0
-                          ? "text-[#10B981]"
-                          : "text-[#EF4444]"
-                      }`}
-                    >
-                      ${(t.net_pnl || 0).toFixed(2)}
-                    </div>
-                  </div>
-                  {t.notes && (
-                    <div className="text-[11px] text-[#6D6D82] whitespace-pre-wrap border-t border-[#E8E8F1] pt-2">
-                      {t.notes}
-                    </div>
-                  )}
-                </div>
-              ))}
-          </div>
-        </Section>
-      )}
-
-      {/* PSYCHOLOGY */}
-      {includes.psychology && (
-        <Section title="8. Psychology Review">
-          {(() => {
-            const moods = {};
-            const mistakes = {};
-            const strengths = {};
-            data.trades.forEach((t) => {
-              (t.mood_before || []).forEach(
-                (m) => (moods[m] = (moods[m] || 0) + 1)
-              );
-              (t.mood_during || []).forEach(
-                (m) => (moods[m] = (moods[m] || 0) + 1)
-              );
-              (t.mood_after || []).forEach(
-                (m) => (moods[m] = (moods[m] || 0) + 1)
-              );
-              (t.mistakes || []).forEach(
-                (m) => (mistakes[m] = (mistakes[m] || 0) + 1)
-              );
-              (t.strengths || []).forEach(
-                (m) => (strengths[m] = (strengths[m] || 0) + 1)
-              );
-            });
-            const top = (obj) =>
-              Object.entries(obj)
-                .sort((a, b) => b[1] - a[1])
-                .slice(0, 5);
-            return (
-              <div className="grid grid-cols-3 gap-3 text-[12px]">
-                <TagsBox label="Moods" items={top(moods)} color="purple" />
-                <TagsBox label="Mistakes" items={top(mistakes)} color="red" />
-                <TagsBox label="Strengths" items={top(strengths)} color="emerald" />
-              </div>
-            );
-          })()}
-        </Section>
-      )}
-
-      {/* AI SUMMARY */}
-      {includes.aiSummary && aiSummary && (
-        <Section title="9. AI Insights & Summary">
-          <div className="p-4 rounded-xl bg-gradient-to-r from-[#F3E8FF] to-[#F6F6FB] border border-[#7C3AED]/20">
-            <div className="flex gap-2 mb-3">
-              <Zap className="w-4 h-4 text-[#7C3AED] flex-shrink-0 mt-0.5" />
-              <div className="text-[11px] text-[#16151F] whitespace-pre-wrap leading-relaxed">
-                {aiSummary}
-              </div>
-            </div>
-          </div>
-        </Section>
-      )}
-
-      {/* NOTES */}
-      {includes.notes && data.daily?.notes?.length > 0 && (
-        <Section title="10. Notes & Reminders">
-          <ul className="list-disc pl-5 space-y-1 text-[12px]">
-            {data.daily.notes.map((n, i) => (
-              <li key={i} className="text-[#16151F]">
-                {n}
-              </li>
-            ))}
-          </ul>
-        </Section>
-      )}
-
-      {/* FOOTER */}
-      <div className="pt-4 mt-6 border-t border-[#E8E8F1] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-[10px] text-[#A1A1AA]">
-        <span>Generated by TheJournalFX</span>
-        <span className="tjfx-mono">{new Date().toISOString().slice(0, 10)}</span>
-        <span className="tjfx-mono">{reportId}</span>
-      </div>
-    </div>
-  );
-}
-
-const Section = ({ title, children }) => (
-  <div>
-    <div className="font-display font-bold text-[15px] text-[#16151F] mb-3 pb-2 border-b-2 border-[#7C3AED]/30">
-      {title}
-    </div>
-    <div>{children}</div>
-  </div>
-);
-
-const Metric = ({ label, value, color = "#16151F" }) => (
-  <div className="p-3 rounded-lg bg-[#F6F6FB] border border-[#E8E8F1]">
-    <div className="text-[10px] text-[#6D6D82] font-medium">{label}</div>
-    <div className="tjfx-mono font-bold text-[16px] mt-1" style={{ color }}>
-      {value}
-    </div>
-  </div>
-);
-
-const BiasBlock = ({ b }) => (
-  <div className="space-y-3">
-    <div className="grid grid-cols-4 gap-2 text-[12px]">
-      <div className="p-2 rounded-lg bg-[#F6F6FB]">
-        <div className="text-[10px] text-[#6D6D82] font-medium">Direction</div>
-        <div
-          className={`font-semibold capitalize mt-1 ${
-            b.direction === "bullish"
-              ? "text-[#10B981]"
-              : b.direction === "bearish"
-              ? "text-[#EF4444]"
-              : ""
-          }`}
-        >
-          {b.direction}
-        </div>
-      </div>
-      <div className="p-2 rounded-lg bg-[#F6F6FB]">
-        <div className="text-[10px] text-[#6D6D82] font-medium">Confidence</div>
-        <div className="font-semibold tjfx-mono mt-1">{b.confidence}%</div>
-      </div>
-      <div className="p-2 rounded-lg bg-[#F6F6FB]">
-        <div className="text-[10px] text-[#6D6D82] font-medium">Session</div>
-        <div className="font-semibold mt-1">{b.session || "—"}</div>
-      </div>
-      <div className="p-2 rounded-lg bg-[#F6F6FB]">
-        <div className="text-[10px] text-[#6D6D82] font-medium">Date</div>
-        <div className="font-semibold tjfx-mono mt-1">{b.date}</div>
-      </div>
-    </div>
-    {b.narrative && (
-      <div className="p-3 rounded-lg bg-[#F6F6FB]">
-        <div className="text-[11px] text-[#16151F] whitespace-pre-wrap">
-          {b.narrative}
-        </div>
-      </div>
-    )}
-    {b.ai_summary && (
-      <div className="p-3 rounded-lg bg-[#F3E8FF] border border-[#7C3AED]/20">
-        <div className="text-[10px] font-semibold text-[#7C3AED] mb-1">
-          AI Summary
-        </div>
-        <div className="text-[11px] whitespace-pre-wrap text-[#16151F]">
-          {b.ai_summary}
-        </div>
-      </div>
-    )}
-  </div>
-);
-
-const TagsBox = ({ label, items, color = "purple" }) => (
-  <div className="p-3 rounded-lg bg-[#F6F6FB] border border-[#E8E8F1]">
-    <div className="text-[10px] text-[#6D6D82] font-medium mb-2">{label}</div>
-    {items.length === 0 ? (
-      <div className="text-[10px] text-[#A1A1AA]">—</div>
-    ) : (
-      <div className="space-y-1.5">
-        {items.map(([k, v]) => (
-          <div key={k} className="flex items-center justify-between text-[11px]">
-            <span className="text-[#16151F]">{k}</span>
-            <span
-              className={`tjfx-mono font-semibold ${
-                color === "red"
-                  ? "text-[#EF4444]"
-                  : color === "emerald"
-                  ? "text-[#10B981]"
-                  : "text-[#7C3AED]"
-              }`}
-            >
-              ×{v}
-            </span>
-          </div>
+          </button>
         ))}
       </div>
-    )}
-  </div>
-);
+
+      {sel && (
+        <div className="fixed inset-0 bg-black/30 z-50" onClick={()=>{setSel(null); setEdit(null);}}>
+          <div onClick={e=>e.stopPropagation()} className="absolute right-0 top-0 h-full w-full max-w-[600px] bg-white shadow-2xl overflow-y-auto scroll-thin p-6 space-y-4 animate-in">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-[11px] uppercase tracking-wide text-[#7C3AED] font-semibold">{sel.type} bias</div>
+                <div className="font-display text-2xl font-bold tjfx-mono">{sel.date}</div>
+              </div>
+              <div className="flex gap-2">
+                {!edit ? (
+                  <button onClick={startEdit} data-testid="record-edit-btn" className="h-9 px-3 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-sm font-semibold flex items-center gap-1"><Pencil className="w-4 h-4"/> Edit</button>
+                ) : (
+                  <>
+                    <button onClick={cancelEdit} className="h-9 px-3 rounded-xl border border-[#E8E8F1] text-sm">Cancel</button>
+                    <button onClick={saveEdit} disabled={saving} data-testid="record-save-btn" className="h-9 px-3 rounded-xl bg-[#7C3AED] text-white text-sm font-semibold flex items-center gap-1 disabled:opacity-60"><Save className="w-4 h-4"/>{saving?"Saving...":"Save"}</button>
+                  </>
+                )}
+                <button onClick={()=>{setSel(null); setEdit(null);}} className="w-9 h-9 rounded-xl hover:bg-[#F6F6FB] flex items-center justify-center"><X className="w-4 h-4"/></button>
+              </div>
+            </div>
+
+            {edit ? <BiasEditForm b={edit} setB={setEdit} toggleP={toggleP} onFile={onFile} htfPresets={htfPresets} uploadingCount={uploadingCount}/> :
+              <BiasView b={sel}/>
+            }
+
+            {!edit && <button onClick={del} data-testid="record-delete-btn" className="w-full h-10 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 text-sm font-medium flex items-center justify-center gap-2"><Trash2 className="w-4 h-4"/> Delete Record</button>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BiasView({ b }) {
+  const openLightbox = useLightbox();
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-3 gap-2">
+        <div className="p-3 rounded-xl bg-[#F6F6FB]"><div className="text-[11px] text-[#6D6D82]">Direction</div><div className={`font-semibold capitalize ${b.direction==="bullish"?"text-emerald-600":b.direction==="bearish"?"text-red-500":""}`}>{b.direction}</div></div>
+        <div className="p-3 rounded-xl bg-[#F6F6FB]"><div className="text-[11px] text-[#6D6D82]">Confidence</div><div className="font-semibold tjfx-mono">{b.confidence}%</div></div>
+        <div className="p-3 rounded-xl bg-[#F6F6FB]"><div className="text-[11px] text-[#6D6D82]">Session</div><div className="font-semibold">{b.session || "—"}</div></div>
+      </div>
+      {b.narrative && <div><div className="text-[11px] text-[#6D6D82] uppercase tracking-wide mb-1">Narrative</div><div className="p-3 bg-[#F6F6FB] rounded-xl text-sm whitespace-pre-wrap">{b.narrative}</div></div>}
+      {b.poi_tags?.length>0 && <div><div className="text-[11px] text-[#6D6D82] uppercase tracking-wide mb-2">HTF POI</div><div className="flex flex-wrap gap-1.5">{b.poi_tags.map(t => <span key={t} className="chip active">{t}</span>)}</div></div>}
+      {b.key_levels?.length>0 && <div><div className="text-[11px] text-[#6D6D82] uppercase tracking-wide mb-2">Key Levels</div><div className="space-y-1">{b.key_levels.map((l,i) => <div key={i} className="flex justify-between p-2 rounded-lg bg-[#F6F6FB] text-sm"><span>{l.name}</span><span className="tjfx-mono">{l.price}</span></div>)}</div></div>}
+      {b.targets?.length>0 && <div><div className="text-[11px] text-[#6D6D82] uppercase tracking-wide mb-2">Targets</div><div className="space-y-1">{b.targets.map((t,i) => <div key={i} className="flex justify-between p-2 rounded-lg bg-emerald-50 text-sm"><span>{t.name}</span><span className="tjfx-mono">{t.price}</span></div>)}</div></div>}
+      {b.notes?.length>0 && <div><div className="text-[11px] text-[#6D6D82] uppercase tracking-wide mb-2">Notes</div><ul className="list-disc pl-5 text-sm space-y-1">{b.notes.map((n,i) => <li key={i}>{n}</li>)}</ul></div>}
+      {b.ai_summary && <div className="p-4 rounded-2xl bg-gradient-to-br from-[#F3E8FF] to-white"><div className="text-[11px] text-[#7C3AED] uppercase tracking-wide font-semibold mb-1 flex items-center gap-1"><Sparkles className="w-3 h-3"/> AI Summary</div><p className="text-sm whitespace-pre-wrap">{b.ai_summary}</p></div>}
+      {b.images?.length>0 && (
+        <div>
+          <div className="text-[11px] text-[#6D6D82] uppercase tracking-wide mb-2">Chart Gallery ({b.images.length})</div>
+          <div className="grid grid-cols-2 gap-2">{b.images.map((s,i) => <img key={i} alt="" src={s} onClick={()=>openLightbox(b.images,i)} className="w-full rounded-lg cursor-zoom-in"/>)}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BiasEditForm({ b, setB, toggleP, onFile, htfPresets, uploadingCount = 0 }) {
+  const openLightbox = useLightbox();
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-3 gap-2">
+        {[["bullish","Bullish",TrendingUp,"emerald"],["bearish","Bearish",TrendingDown,"red"],["neutral","Neutral",Minus,"gray"]].map(([k,l,Icon,c]) => (
+          <button key={k} onClick={()=>setB({...b, direction:k})} className={`p-3 rounded-xl border-2 text-xs font-medium flex flex-col items-center gap-1 ${b.direction===k? (c==="emerald"?"bg-emerald-50 border-emerald-400 text-emerald-700":c==="red"?"bg-red-50 border-red-400 text-red-700":"bg-gray-50 border-gray-400 text-gray-700") : "border-[#E8E8F1]"}`}>
+            <Icon className="w-4 h-4"/> {l}
+          </button>
+        ))}
+      </div>
+      <div>
+        <div className="text-[11px] text-[#6D6D82] mb-1">Confidence <span className="tjfx-mono text-[#7C3AED] font-semibold">{b.confidence}%</span></div>
+        <input type="range" min="0" max="100" value={b.confidence} onChange={e=>setB({...b, confidence:parseInt(e.target.value)})} className="w-full accent-[#7C3AED]"/>
+      </div>
+      <div>
+        <div className="text-[11px] text-[#6D6D82] mb-1">Date</div>
+        <input type="date" value={b.date} onChange={e=>setB({...b,date:e.target.value})} className="w-full h-9 px-3 rounded-lg border border-[#E8E8F1] text-sm tjfx-mono"/>
+      </div>
+      <div>
+        <div className="text-[11px] text-[#6D6D82] mb-1">Narrative</div>
+        <textarea rows={5} value={b.narrative||""} onChange={e=>setB({...b, narrative:e.target.value})} className="w-full p-3 rounded-xl border border-[#E8E8F1] focus:border-[#7C3AED] outline-none text-sm"/>
+      </div>
+      {htfPresets.length>0 && (
+        <div>
+          <div className="text-[11px] text-[#6D6D82] uppercase tracking-wide mb-2">HTF POI</div>
+          <div className="flex flex-wrap gap-1.5">{htfPresets.map(v => <button key={v} onClick={()=>toggleP("poi_tags",v)} className={`chip ${(b.poi_tags||[]).includes(v)?"active":""}`} style={{fontSize:11,padding:"3px 8px"}}>{v}</button>)}</div>
+        </div>
+      )}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <div className="text-[11px] text-[#6D6D82] uppercase tracking-wide">Chart Gallery <span className="tjfx-mono">{(b.images||[]).length}</span></div>
+          <label className="text-[11px] text-[#7C3AED] font-medium cursor-pointer flex items-center gap-1"><Upload className="w-3 h-3"/> Add<input type="file" accept="image/*" multiple hidden onChange={onFile}/></label>
+        </div>
+        <div className="text-[10px] text-[#A1A1AA] mb-2 flex items-center gap-1"><Clipboard className="w-3 h-3"/> Ctrl+V to paste</div>
+        <div className="grid grid-cols-3 gap-2">
+          {(b.images||[]).map((s,i) => (
+            <div key={i} className="relative group">
+              <img alt="" src={s} onClick={()=>openLightbox(b.images,i)} className="w-full h-20 object-cover rounded-lg cursor-zoom-in"/>
+              <button onClick={()=>setB({...b, images: b.images.filter((_,j)=>j!==i)})} className="absolute top-1 right-1 w-6 h-6 rounded-full bg-white/90 opacity-0 group-hover:opacity-100"><X className="w-3 h-3 mx-auto text-red-500"/></button>
+            </div>
+          ))}
+          {Array.from({length: uploadingCount}).map((_,i) => <div key={`u${i}`} className="w-full h-20 rounded-lg border-2 border-dashed border-[#7C3AED]/40 bg-[#F3E8FF]/40 flex items-center justify-center text-[10px] text-[#7C3AED] animate-pulse">Uploading...</div>)}
+        </div>
+      </div>
+    </div>
+  );
+}

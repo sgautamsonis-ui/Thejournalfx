@@ -121,8 +121,21 @@ export default function BiasCenter() {
 
   const save = async () => {
     try {
-      if (b.id) await biasApi.update(b.id, b); else {
-        const r = await biasApi.create(b); setB(r);
+      let payload = b;
+      // AI summary is generated automatically on save (no manual button) —
+      // only when there's a narrative to summarize and we don't already
+      // have a fresh one for this text.
+      if (b.narrative && b.narrative.trim()) {
+        setAiLoading(true);
+        try {
+          const r = await aiApi.biasSummary(b);
+          payload = { ...b, ai_summary: r.summary, ai_confidence: 90 };
+          setB(payload);
+        } catch { /* AI summary is best-effort; don't block saving */ }
+        finally { setAiLoading(false); }
+      }
+      if (payload.id) await biasApi.update(payload.id, payload); else {
+        const r = await biasApi.create(payload); setB(r);
       }
       toast.success("Bias saved. Older bias records are in Records.");
       load();
@@ -138,15 +151,6 @@ export default function BiasCenter() {
     if (!b.id || !confirm("Delete this bias record?")) return;
     await biasApi.delete(b.id);
     toast.success("Deleted"); newRecord(); load();
-  };
-
-  const runAI = async () => {
-    setAiLoading(true);
-    try {
-      const r = await aiApi.biasSummary(b);
-      setB(p => ({...p, ai_summary: r.summary, ai_confidence: 90}));
-      toast.success("AI summary generated");
-    } catch { toast.error("AI failed"); } finally { setAiLoading(false); }
   };
 
   const [uploadingCount, setUploadingCount] = useState(0);
@@ -217,7 +221,7 @@ export default function BiasCenter() {
   const addNote = () => setB(p => ({...p, notes: [...p.notes, ""]}));
 
   return (
-    <div className="compact-bias-page p-5 max-w-[1000px] mx-auto space-y-4" data-testid="bias-page">
+    <div className="compact-bias-page p-5 max-w-[1000px] mx-auto space-y-2" data-testid="bias-page">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <div className="flex items-center gap-2">
@@ -227,16 +231,12 @@ export default function BiasCenter() {
               <option value="daily">Daily Bias</option>
             </select>
           </div>
-          <p className="text-[#6D6D82] mt-1">Build your market narrative. Old bias auto-moves to <span className="text-[#7C3AED]">Records</span> when a new period starts.</p>
         </div>
         <div className="flex flex-col items-end gap-2">
           <div className="flex gap-2">
-            <button onClick={runAI} disabled={aiLoading} className="h-10 px-4 rounded-xl border border-[#E8E8F1] hover:border-[#7C3AED] hover:text-[#7C3AED] text-sm font-medium flex items-center gap-2" data-testid="ai-summary-btn">
-              <Sparkles className="w-4 h-4"/> {aiLoading?"Thinking...":"AI Summary"}
-            </button>
             <button onClick={newRecord} className="h-10 px-4 rounded-xl border border-[#E8E8F1] hover:border-[#7C3AED] text-sm font-medium" data-testid="new-bias-btn">+ New Bias</button>
-            <button onClick={save} className="h-10 px-5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-sm font-semibold flex items-center gap-2" data-testid="save-bias-btn">
-              <Save className="w-4 h-4"/> Save Bias
+            <button onClick={save} disabled={aiLoading} className="h-10 px-5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-sm font-semibold flex items-center gap-2" data-testid="save-bias-btn">
+              <Save className="w-4 h-4"/> {aiLoading?"Saving...":"Save Bias"}
             </button>
           </div>
           <div className="text-[11px] text-[#6D6D82] tjfx-mono">
@@ -247,7 +247,7 @@ export default function BiasCenter() {
         </div>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-2">
         <div className="tjfx-card p-5">
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-display text-[15px] font-bold">Chart Gallery <span className="text-xs text-[#6D6D82] font-normal tjfx-mono ml-1">{b.images.length}/{MAX_IMAGES}</span></h3>
@@ -312,7 +312,7 @@ export default function BiasCenter() {
           </div>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-5">
+        <div className="grid md:grid-cols-2 gap-2">
             <div className="tjfx-card p-5">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-display text-[15px] font-bold">Key Levels</h3>
