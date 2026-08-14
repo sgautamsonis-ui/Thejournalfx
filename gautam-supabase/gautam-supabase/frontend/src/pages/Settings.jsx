@@ -2,12 +2,12 @@ import React, { useEffect, useState } from "react";
 import { settingsApi, accountsApi, prefsApi } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
-import { Trash2, Plus, Pencil, ChevronDown, CheckCircle2 } from "lucide-react";
+import { Trash2, Plus, Pencil, Check, X, ChevronDown } from "lucide-react";
 
 const TABS = ["Profile", "Trade Presets", "Bias Presets"];
 
 // ============================================================================
-// PROP FIRM TYPES CONFIGURATION
+// PROP FIRM TYPES
 // ============================================================================
 const PROP_FIRM_TYPES = {
   DEMO: {
@@ -36,6 +36,25 @@ const PROP_FIRM_TYPES = {
     description: "2 Step challenge"
   }
 };
+
+const PRESET_KINDS = [
+  { kind: "strategy", label: "Strategies", hint: "Dropdown in Add Trade → Strategy" },
+  { kind: "htf_poi_type", label: "HTF POI Types", hint: "HTF POI builder" },
+  { kind: "htf_timeframe", label: "HTF Timeframes", hint: "HTF POI builder" },
+  { kind: "entry_confirmation_type", label: "Entry Confirmation Types", hint: "Entry Confirmation builder" },
+  { kind: "entry_timeframe", label: "Entry Timeframes", hint: "Entry Confirmation builder" },
+  { kind: "mood", label: "Psychology Moods", hint: "Mood chips in Add Trade" },
+  { kind: "setup_tag", label: "Tags", hint: "Setup tags in Add Trade" },
+  { kind: "mistake", label: "Mistakes", hint: "Mistake tracker chips" },
+  { kind: "strength", label: "Strengths", hint: "Strengths chips in Add Trade" },
+  { kind: "session", label: "Sessions", hint: "Session dropdown" },
+  { kind: "symbol", label: "Symbols", hint: "Symbol dropdown in Add Trade" },
+];
+
+const BIAS_KINDS = [
+  { kind: "key_level_weekly", label: "Weekly Key Levels", hint: "Preset names shown in Bias Center → Weekly tab" },
+  { kind: "key_level_daily", label: "Daily Key Levels", hint: "Preset names shown in Bias Center → Daily tab" },
+];
 
 // ============================================================================
 // PROP FIRM TYPE DROPDOWN
@@ -216,7 +235,7 @@ function TwoStepFields({ data, onChange }) {
 }
 
 // ============================================================================
-// EDIT MODAL
+// EDIT ACCOUNT MODAL
 // ============================================================================
 function EditAccountModal({ account, settings, onSave, onCancel }) {
   const limits = settings?.account_limits?.[account.id] || {};
@@ -352,7 +371,6 @@ function TradingAccounts({ settings }) {
       setAccounts(data);
     } catch (error) {
       console.error("Error loading accounts:", error);
-      toast.error("Failed to load accounts");
     }
     setLoading(false);
   };
@@ -456,7 +474,7 @@ function TradingAccounts({ settings }) {
               onClick={addAccount}
               className="flex-1 h-10 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-sm font-semibold"
             >
-              Create
+              Create Account
             </button>
             <button
               onClick={() => setShowForm(false)}
@@ -494,13 +512,13 @@ function TradingAccounts({ settings }) {
                       <div className="text-xs text-[#A1A1AA] mt-2">
                         {type === "TWO_STEP" ? (
                           <>
-                            <div>Step 1: DD {limits.step_1_daily_dd || "—"} / Max {limits.step_1_max_dd || "—"}</div>
-                            <div>Step 2: DD {limits.step_2_daily_dd || "—"} / Max {limits.step_2_max_dd || "—"}</div>
+                            <div>Step 1: DD {limits.step_1_daily_dd || "—"} / Max {limits.step_1_max_dd || "—"} / Target {limits.step_1_profit_target || "—"}</div>
+                            <div>Step 2: DD {limits.step_2_daily_dd || "—"} / Max {limits.step_2_max_dd || "—"} / Target {limits.step_2_profit_target || "—"}</div>
                           </>
                         ) : type === "DEMO" || type === "LIVE" ? (
                           <div>Daily {limits.daily_dd || "—"} / Weekly {limits.weekly_dd || "—"}</div>
                         ) : (
-                          <div>DD {limits.daily_dd || "—"} / Max {limits.max_dd || "—"}</div>
+                          <div>DD {limits.daily_dd || "—"} / Max {limits.max_dd || "—"} {limits.profit_target && `/ Target ${limits.profit_target}`}</div>
                         )}
                       </div>
                     )}
@@ -539,19 +557,226 @@ function TradingAccounts({ settings }) {
 }
 
 // ============================================================================
-// SUPPORTING COMPONENTS
+// PROFILE TAB
 // ============================================================================
+function ProfileTab({ user, settings, onSettingsChange }) {
+  const [name, setName] = React.useState(user?.settings?.display_name || user?.name || "");
+  const { refresh } = useAuth();
+  const [saving, setSaving] = React.useState(false);
 
-const Field = ({ label, children }) => (
-  <div>
-    <label className="block text-[12px] font-medium text-[#6D6D82] mb-1.5">{label}</label>
-    {children}
-  </div>
-);
+  const save = async () => {
+    setSaving(true);
+    try {
+      await settingsApi.update({ display_name: name.trim() });
+      await refresh();
+      toast.success("Profile updated");
+    } catch (error) {
+      toast.error("Save failed");
+    }
+    setSaving(false);
+  };
 
-// Main Settings Component
+  return (
+    <div className="space-y-5">
+      <div className="tjfx-card p-6 space-y-5">
+        <div className="flex items-center gap-4">
+          {user?.picture ? (
+            <img src={user.picture} alt="" className="w-16 h-16 rounded-2xl border border-[#E8E8F1]" />
+          ) : (
+            <div className="w-16 h-16 rounded-2xl bg-[#F3E8FF] flex items-center justify-center text-2xl font-bold text-[#7C3AED]">
+              {(user?.name?.[0] || "T").toUpperCase()}
+            </div>
+          )}
+          <div>
+            <div className="font-display text-xl font-bold">{user?.name}</div>
+            <div className="text-sm text-[#6D6D82]">{user?.email}</div>
+            <div className="text-[11px] text-[#A1A1AA] mt-1">Signed in with Google</div>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-[#6D6D82] mb-1.5">Display Name</label>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="w-full h-10 px-3 rounded-xl border border-[#E8E8F1] focus:border-[#7C3AED] outline-none text-sm"
+            placeholder="How would you like to be called?"
+          />
+        </div>
+
+        <button
+          onClick={save}
+          disabled={saving}
+          className="h-10 px-5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-sm font-semibold disabled:opacity-50"
+        >
+          {saving ? "Saving..." : "Save Profile"}
+        </button>
+      </div>
+
+      <TradingAccounts settings={settings} />
+    </div>
+  );
+}
+
+// ============================================================================
+// PRESET MANAGER
+// ============================================================================
+function PresetManager({ kind, label, hint }) {
+  const [items, setItems] = useState([]);
+  const [val, setVal] = useState("");
+  const [edit, setEdit] = useState({ id: null, val: "" });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadPresets();
+  }, [kind]);
+
+  const loadPresets = async () => {
+    try {
+      const data = await prefsApi.list(kind);
+      setItems(data);
+    } catch (error) {
+      console.error("Error loading presets:", error);
+    }
+    setLoading(false);
+  };
+
+  const add = async () => {
+    if (!val.trim()) return;
+    try {
+      const created = await prefsApi.create(kind, val.trim());
+      setItems([...items, created]);
+      setVal("");
+      localStorage.removeItem("tjfx-preference-cache-v1");
+      toast.success(`${label} added`);
+    } catch (error) {
+      toast.error(error?.response?.data?.detail || "Could not add");
+    }
+  };
+
+  const startEdit = (item) => setEdit({ id: item.id, val: item.value });
+
+  const saveEdit = async () => {
+    if (!edit.val.trim()) return;
+    try {
+      const updated = await prefsApi.update(kind, edit.id, edit.val.trim());
+      setItems(items.map(item => (item.id === updated.id ? updated : item)));
+      localStorage.removeItem("tjfx-preference-cache-v1");
+      setEdit({ id: null, val: "" });
+      toast.success(`${label} updated`);
+    } catch (error) {
+      toast.error(error?.response?.data?.detail || "Could not update");
+    }
+  };
+
+  const del = async (id) => {
+    try {
+      await prefsApi.delete(kind, id);
+      setItems(items.filter(item => item.id !== id));
+      localStorage.removeItem("tjfx-preference-cache-v1");
+      toast.success(`${label} deleted`);
+    } catch (error) {
+      toast.error(error?.response?.data?.detail || "Could not delete");
+    }
+  };
+
+  return (
+    <div className="tjfx-card p-6">
+      <div className="flex items-baseline justify-between mb-1">
+        <h3 className="font-display text-lg font-bold">{label}</h3>
+        <span className="text-[11px] text-[#A1A1AA]">{items.length} items</span>
+      </div>
+      <p className="text-xs text-[#6D6D82] mb-4">{hint}</p>
+
+      <div className="flex gap-2 mb-4">
+        <input
+          value={val}
+          onChange={(e) => setVal(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && add()}
+          placeholder={`Add new ${label.toLowerCase().slice(0, -1)}`}
+          className="flex-1 h-10 px-3 rounded-xl border border-[#E8E8F1] focus:border-[#7C3AED] outline-none text-sm"
+        />
+        <button
+          onClick={add}
+          className="h-10 px-4 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-sm font-semibold flex items-center gap-1"
+        >
+          <Plus className="w-4 h-4" /> Add
+        </button>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {loading ? (
+          <div className="text-sm text-[#999]">Loading...</div>
+        ) : items.length === 0 ? (
+          <div className="text-sm text-[#6D6D82]">No items yet</div>
+        ) : (
+          items.map(item => (
+            edit.id === item.id ? (
+              <div key={item.id} className="flex items-center gap-1 h-8 rounded-full border border-[#7C3AED] bg-white px-2">
+                <input
+                  value={edit.val}
+                  onChange={(e) => setEdit({ ...edit, val: e.target.value })}
+                  className="text-sm outline-none w-32"
+                />
+                <button onClick={saveEdit} className="text-emerald-600">
+                  <Check className="w-4 h-4" />
+                </button>
+                <button onClick={() => setEdit({ id: null, val: "" })} className="text-[#6D6D82]">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <div key={item.id} className="chip active flex items-center gap-1.5 pr-1">
+                <span>{item.value}</span>
+                <button onClick={() => startEdit(item)} className="w-5 h-5 rounded-full hover:bg-white/60 flex items-center justify-center">
+                  <Pencil className="w-3 h-3" />
+                </button>
+                <button onClick={() => del(item.id)} className="w-5 h-5 rounded-full hover:bg-red-100 hover:text-red-600 flex items-center justify-center">
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            )
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// BIAS PRESET TABS
+// ============================================================================
+function BiasPresetTabs() {
+  const [sub, setSub] = useState("key_level_weekly");
+  const active = BIAS_KINDS.find(k => k.kind === sub);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-1 bg-[#F6F6FB] p-1 rounded-xl w-fit">
+        {BIAS_KINDS.map(k => (
+          <button
+            key={k.kind}
+            onClick={() => setSub(k.kind)}
+            className={`px-4 h-9 text-sm rounded-lg font-medium ${
+              sub === k.kind
+                ? "bg-white shadow text-[#7C3AED]"
+                : "text-[#6D6D82]"
+            }`}
+          >
+            {k.label.replace(" Key Levels", "")}
+          </button>
+        ))}
+      </div>
+      <PresetManager kind={active.kind} label={active.label} hint={active.hint} />
+    </div>
+  );
+}
+
+// ============================================================================
+// MAIN SETTINGS COMPONENT
+// ============================================================================
 export default function Settings() {
-  const { refresh, user } = useAuth();
+  const { user } = useAuth();
   const [tab, setTab] = useState("Profile");
   const [settings, setSettings] = useState({});
   const [loading, setLoading] = useState(true);
@@ -599,43 +824,17 @@ export default function Settings() {
         </div>
 
         <div className="col-span-12 md:col-span-9 space-y-4">
-          {tab === "Profile" && (
-            <div className="space-y-5">
-              <TradingAccounts settings={settings} />
-            </div>
-          )}
-
+          {tab === "Profile" && <ProfileTab user={user} settings={settings} onSettingsChange={setSettings} />}
           {tab === "Trade Presets" && (
-            <div className="tjfx-card p-6">
-              <h3 className="font-display text-lg font-bold">Trade Presets</h3>
-              <p className="text-sm text-[#6D6D82] mt-2">Coming soon...</p>
+            <div className="space-y-5">
+              {PRESET_KINDS.map(k => (
+                <PresetManager key={k.kind} kind={k.kind} label={k.label} hint={k.hint} />
+              ))}
             </div>
           )}
-
-          {tab === "Bias Presets" && (
-            <div className="tjfx-card p-6">
-              <h3 className="font-display text-lg font-bold">Bias Presets</h3>
-              <p className="text-sm text-[#6D6D82] mt-2">Coming soon...</p>
-            </div>
-          )}
+          {tab === "Bias Presets" && <BiasPresetTabs />}
         </div>
       </div>
-
-      <style>{`
-        .inp {
-          width: 100%;
-          height: 40px;
-          padding: 0 12px;
-          border: 1px solid #E8E8F1;
-          border-radius: 12px;
-          outline: none;
-          font-size: 14px;
-          background: #fff;
-        }
-        .inp:focus {
-          border-color: #7C3AED;
-        }
-      `}</style>
     </div>
   );
 }
