@@ -11,7 +11,7 @@ import {
   AreaChart, Area, ReferenceLine
 } from "recharts";
 import { 
-  TrendingUp, Target, Activity, Wallet, Sparkles, Settings2, Eye, EyeOff, 
+  Target, Settings2, Eye, EyeOff, 
   ArrowUp, ArrowDown, Trophy, Calendar, Flame, PiggyBank, GripVertical,
   ChevronDown, AlertCircle, CheckCircle2
 } from "lucide-react";
@@ -72,7 +72,6 @@ function ThoughtOfTheDay() {
 
 // =============== WIDGET REGISTRY ===============
 const WIDGETS = [
-  { id: "kpis",           label: "KPI Cards",               category: "overview", size: "full" },
   { id: "performance",    label: "Performance Overview",    category: "main", size: "full" },
   { id: "equity-curve",   label: "Live Equity Curve",       category: "main", size: "full" },
   { id: "positions",      label: "Open Positions & Trades", category: "main", size: "full" },
@@ -386,51 +385,6 @@ export default function Dashboard() {
 
   // =============== RENDER WIDGETS ===============
   const widgetComponents = {
-    // KPI Cards (6 cards)
-    kpis: (
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-1.5" data-testid="kpi-cards">
-        <StatCard 
-          testid="stat-pnl"
-          label="Net P&L" 
-          value={`${(stats?.total_pnl ?? 0) >= 0 ? "+" : ""}$${(stats?.total_pnl ?? 0).toFixed(2)}`}
-          change={stats?.pnl_change}
-          icon={TrendingUp} 
-          color={(stats?.total_pnl ?? 0) >= 0 ? "text-emerald-600" : "text-red-500"} 
-        />
-        <StatCard 
-          testid="stat-winrate"
-          label="Win Rate" 
-          value={`${stats?.win_rate ?? 0}%`}
-          icon={Target} 
-        />
-        <StatCard 
-          testid="stat-trades"
-          label="Total Trades" 
-          value={stats?.total_trades ?? 0}
-          icon={Activity} 
-        />
-        <StatCard 
-          testid="stat-expectancy"
-          label="Expectancy" 
-          value={`+$${(stats?.expectancy ?? 0).toFixed(2)}`}
-          icon={Trophy}
-          color={(stats?.expectancy ?? 0) >= 0 ? "text-emerald-600" : "text-red-500"}
-        />
-        <StatCard 
-          testid="stat-pf"
-          label="Profit Factor" 
-          value={stats?.profit_factor ?? 0}
-          icon={Sparkles} 
-        />
-        <StatCard 
-          testid="stat-rr"
-          label="Avg R:R" 
-          value={stats?.avg_rr ?? 0}
-          icon={Wallet} 
-        />
-      </div>
-    ),
-
     // Performance Overview
     performance: (
       <Card data-testid="performance-overview">

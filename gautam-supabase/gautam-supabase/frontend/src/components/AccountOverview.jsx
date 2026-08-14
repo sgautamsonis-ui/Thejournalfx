@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ResponsiveContainer, AreaChart, Area } from "recharts";
-import { ShieldCheck, Sparkles } from "lucide-react";
+import { Activity, ShieldCheck, Sparkles, TrendingUp, Trophy, Wallet } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useAccount } from "@/context/AccountContext";
 import { statsApi } from "@/lib/api";
@@ -28,7 +28,7 @@ export default function AccountOverview() {
   const totalPnl = stats?.total_pnl ?? 0;
   const dailyDD = stats?.daily_drawdown ?? 0;
   const weeklyDD = stats?.weekly_drawdown ?? 0;
-  const winRate = stats?.win_rate ?? 0;
+  const winRate = Number(stats?.win_rate) || 0;
 
   const limits = (activeId !== "all" && user?.settings?.account_limits?.[activeId]) || null;
   const dailyLimit = limits?.daily;
@@ -47,7 +47,7 @@ export default function AccountOverview() {
     }
     return [
       { i: 0, equity: startBalance },
-      ...curve.map((pt, idx) => ({ i: idx + 1, equity: startBalance + (pt.equity || 0) })),
+      ...curve.map((pt, idx) => ({ i: idx + 1, equity: startBalance + (Number(pt.equity) || 0) })),
     ];
   }, [stats, balance, totalPnl]);
 
@@ -86,7 +86,8 @@ export default function AccountOverview() {
 
   const gaugeR = 42;
   const gaugeC = 2 * Math.PI * gaugeR;
-  const gaugeOffset = gaugeC - (Math.min(100, Math.max(0, winRate)) / 100) * gaugeC;
+  const safeWinRate = Math.min(100, Math.max(0, winRate));
+  const gaugeOffset = gaugeC - (safeWinRate / 100) * gaugeC;
 
   const fmt = (n) => `$${Math.abs(n).toFixed(2)}`;
 
@@ -108,7 +109,7 @@ export default function AccountOverview() {
       </div>
 
       {/* Balance Hero - Full Width */}
-      <div className="relative overflow-hidden rounded-2xl px-5 py-4 text-white bg-gradient-to-br from-[#8B5CF6] via-[#7C3AED] to-[#5B21B6] mb-4">
+      <div className="relative overflow-hidden rounded-2xl px-4 py-3 text-white bg-gradient-to-br from-[#8B5CF6] via-[#7C3AED] to-[#5B21B6] mb-4">
         <div className="text-[11px] font-semibold uppercase tracking-wide text-white/70">
           Current Balance
         </div>
@@ -121,7 +122,7 @@ export default function AccountOverview() {
           </div>
         </div>
 
-        <div className="h-16 -mx-2 mt-2">
+        <div className="h-14 -mx-1 mt-2" aria-label="Balance history chart">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={equityPoints} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
               <defs>
@@ -167,6 +168,9 @@ export default function AccountOverview() {
                 strokeDasharray={gaugeC} strokeDashoffset={gaugeOffset} strokeLinecap="round"
               />
             </svg>
+            <div className="absolute inset-0 flex items-center justify-center text-[19px] font-bold tjfx-mono tjfx-num text-[#16151F]">
+              {safeWinRate.toFixed(0)}%
+            </div>
           </div>
           <div className="text-[10px] text-[#6D6D82] uppercase tracking-wide mt-2">Win Rate</div>
         </div>
@@ -184,6 +188,19 @@ export default function AccountOverview() {
         </div>
       </div>
 
+      {/* These performance KPIs belong to Account Overview. Win Rate intentionally
+          stays only in the circular gauge above, so the same metric is not shown twice. */}
+      <div className="border-t border-[#E8E8F1] mt-4 pt-4">
+        <div className="text-[10px] font-semibold text-[#A1A1AA] uppercase tracking-wide mb-2">Performance</div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2" data-testid="account-overview-kpis">
+          <OverviewKpi label="Net P&L" value={`${totalPnl >= 0 ? "+" : "-"}${fmt(totalPnl)}`} icon={TrendingUp} color={totalPnl >= 0 ? "text-emerald-600" : "text-red-500"} />
+          <OverviewKpi label="Total Trades" value={stats?.total_trades ?? 0} icon={Activity} />
+          <OverviewKpi label="Expectancy" value={`${(Number(stats?.expectancy) || 0) >= 0 ? "+" : "-"}${fmt(Number(stats?.expectancy) || 0)}`} icon={Trophy} color={(Number(stats?.expectancy) || 0) >= 0 ? "text-emerald-600" : "text-red-500"} />
+          <OverviewKpi label="Profit Factor" value={stats?.profit_factor ?? 0} icon={Sparkles} />
+          <OverviewKpi label="Avg R:R" value={stats?.avg_rr ?? 0} icon={Wallet} />
+        </div>
+      </div>
+
       <div className="flex items-center gap-2 mt-4 rounded-xl bg-[#F6F6FB] px-3 py-2">
         <Sparkles className="w-3.5 h-3.5 text-[#7C3AED] shrink-0" />
         <span className="text-[12px] text-[#6D6D82]">{insight}</span>
@@ -194,6 +211,18 @@ export default function AccountOverview() {
           + Set drawdown limits →
         </Link>
       )}
+    </div>
+  );
+}
+
+function OverviewKpi({ label, value, icon: Icon, color = "text-[#16151F]" }) {
+  return (
+    <div className="rounded-xl bg-[#F6F6FB] px-3 py-2.5 min-w-0">
+      <div className="flex items-center justify-between gap-2 text-[10px] text-[#6D6D82] font-medium">
+        <span className="truncate">{label}</span>
+        <Icon className="w-3.5 h-3.5 shrink-0 text-[#7C3AED]" />
+      </div>
+      <div className={`mt-1 text-[17px] font-semibold tjfx-mono tjfx-num truncate ${color}`}>{value}</div>
     </div>
   );
 }
