@@ -953,6 +953,22 @@ async def dashboard_stats(account_id: Optional[str] = None, user=Depends(get_cur
     r = await asyncio.to_thread(q.order("date").execute)
     trades = [{k: v for k, v in d.items() if k != "user_id"} for d in r.data]
 
+    # Recent notebook entries (rules / lessons / checklists) — surfaced on the
+    # dashboard's "Recent Notes" widget so new notes actually show up there.
+    notes_r = await asyncio.to_thread(
+        sb.table("notebook").select("id,kind,title,body,pinned,created_at")
+        .eq("user_id", user["user_id"]).order("created_at", desc=True).limit(5).execute
+    )
+    recent_notes = [
+        {
+            "id": n["id"],
+            "kind": n.get("kind"),
+            "title": n.get("title") or "Untitled",
+            "excerpt": (n.get("body") or "").strip()[:140],
+        }
+        for n in (notes_r.data or [])
+    ]
+
     total = len(trades)
     closed = [t for t in trades if t.get("status") == "closed"]
     wins = [t for t in closed if (t.get("net_pnl") or 0) > 0]
@@ -1321,6 +1337,7 @@ async def dashboard_stats(account_id: Optional[str] = None, user=Depends(get_cur
         "current_losing_streak": current_losing_streak, "worst_losing_streak": worst_loss_streak,
         "mood_analytics": mood_analytics, "calendar": calendar_days,
         "recent_trades": trades[-5:][::-1] if trades else [],
+        "recent_notes": recent_notes,
         "ai_insights": ai_insights, "discipline_score": discipline_score,
     }
 
