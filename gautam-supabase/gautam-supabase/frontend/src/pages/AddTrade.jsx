@@ -531,7 +531,7 @@ function AddTradeWorkspace({ t, setT, presets, accounts, computed, recommendedLo
     .filter(v => v.split("::")[0] === baseStrategy)
     .map(v => v.split("::").slice(1).join("::"))
     .filter(Boolean);
-  const chooseSub = (sub) => setT({ ...t, strategy: currentSub === sub ? baseStrategy : `${baseStrategy} - ${sub}` });
+  const chooseSub = (sub) => setT({ ...t, strategy: (!sub || currentSub === sub) ? baseStrategy : `${baseStrategy} - ${sub}` });
   return (
     <div className="add-trade-page compact-add-trade p-4 sm:p-5 lg:p-6 max-w-[1500px] mx-auto space-y-4" data-testid="add-trade-page">
       <header className="flex flex-wrap items-center justify-between gap-4">
@@ -551,7 +551,11 @@ function AddTradeWorkspace({ t, setT, presets, accounts, computed, recommendedLo
             {subOptions.length>0 && (
               <div className="mt-4 pt-4 border-t border-[#E8E8F1]">
                 <div className="text-[12px] text-[#6D6D82] mb-2">Sub-strategy <span className="text-[#A1A1AA]">(optional — combines into one tag)</span></div>
-                <div className="flex flex-wrap gap-2">{subOptions.map(x=><Chip key={x} label={x} active={currentSub===x} onClick={()=>chooseSub(x)}/>)}</div>
+                <select value={currentSub} onChange={e=>chooseSub(e.target.value)} className={inp} data-testid="sub-strategy-select">
+                  <option value="">No sub-strategy</option>
+                  {subOptions.map(x=><option key={x} value={x}>{x}</option>)}
+                </select>
+                <div className="flex flex-wrap gap-2 mt-3">{subOptions.map(x=><Chip key={x} label={x} active={currentSub===x} onClick={()=>chooseSub(x)}/>)}</div>
                 {currentSub && <div className="mt-3 inline-flex items-center text-xs font-semibold px-2.5 py-1 rounded-full bg-[#F3E8FF] text-[#7C3AED]" data-testid="combined-strategy-tag">{t.strategy}</div>}
               </div>
             )}
