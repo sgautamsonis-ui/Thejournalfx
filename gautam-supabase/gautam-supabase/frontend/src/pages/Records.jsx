@@ -74,7 +74,7 @@ export default function Records() {
   }, [edit]);
 
   return (
-    <div className="p-5 max-w-[1300px] mx-auto space-y-4" data-testid="records-page">
+    <div className="p-5 max-w-[1300px] mx-auto space-y-3" data-testid="records-page">
       <div>
         <h1 className="font-display text-3xl font-bold">Bias Records</h1>
         <p className="text-[#6D6D82] mt-1">Every plan you've written. Click any record to view or edit.</p>
@@ -92,18 +92,18 @@ export default function Records() {
         </div>
       </div>
 
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filtered.length===0 && <div className="col-span-full tjfx-card p-8 text-center text-[#6D6D82]">No records match.</div>}
+      <div className="space-y-3">
+        {filtered.length===0 && <div className="tjfx-card p-8 text-center text-[#6D6D82]">No records match.</div>}
         {filtered.map(b => (
           <button key={b.id} onClick={()=>openRec(b)} data-testid={`record-card-${b.id}`}
-            className="tjfx-card p-5 text-left tjfx-card-hover">
-            <div className="flex items-center justify-between mb-2">
+            className="tjfx-card w-full p-4 text-left tjfx-card-hover flex items-center gap-4 flex-wrap md:flex-nowrap">
+            <div className="flex flex-col items-start gap-0.5 shrink-0 w-24">
               <div className="text-[11px] uppercase tracking-wide text-[#7C3AED] font-semibold">{b.type}</div>
-              <div className={`text-xs px-2 py-0.5 rounded-full ${b.direction==="bullish"?"bg-emerald-50 text-emerald-700":b.direction==="bearish"?"bg-red-50 text-red-700":"bg-gray-50 text-gray-600"}`}>{b.direction}</div>
+              <div className="tjfx-mono text-sm text-[#16151F] font-semibold">{b.date}</div>
             </div>
-            <div className="tjfx-mono text-sm text-[#16151F] font-semibold">{b.date}</div>
-            <div className="mt-2 text-xs text-[#6D6D82] line-clamp-3">{b.narrative || "—"}</div>
-            <div className="mt-3 flex items-center justify-between text-[11px] text-[#6D6D82]">
+            <div className={`shrink-0 text-xs px-2 py-0.5 rounded-full ${b.direction==="bullish"?"bg-emerald-50 text-emerald-700":b.direction==="bearish"?"bg-red-50 text-red-700":"bg-gray-50 text-gray-600"}`}>{b.direction}</div>
+            <div className="flex-1 min-w-0 text-xs text-[#6D6D82] truncate">{b.narrative || "—"}</div>
+            <div className="shrink-0 flex items-center gap-4 text-[11px] text-[#6D6D82] ml-auto">
               <span>Confidence <span className="tjfx-mono font-semibold text-[#16151F]">{b.confidence}%</span></span>
               {b.images?.length>0 && <span>{b.images.length} chart{b.images.length>1?"s":""}</span>}
             </div>
