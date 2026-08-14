@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { tradesApi, prefsApi, uploadApi } from "@/lib/api";
 import { useAccount } from "@/context/AccountContext";
-import { Search, Trash2, X, PlusCircle, Filter, Pencil, Save, ChevronDown, Upload, Clipboard, Image as ImageIcon, TrendingUp, Star, Copy, Eye, RotateCcw, MessageCircle, Download } from "lucide-react";
+import { Search, Trash2, X, PlusCircle, Filter, Pencil, Save, ChevronDown, Upload, Clipboard, Image as ImageIcon, TrendingUp, Star, Copy, Eye, RotateCcw, MessageCircle, Download, AlertTriangle, FileSpreadsheet, FileText } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
+import jsPDF from "jspdf";
 import { computePnl } from "@/lib/pnlCalc";
 import { useLightbox } from "@/components/ImageLightbox";
 import { compressImage } from "@/lib/imageUtils";
@@ -88,6 +89,13 @@ function TradeViewContent() {
   const [activeTab, setActiveTab] = useState("Overview");
   const [saving, setSaving] = useState(false);
   const [sortBy, setSortBy] = useState("newest");
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const exportMenuRef = React.useRef(null);
+  useEffect(() => {
+    const onClick = (e) => { if (exportMenuRef.current && !exportMenuRef.current.contains(e.target)) setExportMenuOpen(false); };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, []);
 
   const [presets, setPresets] = useState({
     symbol: [], strategy: [], session: [], htf_poi: [], entry_tag: [], mood: [], mistake: [], strength: [], setup_tag: [],
@@ -319,6 +327,106 @@ function TradeViewContent() {
     toast.success("Deleted"); setSel(null); reloadAccounts?.(); load();
   };
 
+  // Quick mistake tagging directly from Trade View — used both on the card
+  // (hover popover) and inside the drawer's Mistakes tab. Doesn't require
+  // opening the full Edit form.
+  const toggleMistakeOnTrade = async (trade, value) => {
+    const current = trade.mistakes || [];
+    const updated = current.includes(value) ? current.filter(x => x !== value) : [...current, value];
+    setTrades(prev => prev.map(t => t.id === trade.id ? { ...t, mistakes: updated } : t));
+    if (sel && sel.id === trade.id) setSel(s => ({ ...s, mistakes: updated }));
+    try {
+      await tradesApi.update(trade.id, { mistakes: updated });
+      toast.success(current.includes(value) ? "Mistake tag removed" : "Mistake tagged");
+    } catch {
+      setTrades(prev => prev.map(t => t.id === trade.id ? { ...t, mistakes: current } : t));
+      if (sel && sel.id === trade.id) setSel(s => ({ ...s, mistakes: current }));
+      toast.error("Failed to save mistake tag");
+    }
+  };
+
+  // ---- Export: CSV (Sheets/Excel) + PDF, for either the filtered list or all trades ----
+  const escapeCsv = (val) => {
+    if (val === null || val === undefined) return "";
+    const s = String(val);
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
+
+  const tradesToCsvRows = (list) => {
+    const headers = ["Date","Time","Session","Symbol","Direction","Entry","Exit","Stop Loss","Take Profit","Lot Size","Risk %","Net P&L","R Multiple","Result","Strategy","Mistakes","Strengths","Entry Tags","Notes"];
+    const rows = list.map(t => [
+      t.date || "", t.entry_time || "", t.session || "", t.symbol || "", (t.direction || "").toUpperCase(),
+      t.entry_price ?? "", t.exit_price ?? "", t.stop_loss ?? "", t.take_profit ?? "",
+      t.lot_size ?? "", t.risk_percent ?? "", (t.net_pnl ?? 0).toFixed(2), t.r_multiple ?? "",
+      (t.net_pnl || 0) > 0 ? "Win" : (t.net_pnl || 0) < 0 ? "Loss" : "Breakeven",
+      t.strategy || "", (t.mistakes || []).join("; "), (t.strengths || []).join("; "),
+      (t.entry_tags || []).join("; "), (t.notes || "").replace(/\r?\n/g, " "),
+    ]);
+    return [headers, ...rows];
+  };
+
+  const downloadBlob = (blob, filename) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportCsv = (list, scopeLabel) => {
+    if (!list.length) { toast.error("No trades to export"); return; }
+    const rows = tradesToCsvRows(list);
+    const csv = rows.map(r => r.map(escapeCsv).join(",")).join("\r\n");
+    // \uFEFF (BOM) so Excel / Google Sheets read it correctly on import
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    downloadBlob(blob, `tradejournal-${scopeLabel}-${new Date().toISOString().slice(0,10)}.csv`);
+    toast.success("CSV exported — open it in Google Sheets or Excel");
+  };
+
+  const exportPdf = (list, scopeLabel) => {
+    if (!list.length) { toast.error("No trades to export"); return; }
+    const doc = new jsPDF({ unit: "pt", format: "a4" });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const marginX = 40;
+    let y = 50;
+
+    doc.setFont("helvetica", "bold"); doc.setFontSize(16);
+    doc.text("TheJournalFX — Trade Export", marginX, y); y += 18;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+    doc.text(`Generated: ${new Date().toLocaleString()}   •   Scope: ${scopeLabel}   •   Trades: ${list.length}`, marginX, y);
+    y += 22;
+
+    list.forEach((t, idx) => {
+      if (y > 740) { doc.addPage(); y = 50; }
+      const pnl = t.net_pnl || 0;
+      doc.setFont("helvetica", "bold"); doc.setFontSize(11);
+      doc.text(`${idx + 1}. ${t.symbol || "-"}  (${(t.direction || "").toUpperCase()})  —  ${pnl >= 0 ? "+" : ""}$${pnl.toFixed(2)}  (${t.r_multiple ?? "-"}R)`, marginX, y);
+      y += 14;
+      doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+      const lines = [
+        `Date: ${t.date || "-"}   Time: ${t.entry_time || "-"}   Session: ${t.session || "-"}   Strategy: ${t.strategy || "-"}`,
+        `Entry: ${t.entry_price ?? "-"}   Exit: ${t.exit_price ?? "-"}   SL: ${t.stop_loss ?? "-"}   TP: ${t.take_profit ?? "-"}   Lot: ${t.lot_size ?? "-"}`,
+        `Mistakes: ${(t.mistakes || []).join(", ") || "-"}`,
+        `Strengths: ${(t.strengths || []).join(", ") || "-"}`,
+        `Notes: ${(t.notes || "-").slice(0, 200)}`,
+      ];
+      lines.forEach(line => {
+        const wrapped = doc.splitTextToSize(line, pageWidth - marginX * 2);
+        wrapped.forEach(w => {
+          if (y > 760) { doc.addPage(); y = 50; }
+          doc.text(w, marginX, y); y += 12;
+        });
+      });
+      y += 6;
+      doc.setDrawColor(230);
+      doc.line(marginX, y, pageWidth - marginX, y);
+      y += 14;
+    });
+
+    doc.save(`tradejournal-${scopeLabel}-${new Date().toISOString().slice(0,10)}.pdf`);
+    toast.success("PDF exported");
+  };
+
   const inp = "w-full h-9 px-3 rounded-lg border border-[#E8E8F1] focus:border-[#7C3AED] outline-none text-sm bg-white tjfx-mono";
   const openLightbox = useLightbox();
 
@@ -364,9 +472,33 @@ function TradeViewContent() {
               <p className="text-[#6D6D82] text-sm mt-1">All your trades. All your lessons.</p>
             </div>
             <div className="flex gap-2">
-              <button className="h-10 px-4 rounded-xl border border-[#E8E8F1] hover:border-[#7C3AED] text-sm font-medium flex items-center gap-2 transition hover:bg-[#F6F6FB]">
-                <Download className="w-4 h-4"/> Export
-              </button>
+              <div className="relative" ref={exportMenuRef}>
+                <button onClick={() => setExportMenuOpen(o => !o)} className="h-10 px-4 rounded-xl border border-[#E8E8F1] hover:border-[#7C3AED] text-sm font-medium flex items-center gap-2 transition hover:bg-[#F6F6FB]">
+                  <Download className="w-4 h-4"/> Export
+                </button>
+                {exportMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-72 bg-white rounded-xl border border-[#E8E8F1] shadow-xl z-50 overflow-hidden">
+                    <div className="px-4 pt-3 pb-1.5 text-[11px] font-bold text-[#6D6D82] uppercase tracking-wide">
+                      Filtered view ({filtered.length} trade{filtered.length !== 1 ? "s" : ""})
+                    </div>
+                    <button onClick={() => { exportCsv(filtered, "filtered"); setExportMenuOpen(false); }} className="w-full text-left px-4 py-2.5 text-sm hover:bg-[#F6F6FB] flex items-center gap-2.5">
+                      <FileSpreadsheet className="w-4 h-4 text-[#7C3AED]"/> CSV (Google Sheets / Excel)
+                    </button>
+                    <button onClick={() => { exportPdf(filtered, "filtered"); setExportMenuOpen(false); }} className="w-full text-left px-4 py-2.5 text-sm hover:bg-[#F6F6FB] flex items-center gap-2.5">
+                      <FileText className="w-4 h-4 text-[#7C3AED]"/> PDF Report
+                    </button>
+                    <div className="px-4 pt-3 pb-1.5 border-t border-[#E8E8F1] text-[11px] font-bold text-[#6D6D82] uppercase tracking-wide">
+                      All trades ({trades.length})
+                    </div>
+                    <button onClick={() => { exportCsv(trades, "all"); setExportMenuOpen(false); }} className="w-full text-left px-4 py-2.5 text-sm hover:bg-[#F6F6FB] flex items-center gap-2.5">
+                      <FileSpreadsheet className="w-4 h-4 text-[#7C3AED]"/> CSV (Google Sheets / Excel)
+                    </button>
+                    <button onClick={() => { exportPdf(trades, "all"); setExportMenuOpen(false); }} className="w-full text-left px-4 py-2.5 text-sm hover:bg-[#F6F6FB] flex items-center gap-2.5 pb-3">
+                      <FileText className="w-4 h-4 text-[#7C3AED]"/> PDF Report
+                    </button>
+                  </div>
+                )}
+              </div>
               <Link to="/add-trade" className="h-10 px-4 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-sm font-semibold flex items-center gap-2 transition shadow-lg shadow-[#7C3AED]/30">
                 <PlusCircle className="w-4 h-4"/> Add Trade
               </Link>
@@ -509,6 +641,8 @@ function TradeViewContent() {
                 onOpen={openTrade} 
                 onDelete={del}
                 timeFormat={timeFormat}
+                mistakePresets={presets.mistake}
+                onToggleMistake={toggleMistakeOnTrade}
               />
             ))}
           </div>
@@ -619,7 +753,7 @@ function TradeViewContent() {
               )}
 
               {edit ? <EditForm edit={edit} setEdit={setEdit} toggleEdit={toggleEdit} computed={editComputed} presets={presets}/> :
-                <ViewBlock t={sel} tab={activeTab}/>
+                <ViewBlock t={sel} tab={activeTab} mistakePresets={presets.mistake} onToggleMistake={toggleMistakeOnTrade}/>
               }
 
               {!edit && (
@@ -663,7 +797,7 @@ function MetricBadge({ label, value, change, icon, isCircle, status }) {
 
 // One collapsible day: a date header (with the day's Net P&L and win rate)
 // that expands below to reveal that day's trades — like TradeZella's Day View.
-function DayGroup({ group, defaultOpen, onOpen, onDelete, timeFormat }) {
+function DayGroup({ group, defaultOpen, onOpen, onDelete, timeFormat, mistakePresets, onToggleMistake }) {
   const [open, setOpen] = React.useState(defaultOpen);
   const isPos = group.netPnl >= 0;
   const parsed = new Date(`${group.date}T00:00:00`);
@@ -697,6 +831,8 @@ function DayGroup({ group, defaultOpen, onOpen, onDelete, timeFormat }) {
               trade={t} 
               onOpen={onOpen} 
               onDelete={onDelete}
+              mistakePresets={mistakePresets}
+              onToggleMistake={onToggleMistake}
               style={{animation: `fadeIn 0.3s ease-out ${i*50}ms both`}}
             />
           ))}
@@ -707,11 +843,20 @@ function DayGroup({ group, defaultOpen, onOpen, onDelete, timeFormat }) {
 }
 
 // Premium Trade Card Component
-function PremiumTradeCard({ trade, onOpen, onDelete, style }) {
+function PremiumTradeCard({ trade, onOpen, onDelete, mistakePresets, onToggleMistake, style }) {
   const pnl = asNumber(trade.net_pnl);
   const isWin = pnl > 0;
   const thumb = trade.screenshots?.[0];
   const direction = (trade.direction || "—").toUpperCase();
+
+  const [mistakeMenuOpen, setMistakeMenuOpen] = React.useState(false);
+  const mistakeMenuRef = React.useRef(null);
+  React.useEffect(() => {
+    if (!mistakeMenuOpen) return;
+    const onClick = (e) => { if (mistakeMenuRef.current && !mistakeMenuRef.current.contains(e.target)) setMistakeMenuOpen(false); };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [mistakeMenuOpen]);
   
   return (
     <div 
@@ -748,11 +893,16 @@ function PremiumTradeCard({ trade, onOpen, onDelete, style }) {
 
         {/* Middle Section */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center gap-2 mb-2 flex-wrap">
             <h4 className="font-display font-bold text-lg text-[#16151F]">{trade.symbol}</h4>
             <span className={`px-2 py-1 rounded-lg text-xs font-bold whitespace-nowrap ${trade.direction === "long" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>
               {direction}
             </span>
+            {trade.mistakes?.map(m => (
+              <span key={m} className="px-2 py-1 rounded-lg text-xs font-bold whitespace-nowrap bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1">
+                <AlertTriangle className="w-3 h-3"/> {m}
+              </span>
+            ))}
           </div>
 
           <div className="text-xs text-[#6D6D82] mb-2 space-y-0.5">
@@ -791,6 +941,34 @@ function PremiumTradeCard({ trade, onOpen, onDelete, style }) {
 
       {/* Quick Actions on Hover */}
       <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition">
+        <div className="relative" ref={mistakeMenuRef}>
+          <button
+            onClick={(e) => { e.stopPropagation(); setMistakeMenuOpen(o => !o); }}
+            className={`w-8 h-8 rounded-lg bg-white hover:bg-amber-50 flex items-center justify-center border shadow-md transition ${trade.mistakes?.length ? "border-amber-300" : "border-[#E8E8F1]"}`}
+            title="Tag Mistake"
+          >
+            <AlertTriangle className={`w-4 h-4 ${trade.mistakes?.length ? "text-amber-500" : "text-[#6D6D82]"}`}/>
+          </button>
+          {mistakeMenuOpen && (
+            <div onClick={(e) => e.stopPropagation()} className="absolute top-10 right-0 z-20 w-60 bg-white rounded-xl border border-[#E8E8F1] shadow-xl p-3">
+              <div className="text-[11px] font-bold text-[#6D6D82] mb-2 uppercase tracking-wide">Tag a mistake</div>
+              <div className="flex flex-wrap gap-1.5">
+                {(mistakePresets || []).length ? mistakePresets.map(m => (
+                  <button
+                    key={m}
+                    onClick={() => onToggleMistake(trade, m)}
+                    className={`chip ${trade.mistakes?.includes(m) ? "active" : ""}`}
+                    style={{ fontSize: 10, padding: "3px 8px" }}
+                  >
+                    {m}
+                  </button>
+                )) : (
+                  <div className="text-[11px] text-[#A1A1AA]">No mistake presets yet. Add some from Settings → Presets.</div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
         <button 
           onClick={(e) => { e.stopPropagation(); onOpen(trade); }} 
           className="w-8 h-8 rounded-lg bg-white hover:bg-[#F6F6FB] flex items-center justify-center border border-[#E8E8F1] shadow-md transition"
@@ -851,7 +1029,7 @@ const EmptyTabState = ({ label }) => (
 // Renders the drawer body based on which tab is active. Each tab used to be
 // a dead button that always showed the same Overview content — now they
 // actually switch what's displayed.
-function ViewBlock({ t, tab = "Overview" }) {
+function ViewBlock({ t, tab = "Overview", mistakePresets, onToggleMistake }) {
   const openLightbox = useLightbox();
 
   if (tab === "Chart") {
@@ -871,9 +1049,30 @@ function ViewBlock({ t, tab = "Overview" }) {
   }
 
   if (tab === "Mistakes") {
-    return t.mistakes?.length > 0 ? (
-      <TagBlock label="Mistakes" items={t.mistakes}/>
-    ) : <EmptyTabState label="No mistakes tagged on this trade."/>;
+    return (
+      <div className="space-y-4">
+        {t.mistakes?.length > 0 ? (
+          <TagBlock label="Mistakes" items={t.mistakes}/>
+        ) : <EmptyTabState label="No mistakes tagged on this trade."/>}
+        <div className="pt-3 border-t border-[#E8E8F1]">
+          <div className="text-[11px] font-bold text-[#6D6D82] mb-2 uppercase tracking-wide">Tag a mistake</div>
+          <div className="flex flex-wrap gap-1.5">
+            {(mistakePresets || []).length ? mistakePresets.map(m => (
+              <button
+                key={m}
+                onClick={() => onToggleMistake(t, m)}
+                className={`chip ${t.mistakes?.includes(m) ? "active" : ""}`}
+                style={{ fontSize: 11, padding: "3px 10px" }}
+              >
+                {m}
+              </button>
+            )) : (
+              <div className="text-xs text-[#A1A1AA]">No mistake presets found. Add some from Settings → Presets.</div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (tab === "Checklist") {
