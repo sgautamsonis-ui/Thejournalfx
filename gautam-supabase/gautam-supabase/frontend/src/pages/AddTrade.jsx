@@ -567,7 +567,10 @@ function AddTradePremium({ t, setT, presets, accounts, computed, recommendedLot,
             <PairedPresetBuilder number="4" title="Entry Confirmation" description="The confirmation that triggered the entry." timeframeLabel="Entry Timeframe" typeLabel="Confirmation Type" timeframes={presets.entry_timeframe} types={presets.entry_confirmation_type} draft={entryDraft} onDraftChange={setEntryDraft} items={t.entry_tags} onAdd={()=>addPairedPreset("entry_tags",entryDraft,setEntryDraft,"entry confirmation")} onRemove={value=>removePairedPreset("entry_tags",value)} testid="entry-confirmation"/>
           </main>
           <aside className="xl:col-span-4 space-y-4">
-            <LinkedBiasCard number="5" />
+            <div className="bias-screenshot-column">
+              <LinkedBiasCard number="5" />
+              <section className="tjfx-card premium-card screenshot-premium"><SectionHeading number="7" title="Trade Screenshot" subtitle="Upload or paste chart images." /><AttachmentPanel images={t.screenshots} onFile={onFile} uploadingCount={uploadingCount}/></section>
+            </div>
             <section className="tjfx-card premium-card psychology-premium"><SectionHeading number="6" title="Psychology & Mood" subtitle="Your state before, during and after." />
               <div className="grid grid-cols-1 sm:grid-cols-3 xl:grid-cols-1 gap-4">
                 <MoodPresetPicker label="Mood Before" items={presets.mood} draft={moodDraft.before} onDraftChange={v=>setMoodDraft({...moodDraft, before:v})} selected={t.mood_before} onAdd={()=>{ if (moodDraft.before && !t.mood_before.includes(moodDraft.before)) toggle("mood_before", moodDraft.before); setMoodDraft({...moodDraft, before:""}); }} onRemove={v=>toggle("mood_before", v)} testid="mood-before"/>
@@ -576,7 +579,6 @@ function AddTradePremium({ t, setT, presets, accounts, computed, recommendedLot,
               </div>
               <div className="mt-4 pt-4 border-t border-[#F0F0F5]"><div className="text-[12px] text-[#6D6D82] mb-2">Notes</div><textarea value={t.notes} onChange={e=>setT({...t,notes:e.target.value})} rows={3} className="w-full p-3 rounded-xl border border-[#E8E8F1] focus:border-[#7C3AED] outline-none text-sm" placeholder="Mindset, execution and lessons"/></div>
             </section>
-            <section className="tjfx-card premium-card screenshot-premium"><SectionHeading number="7" title="Trade Screenshot" subtitle="Upload or paste chart images." /><AttachmentPanel images={t.screenshots} onFile={onFile} uploadingCount={uploadingCount}/></section>
           </aside>
         </div>
         <section className="tjfx-card premium-card review-premium mt-4"><SectionHeading number="8" title="Review & Save" subtitle="One last quick check before logging it." /><ReviewCard t={t} computed={computed} /><button onClick={save} disabled={saving} className="premium-save mt-4 h-11 min-w-[220px] rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-sm font-semibold disabled:opacity-60">{saving?"Saving trade...":"Save Trade"}</button></section>

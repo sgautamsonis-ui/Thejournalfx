@@ -370,6 +370,19 @@ h1, h2, h3, h4, h5 { font-family: 'Comfortaa', sans-serif; letter-spacing: -0.01
 
 .premium-trade-page [data-testid="linked-bias-card"] .grid { gap: .5rem; }
 
+/* Connected workspace: panels touch; only controls inside a panel keep air. */
+.premium-trade-page fieldset > .grid > main.space-y-4 > :not([hidden]) ~ :not([hidden]),
+.premium-trade-page fieldset > .grid > aside.space-y-4 > :not([hidden]) ~ :not([hidden]) { margin-top: 0 !important; }
+.premium-trade-page fieldset > .grid > main > .grid { gap: 0 !important; }
+.premium-trade-page .review-premium.mt-4 { margin-top: 0 !important; }
+.bias-screenshot-column { display: flex; flex-direction: column; gap: 0; }
+.bias-screenshot-column > .tjfx-card,
+.premium-trade-page fieldset > .grid > main > .grid > .tjfx-card { border-radius: 0 !important; }
+@media (min-width: 1280px) {
+  .premium-trade-page fieldset > .grid > aside { gap: 0; }
+  .premium-trade-page fieldset > .grid > aside > :last-child { grid-column: auto; }
+}
+
 /* A short, scannable final checkpoint instead of a second large form card. */
 .premium-trade-page .review-premium { padding: 1rem 1.15rem !important; }
 .premium-trade-page .review-premium [data-testid="review-card"] { padding: .75rem 1rem; }
