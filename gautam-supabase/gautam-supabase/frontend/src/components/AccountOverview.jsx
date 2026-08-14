@@ -91,8 +91,8 @@ export default function AccountOverview() {
   const fmt = (n) => `$${Math.abs(n).toFixed(2)}`;
 
   return (
-    <div className="tjfx-card px-4 py-3.5 mb-4" data-testid="account-overview">
-      <div className="flex items-center gap-3 mb-3 flex-wrap">
+    <div className="tjfx-card px-5 py-4 mb-4" data-testid="account-overview">
+      <div className="flex items-center gap-3 mb-4 flex-wrap">
         <div className="text-[11px] font-semibold text-[#A1A1AA] uppercase tracking-wide whitespace-nowrap">
           Account Overview
         </div>
@@ -107,88 +107,84 @@ export default function AccountOverview() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_1.4fr] gap-4">
-        {/* Balance hero */}
-        <div className="relative overflow-hidden rounded-2xl px-5 py-4 text-white bg-gradient-to-br from-[#8B5CF6] via-[#7C3AED] to-[#5B21B6]">
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-white/70">
-            Current Balance
+      {/* Balance Hero - Full Width */}
+      <div className="relative overflow-hidden rounded-2xl px-5 py-4 text-white bg-gradient-to-br from-[#8B5CF6] via-[#7C3AED] to-[#5B21B6] mb-4">
+        <div className="text-[11px] font-semibold uppercase tracking-wide text-white/70">
+          Current Balance
+        </div>
+        <div className="flex items-end gap-3 mt-1">
+          <div className="text-[32px] leading-none font-bold tjfx-mono tjfx-num">
+            ${balance.toFixed(2)}
           </div>
-          <div className="flex items-end gap-3 mt-1">
-            <div className="text-[32px] leading-none font-bold tjfx-mono tjfx-num">
-              ${balance.toFixed(2)}
-            </div>
-            <div className={`mb-0.5 text-[11px] font-semibold rounded-full px-2 py-0.5 ${todaysPct >= 0 ? "bg-white/20" : "bg-red-500/30"}`}>
-              {todaysPct >= 0 ? "▲" : "▼"} {Math.abs(todaysPct).toFixed(2)}% today
-            </div>
-          </div>
-
-          <div className="h-16 -mx-2 mt-1">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={equityPoints} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="aoSpark" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#ffffff" stopOpacity={0.55} />
-                    <stop offset="100%" stopColor="#ffffff" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <Area type="monotone" dataKey="equity" stroke="#ffffff" strokeWidth={2} fill="url(#aoSpark)" isAnimationActive={false} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-
-          <div className="grid grid-cols-3 gap-2 mt-2 pt-3 border-t border-white/15">
-            <div>
-              <div className="text-[10px] text-white/70 uppercase tracking-wide">Today's P&L</div>
-              <div className="text-[13px] font-semibold tjfx-mono tjfx-num">
-                {todaysPnl >= 0 ? "+" : "-"}{fmt(todaysPnl)}
-              </div>
-            </div>
-            <div>
-              <div className="text-[10px] text-white/70 uppercase tracking-wide">Total P&L</div>
-              <div className="text-[13px] font-semibold tjfx-mono tjfx-num">
-                {totalPnl >= 0 ? "+" : "-"}{fmt(totalPnl)}
-              </div>
-            </div>
-            <div>
-              <div className="text-[10px] text-white/70 uppercase tracking-wide">Equity</div>
-              <div className="text-[13px] font-semibold tjfx-mono tjfx-num">${balance.toFixed(2)}</div>
-            </div>
+          <div className={`mb-0.5 text-[11px] font-semibold rounded-full px-2 py-0.5 ${todaysPct >= 0 ? "bg-white/20" : "bg-red-500/30"}`}>
+            {todaysPct >= 0 ? "▲" : "▼"} {Math.abs(todaysPct).toFixed(2)}% today
           </div>
         </div>
 
-        {/* Right: gauge + drawdowns + risk */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="flex flex-col items-center justify-center rounded-2xl border border-[#E8E8F1] p-3">
-            <div className="relative w-[92px] h-[92px]">
-              <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
-                <circle cx="50" cy="50" r={gaugeR} fill="none" stroke="#E8E8F1" strokeWidth="9" />
-                <circle
-                  cx="50" cy="50" r={gaugeR} fill="none" stroke="#10B981" strokeWidth="9"
-                  strokeDasharray={gaugeC} strokeDashoffset={gaugeOffset} strokeLinecap="round"
-                />
-              </svg>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-[16px] font-bold tjfx-mono tjfx-num text-[#16151F]">{winRate.toFixed(1)}%</span>
-              </div>
+        <div className="h-16 -mx-2 mt-2">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={equityPoints} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="aoSpark" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#ffffff" stopOpacity={0.55} />
+                  <stop offset="100%" stopColor="#ffffff" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <Area type="linear" dataKey="equity" stroke="#ffffff" strokeWidth={2.5} fill="url(#aoSpark)" isAnimationActive={false} dot={false} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2 mt-2 pt-3 border-t border-white/15">
+          <div>
+            <div className="text-[10px] text-white/70 uppercase tracking-wide">Today's P&L</div>
+            <div className="text-[13px] font-semibold tjfx-mono tjfx-num">
+              {todaysPnl >= 0 ? "+" : "-"}{fmt(todaysPnl)}
             </div>
-            <div className="text-[10px] text-[#6D6D82] uppercase tracking-wide mt-1.5">Win Rate</div>
           </div>
-
-          <DrawdownTile label="Daily Drawdown" used={dailyDD} limit={dailyLimit} pct={dailyPct} fmt={fmt} />
-          <DrawdownTile label="Weekly Drawdown" used={weeklyDD} limit={weeklyLimit} pct={weeklyPct} fmt={fmt} />
-
-          <div className="flex flex-col items-center justify-center rounded-2xl border border-[#E8E8F1] p-3 text-center">
-            <div className="text-[10px] text-[#6D6D82] uppercase tracking-wide">Risk Per Trade</div>
-            <div className="text-[22px] font-bold tjfx-mono tjfx-num text-[#16151F] mt-1">{riskPercent}%</div>
-            <div className="text-[10px] text-[#A1A1AA]">of Account</div>
-            <Link to="/settings" className="mt-1.5 w-6 h-6 rounded-lg bg-[#F3E8FF] flex items-center justify-center">
-              <ShieldCheck className="w-3.5 h-3.5 text-[#7C3AED]" />
-            </Link>
+          <div>
+            <div className="text-[10px] text-white/70 uppercase tracking-wide">Total P&L</div>
+            <div className="text-[13px] font-semibold tjfx-mono tjfx-num">
+              {totalPnl >= 0 ? "+" : "-"}{fmt(totalPnl)}
+            </div>
+          </div>
+          <div>
+            <div className="text-[10px] text-white/70 uppercase tracking-wide">Equity</div>
+            <div className="text-[13px] font-semibold tjfx-mono tjfx-num">${balance.toFixed(2)}</div>
           </div>
         </div>
       </div>
 
-      <div className="flex items-center gap-2 mt-3 rounded-xl bg-[#F6F6FB] px-3 py-2">
+      {/* Stats Grid - No gaps, unified look */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-0 -mx-5 -mb-4">
+        {/* Win Rate Gauge */}
+        <div className="flex flex-col items-center justify-center px-3 py-4">
+          <div className="relative w-[92px] h-[92px]">
+            <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
+              <circle cx="50" cy="50" r={gaugeR} fill="none" stroke="#E8E8F1" strokeWidth="9" />
+              <circle
+                cx="50" cy="50" r={gaugeR} fill="none" stroke="#10B981" strokeWidth="9"
+                strokeDasharray={gaugeC} strokeDashoffset={gaugeOffset} strokeLinecap="round"
+              />
+            </svg>
+          </div>
+          <div className="text-[10px] text-[#6D6D82] uppercase tracking-wide mt-2">Win Rate</div>
+        </div>
+
+        <DrawdownTileUnified label="Daily Drawdown" used={dailyDD} limit={dailyLimit} pct={dailyPct} fmt={fmt} />
+        <DrawdownTileUnified label="Weekly Drawdown" used={weeklyDD} limit={weeklyLimit} pct={weeklyPct} fmt={fmt} />
+
+        <div className="flex flex-col items-center justify-center px-3 py-4 text-center">
+          <div className="text-[10px] text-[#6D6D82] uppercase tracking-wide">Risk Per Trade</div>
+          <div className="text-[22px] font-bold tjfx-mono tjfx-num text-[#16151F] mt-2">{riskPercent}%</div>
+          <div className="text-[10px] text-[#A1A1AA] mt-0.5">of Account</div>
+          <Link to="/settings" className="mt-2 w-6 h-6 rounded-lg bg-[#F3E8FF] flex items-center justify-center">
+            <ShieldCheck className="w-3.5 h-3.5 text-[#7C3AED]" />
+          </Link>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2 mt-4 rounded-xl bg-[#F6F6FB] px-3 py-2">
         <Sparkles className="w-3.5 h-3.5 text-[#7C3AED] shrink-0" />
         <span className="text-[12px] text-[#6D6D82]">{insight}</span>
       </div>
@@ -202,21 +198,21 @@ export default function AccountOverview() {
   );
 }
 
-function DrawdownTile({ label, used, limit, pct, fmt }) {
+function DrawdownTileUnified({ label, used, limit, pct, fmt }) {
   const barColor = pct >= 90 ? "bg-red-500" : pct >= 60 ? "bg-amber-500" : "bg-emerald-500";
   return (
-    <div className="flex flex-col justify-center rounded-2xl border border-[#E8E8F1] p-3">
+    <div className="flex flex-col justify-center px-3 py-4 text-center">
       <div className="text-[10px] text-[#6D6D82] uppercase tracking-wide">{label}</div>
-      <div className="text-[15px] font-semibold tjfx-mono tjfx-num text-[#16151F] mt-1">
+      <div className="text-[15px] font-semibold tjfx-mono tjfx-num text-[#16151F] mt-1.5">
         {fmt(used)}
         {limit ? <span className="text-[#A1A1AA] font-normal text-[12px]"> / ${limit.toFixed(0)}</span> : null}
       </div>
       {limit ? (
-        <div className="h-1.5 w-full rounded-full bg-[#E8E8F1] overflow-hidden mt-1.5">
+        <div className="h-1.5 w-full rounded-full bg-[#E8E8F1] overflow-hidden mt-2">
           <div className={`h-full rounded-full ${barColor}`} style={{ width: `${pct}%` }} />
         </div>
       ) : (
-        <div className="text-[10px] text-[#A1A1AA] mt-1.5">No limit set</div>
+        <div className="text-[10px] text-[#A1A1AA] mt-2">No limit set</div>
       )}
     </div>
   );
