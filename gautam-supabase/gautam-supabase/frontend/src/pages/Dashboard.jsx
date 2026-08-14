@@ -20,6 +20,8 @@ import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from 
 import { SortableContext, useSortable, rectSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { getThoughtOfTheDay } from "@/lib/thoughtOfDay";
+import { useHeaderActions } from "@/context/HeaderActionsContext";
+import AccountOverview from "@/components/AccountOverview";
 
 // Fixed (non-customizable) daily section shown above the widget grid — a new
 // quote per category is picked automatically based on today's date, no API
@@ -243,6 +245,28 @@ export default function Dashboard() {
   const [positionsTab, setPositionsTab] = useState("open");
   const [allTrades, setAllTrades] = useState([]);
   const [selectedDay, setSelectedDay] = useState(null);
+
+  // Render the Customize button in the shared header (via HeaderActionsContext)
+  // instead of inline on the page, and clear it again when leaving Dashboard.
+  const { setHeaderAction } = useHeaderActions();
+  useEffect(() => {
+    setHeaderAction(
+      <button
+        onClick={() => setCustomize(c => !c)}
+        data-testid="customize-btn"
+        title={customize ? "Done customizing" : "Customize dashboard"}
+        aria-label={customize ? "Done customizing" : "Customize dashboard"}
+        className={`h-8 w-8 rounded-lg sm:rounded-xl flex items-center justify-center transition ${
+          customize
+            ? "bg-[#7C3AED] text-white"
+            : "border border-[#E8E8F1] text-[#16151F] hover:border-[#7C3AED] hover:text-[#7C3AED]"
+        }`}
+      >
+        <Settings2 className="w-4 h-4" />
+      </button>
+    );
+    return () => setHeaderAction(null);
+  }, [customize, setHeaderAction]);
   
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
@@ -264,9 +288,14 @@ export default function Dashboard() {
   );
 
   // Live equity curve — running cumulative balance across closed trades, sorted
-  // chronologically, starting from the account's starting balance.
+  // chronologically, starting from the account's starting balance. When "All
+  // Accounts" is selected, `active` is null (it only holds a single account),
+  // so the current balance must be summed across every account instead —
+  // otherwise this silently fell back to 0 and made the whole curve wrong.
   const equityCurveData = useMemo(() => {
-    const currentBalance = Number(active?.balance ?? 0);
+    const currentBalance = activeId === "all"
+      ? accounts.reduce((s, a) => s + (Number(a.balance) || 0), 0)
+      : Number(active?.balance ?? 0);
     const closed = allTrades
       .filter(t => t && t.date && (t.net_pnl !== undefined && t.net_pnl !== null))
       .slice()
@@ -281,7 +310,7 @@ export default function Dashboard() {
       points.push({ date: t.date, equity: running, pnl: t.net_pnl, symbol: t.symbol });
     }
     return { points, startBalance, current: running, hasTrades: closed.length > 0 };
-  }, [allTrades, active]);
+  }, [allTrades, active, activeId, accounts]);
 
   // Journaling streak = consecutive days with at least one trade logged.
   const { journalCurrent, journalBest } = useMemo(() => {
@@ -359,7 +388,7 @@ export default function Dashboard() {
   const widgetComponents = {
     // KPI Cards (6 cards)
     kpis: (
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3" data-testid="kpi-cards">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-1.5" data-testid="kpi-cards">
         <StatCard 
           testid="stat-pnl"
           label="Net P&L" 
@@ -1129,6 +1158,7 @@ export default function Dashboard() {
   return (
     <div className="p-5 max-w-[1800px] mx-auto" data-testid="dashboard-page">
       <ThoughtOfTheDay />
+      <AccountOverview />
 
       {/* Customize Panel */}
       {customize && (
@@ -1165,22 +1195,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Customize Button */}
-      <div className="flex items-center justify-end mb-4">
-        <button
-          onClick={() => setCustomize(!customize)}
-          data-testid="customize-btn"
-          title={customize ? "Done customizing" : "Customize dashboard"}
-          aria-label={customize ? "Done customizing" : "Customize dashboard"}
-          className={`h-9 w-9 rounded-xl flex items-center justify-center transition ${
-            customize
-              ? "bg-[#7C3AED] text-white"
-              : "border border-[#E8E8F1] text-[#16151F] hover:border-[#7C3AED] hover:text-[#7C3AED]"
-          }`}
-        >
-          <Settings2 className="w-4 h-4" />
-        </button>
-      </div>
+      {/* Customize Button now lives in the shared header — see HeaderActionsContext usage above */}
 
       {/* Dashboard Grid */}
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
@@ -1188,7 +1203,7 @@ export default function Dashboard() {
           items={visibleLayout.map(x => x.id)} 
           strategy={rectSortingStrategy}
         >
-          <div ref={gridRef} className="grid grid-cols-12 auto-rows-max gap-3">
+          <div ref={gridRef} className="grid grid-cols-12 auto-rows-max gap-1.5">
             {visibleLayout.map((item) => (
               <SortableCard
                 key={item.id}

@@ -5,7 +5,7 @@ import AccountSwitcher from "@/components/AccountSwitcher";
 import CoachWidget from "@/components/CoachWidget";
 import { useAuth } from "@/context/AuthContext";
 import { useAccount } from "@/context/AccountContext";
-import { statsApi } from "@/lib/api";
+import { HeaderActionsProvider, useHeaderActions } from "@/context/HeaderActionsContext";
 import { Toaster } from "sonner";
 import {
   DropdownMenu,
@@ -15,94 +15,6 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-
-function AccountOverview() {
-  const { activeId, active, accounts } = useAccount();
-  const { user } = useAuth();
-  const [stats, setStats] = useState(null);
-
-  useEffect(() => {
-    statsApi.dashboard(activeId).then(setStats).catch(() => setStats(null));
-  }, [activeId]);
-
-  const balance = activeId === "all"
-    ? accounts.reduce((s, a) => s + (a.balance || 0), 0)
-    : (active?.balance || 0);
-  const todaysPnl = stats?.todays_pnl ?? 0;
-  const totalPnl = stats?.total_pnl ?? 0;
-  const dailyDD = stats?.daily_drawdown ?? 0;
-  const weeklyDD = stats?.weekly_drawdown ?? 0;
-
-  const limits = (activeId !== "all" && user?.settings?.account_limits?.[activeId]) || null;
-  const dailyLimit = limits?.daily;
-  const weeklyLimit = limits?.weekly;
-
-  const Row = ({ label, value, positive, limit }) => (
-    <div className="flex items-center justify-between py-1.5">
-      <span className="text-[12px] text-[#6D6D82]">{label}</span>
-      <span className={`text-[12px] sm:text-[13px] font-semibold tjfx-mono tjfx-num ${
-        positive === undefined ? "text-[#16151F]" : positive ? "text-emerald-600" : "text-red-500"
-      }`}>
-        {value}{limit ? <span className="text-[#A1A1AA] font-normal"> / ${limit.toFixed(0)}</span> : ""}
-      </span>
-    </div>
-  );
-
-  const DrawdownBar = ({ label, used, limit }) => {
-    const pct = limit ? Math.min(100, (Math.abs(used) / limit) * 100) : 0;
-    const barColor = pct >= 90 ? "bg-red-500" : pct >= 60 ? "bg-amber-500" : "bg-emerald-500";
-    return (
-      <div className="py-1.5">
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-[12px] text-[#6D6D82]">{label}</span>
-          <span className="text-[12px] sm:text-[13px] font-semibold tjfx-mono text-[#16151F]">
-            ${Math.abs(used).toFixed(0)} <span className="text-[#A1A1AA] font-normal">/ ${limit.toFixed(0)}</span>
-          </span>
-        </div>
-        <div className="h-2.5 w-full rounded-full bg-[#E8E8F1] overflow-hidden">
-          <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
-        </div>
-      </div>
-    );
-  };
-
-  return (
-    <div className="px-3 py-3 border-t border-[#E8E8F1] bg-white" data-testid="account-overview">
-      <div className="text-[11px] font-semibold text-[#A1A1AA] uppercase tracking-wide px-1 mb-2">
-        Account Overview
-      </div>
-      <div className="px-1">
-        <Row label="Balance" value={`$${balance.toFixed(2)}`} />
-        <Row label="Today's P&L" value={`${todaysPnl >= 0 ? "+" : ""}$${todaysPnl.toFixed(2)}`} positive={todaysPnl >= 0} />
-        <Row label="Total P&L" value={`${totalPnl >= 0 ? "+" : ""}$${totalPnl.toFixed(2)}`} positive={totalPnl >= 0} />
-        <Row label="Win Rate" value={`${stats?.win_rate ?? 0}%`} />
-        {dailyLimit ? (
-          <DrawdownBar label="Daily Drawdown" used={dailyDD} limit={dailyLimit} />
-        ) : (
-          <Row
-            label="Daily Drawdown"
-            value={`${dailyDD === 0 ? "" : "-"}$${Math.abs(dailyDD).toFixed(2)}`}
-            positive={dailyDD >= -0.001 ? undefined : false}
-          />
-        )}
-        {weeklyLimit ? (
-          <DrawdownBar label="Weekly Drawdown" used={weeklyDD} limit={weeklyLimit} />
-        ) : (
-          <Row
-            label="Weekly Drawdown"
-            value={`${weeklyDD === 0 ? "" : "-"}$${Math.abs(weeklyDD).toFixed(2)}`}
-            positive={weeklyDD >= -0.001 ? undefined : false}
-          />
-        )}
-        {activeId !== "all" && !limits && (
-          <Link to="/settings" className="mt-1 block text-[11px] text-[#7C3AED] hover:underline">
-            + Set drawdown limits →
-          </Link>
-        )}
-      </div>
-    </div>
-  );
-}
 
 const nav = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, testid: "nav-dashboard" },
@@ -116,7 +28,18 @@ const nav = [
   { to: "/settings", label: "Settings", icon: Settings, testid: "nav-settings" },
 ];
 
+// Layout is only responsible for providing header-action slots; the actual
+// header/sidebar rendering lives in LayoutInner so it can consume the
+// context a level below where it's provided.
 export default function Layout() {
+  return (
+    <HeaderActionsProvider>
+      <LayoutInner />
+    </HeaderActionsProvider>
+  );
+}
+
+function LayoutInner() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [theme, setTheme] = useState(() => localStorage.getItem("tjfx-theme") || "light");
@@ -150,7 +73,7 @@ export default function Layout() {
   }, [navigate]);
 
   return (
-    <div className={`min-h-screen flex flex-col md:flex-row bg-[#F6F6FB] ${theme === "dark" ? "dark" : ""}`}>
+    <div className={`h-screen overflow-hidden flex flex-col md:flex-row bg-[#F6F6FB] ${theme === "dark" ? "dark" : ""}`}>
       {sidebarOpen && (
         <div
           className="fixed inset-0 bg-black/40 z-20 md:hidden"
@@ -206,8 +129,7 @@ export default function Layout() {
         </div>
 
         <div className="shrink-0 border-t border-[#E8E8F1] bg-white">
-          <div className="px-3 pt-3"><AccountSwitcher /></div>
-          <AccountOverview />
+          <div className="px-3 py-3"><AccountSwitcher /></div>
         </div>
 
       </aside>
@@ -252,28 +174,8 @@ export default function Layout() {
           </div>
 
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-            <NavLink
-              to="/settings"
-              data-testid="header-settings-btn"
-              aria-label="Settings"
-              className="w-8 h-8 rounded-lg sm:rounded-xl border border-[#E8E8F1] flex items-center justify-center text-[#6D6D82] hover:text-[#7C3AED] hover:border-[#7C3AED] transition-colors"
-            >
-              <Settings className="w-4 h-4" />
-            </NavLink>
-
-            <button
-              type="button"
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              aria-label="Toggle color theme"
-              data-testid="theme-toggle"
-              className="w-8 h-8 rounded-lg sm:rounded-xl border border-[#E8E8F1] flex items-center justify-center text-[#6D6D82] hover:text-[#7C3AED] hover:border-[#7C3AED] transition-colors"
-            >
-              {theme === "dark" ? (
-                <Sun className="w-4 h-4" />
-              ) : (
-                <Moon className="w-4 h-4" />
-              )}
-            </button>
+            {/* Page-specific action injected via HeaderActionsContext — e.g. Dashboard's "Customize" button */}
+            <HeaderActionSlot />
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -310,6 +212,14 @@ export default function Layout() {
                   <Settings className="w-4 h-4 mr-2" /> Settings
                 </DropdownMenuItem>
                 <DropdownMenuItem
+                  onSelect={(e) => { e.preventDefault(); setTheme(theme === "dark" ? "light" : "dark"); }}
+                  data-testid="header-menu-theme"
+                >
+                  {theme === "dark" ? <Sun className="w-4 h-4 mr-2" /> : <Moon className="w-4 h-4 mr-2" />}
+                  {theme === "dark" ? "Light Mode" : "Dark Mode"}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
                   onClick={logout}
                   data-testid="header-menu-logout"
                   className="text-red-600 focus:text-red-600"
@@ -330,4 +240,9 @@ export default function Layout() {
       <CoachWidget />
     </div>
   );
+}
+
+function HeaderActionSlot() {
+  const { headerAction } = useHeaderActions();
+  return headerAction || null;
 }
