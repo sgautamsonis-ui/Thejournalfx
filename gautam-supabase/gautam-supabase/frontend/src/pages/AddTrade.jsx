@@ -2,11 +2,12 @@ import React, { useEffect, useMemo, useState } from "react";
 import { tradesApi, aiApi, notebookApi, prefsApi, accountsApi, biasApi, uploadApi } from "@/lib/api";
 import { computePnl } from "@/lib/pnlCalc";
 import { setPendingTrade, clearPendingTrade, notifyTradeSync } from "@/lib/pendingTrade";
-import { useAccount } from "@/context/AccountContext";import { toast } from "sonner";
+import { useAccount } from "@/context/AccountContext";import { useAuth } from "@/context/AuthContext";import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { Sparkles, Save, X, Upload, Star, CheckCircle2, Circle, ClipboardList, Clipboard } from "lucide-react";
 import { AttachmentPanel, LinkedBiasCard } from "@/components/TradePanels";
 import { compressImage } from "@/lib/imageUtils";
+import { formatTradeTime } from "@/lib/time";
 
 const MAX_IMAGES = 15;
 const BUILDER_DEFAULTS = {
@@ -30,6 +31,8 @@ const inp = "w-full h-10 px-3 rounded-xl border border-[#E8E8F1] focus:border-[#
 export default function AddTrade() {
   const nav = useNavigate();
   const { accounts, activeId, active, reload: reloadAccounts, dailyDrawdownLocked, dailyDrawdownInfo } = useAccount();
+  const { user } = useAuth();
+  const timeFormat = user?.settings?.time_format || user?.settings?.report_time_format || "12h";
   const [t, setT] = useState({
     account_id: (activeId && activeId!=="all") ? activeId : (accounts[0]?.id || null),
     symbol: "XAUUSD", direction: "long", order_type: "Market",
@@ -581,7 +584,7 @@ function AddTradePremium({ t, setT, presets, accounts, computed, recommendedLot,
             </section>
           </aside>
         </div>
-        <section className="tjfx-card premium-card review-premium mt-4"><SectionHeading number="8" title="Review & Save" subtitle="One last quick check before logging it." /><ReviewCard t={t} computed={computed} /><button onClick={save} disabled={saving} className="premium-save mt-4 h-11 min-w-[220px] rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-sm font-semibold disabled:opacity-60">{saving?"Saving trade...":"Save Trade"}</button></section>
+        <section className="tjfx-card premium-card review-premium mt-4"><SectionHeading number="8" title="Review & Save" subtitle="One last quick check before logging it." /><ReviewCard t={t} computed={computed} timeFormat={timeFormat} /><button onClick={save} disabled={saving} className="premium-save mt-4 h-11 min-w-[220px] rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-sm font-semibold disabled:opacity-60">{saving?"Saving trade...":"Save Trade"}</button></section>
       </fieldset>
     </div>
   );
@@ -668,7 +671,7 @@ function AddTradeWorkspace({ t, setT, presets, accounts, computed, recommendedLo
 
           <section className="tjfx-card p-5">
             <SectionHeading number="8" title="Review & Save" subtitle="Check your execution details before saving." />
-            <div className="mt-4"><ReviewCard t={t} computed={computed} /></div>
+            <div className="mt-4"><ReviewCard t={t} computed={computed} timeFormat={timeFormat} /></div>
             <button onClick={save} disabled={saving} className="mt-5 h-11 min-w-[220px] rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-sm font-semibold disabled:opacity-60">{saving?"Saving trade...":"Save Trade"}</button>
           </section>
       </fieldset>
@@ -676,7 +679,7 @@ function AddTradeWorkspace({ t, setT, presets, accounts, computed, recommendedLo
   );
 }
 
-function ReviewCard({ t, computed }) {
+function ReviewCard({ t, computed, timeFormat }) {
   const lossAmt = computed.risk;
   const profitAmt = computed.reward;
   const pnl = computed.pnl;
@@ -687,7 +690,7 @@ function ReviewCard({ t, computed }) {
     <div className="rounded-2xl border border-[#E8E8F1] bg-gradient-to-br from-white to-[#FAFAFF] p-5" data-testid="review-card">
       {/* Meta strip: Date & Time → Lot → Session → Symbol/Direction */}
       <div className="flex flex-wrap items-center gap-2 mb-5 pb-4 border-b border-[#E8E8F1]">
-        <MetaPill label={dt && !isNaN(dt) ? dt.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : t.date} sub={t.entry_time} />
+        <MetaPill label={dt && !isNaN(dt) ? dt.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : t.date} sub={t.entry_time ? formatTradeTime(t.entry_time, timeFormat) : ""} />
         <MetaPill label={`${t.lot_size || 0} lot`} />
         <MetaPill label={t.session || "—"} />
         <span className="ml-auto flex items-center gap-2">
