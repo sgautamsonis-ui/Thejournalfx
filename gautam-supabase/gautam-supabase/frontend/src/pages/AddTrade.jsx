@@ -235,7 +235,7 @@ export default function AddTrade() {
     } catch (e) { toast.error("Save failed"); setSaving(false); }
   };
 
-  return <AddTradeWorkspace t={t} setT={setT} presets={presets} accounts={accounts} computed={computed} recommendedLot={recommendedLot}
+  return <AddTradePremium t={t} setT={setT} presets={presets} accounts={accounts} computed={computed} recommendedLot={recommendedLot}
     htfDraft={htfDraft} setHtfDraft={setHtfDraft} entryDraft={entryDraft} setEntryDraft={setEntryDraft}
     moodDraft={moodDraft} setMoodDraft={setMoodDraft} strategyDraft={strategyDraft} setStrategyDraft={setStrategyDraft} addStrategy={addStrategy}
     addPairedPreset={addPairedPreset} removePairedPreset={removePairedPreset} toggle={toggle}
@@ -528,6 +528,59 @@ function ChipRow({ label, items, selected, onToggle }) {
       {items.length===0 ? <div className="text-xs text-[#A1A1AA]">Manage in Settings → Trade Presets</div> :
         <div className="flex flex-wrap gap-2">{items.map(v => <Chip key={v} label={v} active={selected.includes(v)} onClick={()=>onToggle(v)} />)}</div>
       }
+    </div>
+  );
+}
+
+function AddTradePremium({ t, setT, presets, accounts, computed, recommendedLot, htfDraft, setHtfDraft, entryDraft, setEntryDraft, moodDraft, setMoodDraft, strategyDraft, setStrategyDraft, addStrategy, addPairedPreset, removePairedPreset, toggle, saving, save, onFile, uploadingCount, tradeLocked, drawdownInfo }) {
+  const draftSubOptions = (presets.sub_strategy || []).filter(v => v.split("::")[0] === strategyDraft.timeframe).map(v => v.split("::").slice(1).join("::")).filter(Boolean);
+  const input = (label, key, type = "number") => <Field label={label}><input value={t[key]} onChange={e=>setT({...t,[key]:e.target.value})} type={type} step={type === "number" ? "any" : undefined} className={inp}/></Field>;
+  return (
+    <div className="add-trade-page compact-add-trade premium-trade-page p-4 sm:p-5 lg:p-6 max-w-[1500px] mx-auto space-y-4" data-testid="add-trade-page">
+      <header className="premium-trade-header flex flex-wrap items-center justify-between gap-4">
+        <div><div className="premium-eyebrow">TRADE JOURNAL</div><h1 className="font-display text-3xl font-bold">Add New Trade</h1><p className="text-sm text-[#6D6D82] mt-1">A focused workspace for setup, execution and review.</p></div>
+        <button onClick={save} disabled={saving || tradeLocked} className="premium-save h-11 px-5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-sm font-semibold disabled:opacity-60">{tradeLocked ? "Trading locked" : saving ? "Saving..." : "Save Trade"}</button>
+      </header>
+      {tradeLocked && <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 font-medium">Daily drawdown limit of ${Number(drawdownInfo.limit || 0).toFixed(0)} has been reached. New trades are locked until the next trading day.</div>}
+      <fieldset disabled={tradeLocked} className={tradeLocked ? "opacity-50 pointer-events-none" : ""}>
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
+          <main className="xl:col-span-8 space-y-4">
+            <section className="tjfx-card premium-card trade-details-premium">
+              <SectionHeading number="1" title="Trade Details" subtitle="Execution, pricing and risk — kept together." />
+              {accounts.length > 0 && <div className="premium-account"><Field label="Trading Account"><select value={t.account_id||""} onChange={e=>setT({...t,account_id:e.target.value})} className={inp}>{accounts.map(a=><option key={a.id} value={a.id}>{a.name} · {a.broker} · ${Number(a.balance||0).toFixed(2)}</option>)}</select></Field></div>}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
+                <Field label="Symbol"><select value={t.symbol} onChange={e=>setT({...t,symbol:e.target.value})} className={inp}>{(presets.symbol.length?presets.symbol:["XAUUSD"]).map(x=><option key={x}>{x}</option>)}</select></Field>
+                <Field label="Direction"><div className="grid grid-cols-2 gap-1"><button type="button" onClick={()=>setT({...t,direction:"long"})} className={`h-10 rounded-xl text-sm border ${t.direction==="long"?"bg-emerald-600 text-white border-emerald-600":"border-[#E8E8F1]"}`}>Long</button><button type="button" onClick={()=>setT({...t,direction:"short"})} className={`h-10 rounded-xl text-sm border ${t.direction==="short"?"bg-red-600 text-white border-red-600":"border-[#E8E8F1]"}`}>Short</button></div></Field>
+                <Field label="Order Type"><select value={t.order_type} onChange={e=>setT({...t,order_type:e.target.value})} className={inp}>{["Market","Limit","Stop"].map(x=><option key={x}>{x}</option>)}</select></Field>
+                <Field label="Status"><select value={t.status} onChange={e=>setT({...t,status:e.target.value})} className={inp}>{["closed","open","cancelled"].map(x=><option key={x} value={x}>{x[0].toUpperCase()+x.slice(1)}</option>)}</select></Field>
+                {input("Entry Price", "entry_price")}{input("Exit Price", "exit_price")}{input("SL Price", "stop_loss")}{input("TP Price", "take_profit")}
+                {input("Lot Size", "lot_size")}{input("Risk %", "risk_percent")}{input("Commission", "commission")}{input("Swap", "swap")}
+                {input("Date", "date", "date")}{input("Time", "entry_time", "time")}
+                <Field label="Session"><select value={t.session} onChange={e=>setT({...t,session:e.target.value})} className={inp}>{(presets.session.length?presets.session:["London"]).map(x=><option key={x}>{x}</option>)}</select></Field>
+              </div>
+              <div className="mt-4"><LotCalculator recommendedLot={recommendedLot} computed={computed} onUse={()=>recommendedLot.lot!==null&&setT({...t,lot_size:recommendedLot.lot})}/></div>
+            </section>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <PairedPresetBuilder number="2" title="Strategy" description="Core setup and optional sub-strategy." timeframeLabel="Strategy" typeLabel="Sub-strategy (optional)" timeframePlaceholder="Select strategy..." typePlaceholder="Select sub-strategy..." timeframes={presets.strategy} types={draftSubOptions} draft={strategyDraft} onDraftChange={setStrategyDraft} items={t.strategy ? [t.strategy] : []} onAdd={addStrategy} onRemove={()=>setT({...t, strategy:""})} testid="strategy"/>
+              <PairedPresetBuilder number="3" title="HTF Point of Interest" description="The higher-timeframe level that mattered." timeframeLabel="HTF Timeframe" typeLabel="POI Type" timeframes={presets.htf_timeframe} types={presets.htf_poi_type} draft={htfDraft} onDraftChange={setHtfDraft} items={t.htf_poi} onAdd={()=>addPairedPreset("htf_poi",htfDraft,setHtfDraft,"HTF POI")} onRemove={value=>removePairedPreset("htf_poi",value)} testid="htf-poi"/>
+            </div>
+            <PairedPresetBuilder number="4" title="Entry Confirmation" description="The confirmation that triggered the entry." timeframeLabel="Entry Timeframe" typeLabel="Confirmation Type" timeframes={presets.entry_timeframe} types={presets.entry_confirmation_type} draft={entryDraft} onDraftChange={setEntryDraft} items={t.entry_tags} onAdd={()=>addPairedPreset("entry_tags",entryDraft,setEntryDraft,"entry confirmation")} onRemove={value=>removePairedPreset("entry_tags",value)} testid="entry-confirmation"/>
+          </main>
+          <aside className="xl:col-span-4 space-y-4">
+            <LinkedBiasCard number="5" />
+            <section className="tjfx-card premium-card psychology-premium"><SectionHeading number="6" title="Psychology & Mood" subtitle="Your state before, during and after." />
+              <div className="grid grid-cols-1 sm:grid-cols-3 xl:grid-cols-1 gap-4">
+                <MoodPresetPicker label="Mood Before" items={presets.mood} draft={moodDraft.before} onDraftChange={v=>setMoodDraft({...moodDraft, before:v})} selected={t.mood_before} onAdd={()=>{ if (moodDraft.before && !t.mood_before.includes(moodDraft.before)) toggle("mood_before", moodDraft.before); setMoodDraft({...moodDraft, before:""}); }} onRemove={v=>toggle("mood_before", v)} testid="mood-before"/>
+                <div><MoodPresetPicker label="Mood During" items={presets.mood} draft={moodDraft.during} onDraftChange={v=>setMoodDraft({...moodDraft, during:v})} selected={t.mood_during} onAdd={()=>{ if (moodDraft.during && !t.mood_during.includes(moodDraft.during)) toggle("mood_during", moodDraft.during); setMoodDraft({...moodDraft, during:""}); }} onRemove={v=>toggle("mood_during", v)} testid="mood-during"/><textarea value={t.mood_during_notes} onChange={e=>setT({...t,mood_during_notes:e.target.value})} rows={2} className="w-full mt-2 p-3 rounded-xl border border-[#E8E8F1] focus:border-[#7C3AED] outline-none text-sm" placeholder="What were you thinking or feeling?"/></div>
+                <MoodPresetPicker label="Mood After" items={presets.mood} draft={moodDraft.after} onDraftChange={v=>setMoodDraft({...moodDraft, after:v})} selected={t.mood_after} onAdd={()=>{ if (moodDraft.after && !t.mood_after.includes(moodDraft.after)) toggle("mood_after", moodDraft.after); setMoodDraft({...moodDraft, after:""}); }} onRemove={v=>toggle("mood_after", v)} testid="mood-after"/>
+              </div>
+              <div className="mt-4 pt-4 border-t border-[#F0F0F5]"><div className="text-[12px] text-[#6D6D82] mb-2">Notes</div><textarea value={t.notes} onChange={e=>setT({...t,notes:e.target.value})} rows={3} className="w-full p-3 rounded-xl border border-[#E8E8F1] focus:border-[#7C3AED] outline-none text-sm" placeholder="Mindset, execution and lessons"/></div>
+            </section>
+            <section className="tjfx-card premium-card screenshot-premium"><SectionHeading number="7" title="Trade Screenshot" subtitle="Upload or paste chart images." /><AttachmentPanel images={t.screenshots} onFile={onFile} uploadingCount={uploadingCount}/></section>
+          </aside>
+        </div>
+        <section className="tjfx-card premium-card review-premium mt-4"><SectionHeading number="8" title="Review & Save" subtitle="One last quick check before logging it." /><ReviewCard t={t} computed={computed} /><button onClick={save} disabled={saving} className="premium-save mt-4 h-11 min-w-[220px] rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-sm font-semibold disabled:opacity-60">{saving?"Saving trade...":"Save Trade"}</button></section>
+      </fieldset>
     </div>
   );
 }

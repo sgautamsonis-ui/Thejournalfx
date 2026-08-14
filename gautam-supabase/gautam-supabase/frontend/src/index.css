@@ -314,3 +314,28 @@ h1, h2, h3, h4, h5 { font-family: 'Comfortaa', sans-serif; letter-spacing: -0.01
 .dark table tr { border-color: #213042 !important; }
 .dark tbody tr:hover { background: rgba(124,58,237,.08) !important; }
 .dark ::-webkit-scrollbar-thumb { background: #213042 !important; }
+
+/* Add Trade: compact, premium workspace */
+.premium-trade-page { max-width: 1440px !important; }
+.premium-trade-header {
+  padding: 1.15rem 1.25rem;
+  border: 1px solid #e8e8f1;
+  border-radius: 18px;
+  background: radial-gradient(circle at 100% 0%, rgba(124,58,237,.13), transparent 34%), linear-gradient(135deg, #fff 0%, #faf9ff 100%);
+  box-shadow: 0 8px 28px rgba(41, 30, 76, .05);
+}
+.premium-eyebrow { color: #7c3aed; font-size: 10px; letter-spacing: .18em; font-weight: 800; margin-bottom: .25rem; }
+.premium-card, .premium-trade-page .trade-builder-card { padding: 1.15rem !important; border-radius: 18px !important; box-shadow: 0 8px 26px rgba(32, 24, 56, .045) !important; }
+.premium-account { padding: .65rem .75rem; background: #f8f7ff; border: 1px solid #ece9ff; border-radius: 12px; }
+.premium-trade-page .trade-builder-card > div:first-child { margin-bottom: .8rem; }
+.premium-trade-page .trade-builder-card > div:first-child p { line-height: 1.25; }
+.premium-trade-page .trade-builder-card .mt-4 { margin-top: .75rem !important; }
+.premium-trade-page .trade-builder-card .pt-4 { padding-top: .75rem !important; }
+.premium-trade-page [data-testid="lot-size-calculator"] { padding: .85rem 1rem !important; border-radius: 14px !important; }
+.premium-trade-page [data-testid="lot-size-calculator"] h3 { font-size: .95rem; }
+.premium-save { box-shadow: 0 9px 18px rgba(124,58,237,.25); transition: transform .16s ease, box-shadow .16s ease; }
+.premium-save:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 12px 24px rgba(124,58,237,.32); }
+.premium-trade-page textarea { resize: vertical; }
+.premium-trade-page .psychology-premium .space-y-5 > :not([hidden]) ~ :not([hidden]) { margin-top: 0; }
+.dark .premium-trade-header { background: radial-gradient(circle at 100% 0%, rgba(124,58,237,.24), transparent 36%), linear-gradient(135deg, #0d1722, #09111a); border-color: #213042; }
+.dark .premium-account { background: rgba(124,58,237,.09); border-color: rgba(139,92,246,.24); }
