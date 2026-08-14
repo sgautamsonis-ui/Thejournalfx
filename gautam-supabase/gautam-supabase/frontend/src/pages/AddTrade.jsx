@@ -134,7 +134,7 @@ export default function AddTrade() {
   // "Liquidity Sweep + MSS - PDH" — with no extra field needed.
   const [strategyDraft, setStrategyDraft] = useState({ timeframe: "", type: "" });
   const addStrategy = () => {
-    if (!strategyDraft.timeframe) { toast.error("Choose a strategy"); return; }
+    if (!strategyDraft.strategy) { toast.error("Choose a strategy"); return; }
     const combined = strategyDraft.type ? `${strategyDraft.timeframe} - ${strategyDraft.type}` : strategyDraft.timeframe;
     setT(p => ({ ...p, strategy: combined }));
   };
