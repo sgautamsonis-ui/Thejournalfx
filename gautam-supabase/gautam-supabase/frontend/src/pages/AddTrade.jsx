@@ -468,7 +468,7 @@ function SectionHeading({ number, title, subtitle }) {
   );
 }
 
-function PairedPresetBuilder({ number, title, description, timeframeLabel, typeLabel, timeframes, types, draft, onDraftChange, items, onAdd, onRemove, testid }) {
+function PairedPresetBuilder({ number, title, description, timeframeLabel, typeLabel, timeframePlaceholder = "Select timeframe...", typePlaceholder = "Select type...", timeframes, types, draft, onDraftChange, items, onAdd, onRemove, testid }) {
   return (
     <div className="tjfx-card p-6">
       <div className="flex flex-wrap items-baseline justify-between gap-2 mb-4">
@@ -476,8 +476,8 @@ function PairedPresetBuilder({ number, title, description, timeframeLabel, typeL
         <span className="text-[11px] text-[#A1A1AA]">Manage options in Settings</span>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-2">
-        <Field label={timeframeLabel}><select value={draft.timeframe} onChange={e=>onDraftChange({...draft,timeframe:e.target.value})} className={inp} data-testid={`${testid}-timeframe`}><option value="">Select timeframe...</option>{timeframes.map(value => <option key={value} value={value}>{value}</option>)}</select></Field>
-        <Field label={typeLabel}><select value={draft.type} onChange={e=>onDraftChange({...draft,type:e.target.value})} className={inp} data-testid={`${testid}-type`}><option value="">Select type...</option>{types.map(value => <option key={value} value={value}>{value}</option>)}</select></Field>
+        <Field label={timeframeLabel}><select value={draft.timeframe} onChange={e=>onDraftChange({...draft,timeframe:e.target.value})} className={inp} data-testid={`${testid}-timeframe`}><option value="">{timeframePlaceholder}</option>{timeframes.map(value => <option key={value} value={value}>{value}</option>)}</select></Field>
+        <Field label={typeLabel}><select value={draft.type} onChange={e=>onDraftChange({...draft,type:e.target.value})} className={inp} data-testid={`${testid}-type`}><option value="">{typePlaceholder}</option>{types.map(value => <option key={value} value={value}>{value}</option>)}</select></Field>
         <div className="flex items-end"><button type="button" onClick={onAdd} data-testid={`${testid}-add`} className="h-10 w-full sm:w-auto px-4 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-sm font-semibold">+ Add</button></div>
       </div>
       {items.length > 0 ? <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-[#F0F0F5]">{items.map(value => <span key={value} className="chip active inline-flex items-center gap-1.5 pr-1">{value}<button type="button" onClick={()=>onRemove(value)} aria-label={`Remove ${value}`} className="w-5 h-5 rounded-full hover:bg-white/60 flex items-center justify-center"><X className="w-3 h-3"/></button></span>)}</div> : <div className="mt-4 pt-4 border-t border-[#F0F0F5] text-sm text-[#6D6D82]">No selections yet. Add the combinations used for this trade.</div>}
@@ -551,7 +551,7 @@ function AddTradeWorkspace({ t, setT, presets, accounts, computed, recommendedLo
       <fieldset disabled={tradeLocked} className={tradeLocked ? "opacity-50 pointer-events-none" : ""}>
           <LinkedBiasCard number="1" />
 
-          <PairedPresetBuilder number="2" title="Strategy" description="Choose your strategy and, if it has one, a sub-strategy — combines into one tag." timeframeLabel="Strategy" typeLabel="Sub-strategy (optional)" timeframes={presets.strategy} types={draftSubOptions} draft={strategyDraft} onDraftChange={setStrategyDraft} items={t.strategy ? [t.strategy] : []} onAdd={addStrategy} onRemove={()=>setT({...t, strategy:""})} testid="strategy"/>
+          <PairedPresetBuilder number="2" title="Strategy" description="Choose your strategy and, if it has one, a sub-strategy — combines into one tag." timeframeLabel="Strategy" typeLabel="Sub-strategy (optional)" timeframePlaceholder="Select strategy..." typePlaceholder="Select sub-strategy..." timeframes={presets.strategy} types={draftSubOptions} draft={strategyDraft} onDraftChange={setStrategyDraft} items={t.strategy ? [t.strategy] : []} onAdd={addStrategy} onRemove={()=>setT({...t, strategy:""})} testid="strategy"/>
 
           <PairedPresetBuilder number="3" title="HTF Points of Interest" description="Select a timeframe and POI type, then add it to this trade." timeframeLabel="HTF Timeframe" typeLabel="POI Type" timeframes={presets.htf_timeframe} types={presets.htf_poi_type} draft={htfDraft} onDraftChange={setHtfDraft} items={t.htf_poi} onAdd={()=>addPairedPreset("htf_poi",htfDraft,setHtfDraft,"HTF POI")} onRemove={value=>removePairedPreset("htf_poi",value)} testid="htf-poi"/>
 
