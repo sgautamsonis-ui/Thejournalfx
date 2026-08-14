@@ -61,7 +61,7 @@ export default function AddTrade() {
 
   useEffect(() => {
     const kinds = ["symbol","strategy","sub_strategy","session","mood","mistake","strength","htf_poi_type","htf_timeframe","entry_confirmation_type","entry_timeframe"];
-    const cacheKey = "tjfx-preference-cache-v1";
+    const cacheKey = "tjfx-preference-cache-v2"; // bumped so old cached data (saved before sub_strategy existed) never overrides fresh presets
     try {
       const cached = JSON.parse(localStorage.getItem(cacheKey) || "null");
       if (cached?.data) setPresets(p => ({ ...p, ...Object.fromEntries(Object.entries(cached.data).map(([k, v]) => [k, v.map(x => x.value)])) }));

@@ -391,7 +391,7 @@ function PresetManager({ kind, label, hint }) {
       const created = await prefsApi.create(kind, val.trim());
       setItems(current => [...current, created]);
       setVal("");
-      localStorage.removeItem("tjfx-preference-cache-v1");
+      localStorage.removeItem("tjfx-preference-cache-v2");
       toast.success(`${label} added`);
     } catch (error) {
       toast.error(error?.response?.data?.detail || "Could not add this item. Update and restart the backend, then try again.");
@@ -403,13 +403,13 @@ function PresetManager({ kind, label, hint }) {
     try {
       const updated = await prefsApi.update(kind, edit.id, edit.val.trim());
       setItems(current => current.map(item => item.id === updated.id ? updated : item));
-      localStorage.removeItem("tjfx-preference-cache-v1");
+      localStorage.removeItem("tjfx-preference-cache-v2");
       setEdit({ id: null, val: "" });
       toast.success(`${label} updated`);
     } catch (error) { toast.error(error?.response?.data?.detail || "Could not update this item"); }
   };
   const del = async (id) => {
-    try { await prefsApi.delete(kind, id); setItems(current => current.filter(item => item.id !== id)); localStorage.removeItem("tjfx-preference-cache-v1"); toast.success(`${label} deleted`); }
+    try { await prefsApi.delete(kind, id); setItems(current => current.filter(item => item.id !== id)); localStorage.removeItem("tjfx-preference-cache-v2"); toast.success(`${label} deleted`); }
     catch (error) { toast.error(error?.response?.data?.detail || "Could not delete this item"); }
   };
 
@@ -470,7 +470,7 @@ function StrategySubPresetManager() {
       const created = await prefsApi.create("sub_strategy", `${parent}::${val.trim()}`);
       setItems(current => [...current, created]);
       setVal("");
-      localStorage.removeItem("tjfx-preference-cache-v1");
+      localStorage.removeItem("tjfx-preference-cache-v2");
       toast.success("Sub-strategy added");
     } catch (error) {
       toast.error(error?.response?.data?.detail || "Could not add this item.");
@@ -483,13 +483,13 @@ function StrategySubPresetManager() {
       const parentName = it.value.split("::")[0];
       const updated = await prefsApi.update("sub_strategy", edit.id, `${parentName}::${edit.val.trim()}`);
       setItems(current => current.map(item => item.id === updated.id ? updated : item));
-      localStorage.removeItem("tjfx-preference-cache-v1");
+      localStorage.removeItem("tjfx-preference-cache-v2");
       setEdit({ id: null, val: "" });
       toast.success("Sub-strategy updated");
     } catch (error) { toast.error(error?.response?.data?.detail || "Could not update this item"); }
   };
   const del = async (id) => {
-    try { await prefsApi.delete("sub_strategy", id); setItems(current => current.filter(item => item.id !== id)); localStorage.removeItem("tjfx-preference-cache-v1"); toast.success("Sub-strategy deleted"); }
+    try { await prefsApi.delete("sub_strategy", id); setItems(current => current.filter(item => item.id !== id)); localStorage.removeItem("tjfx-preference-cache-v2"); toast.success("Sub-strategy deleted"); }
     catch (error) { toast.error(error?.response?.data?.detail || "Could not delete this item"); }
   };
 

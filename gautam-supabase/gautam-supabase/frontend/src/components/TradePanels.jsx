@@ -26,6 +26,7 @@ function formatBullets(text) {
 
 export function LinkedBiasCard({ number = "1" }) {
   const [biases, setBiases] = useState({ daily: null, weekly: null });
+  const openLightbox = useLightbox();
   useEffect(() => { let alive = true; Promise.all([biasApi.latest("daily"), biasApi.latest("weekly")]).then(([daily, weekly]) => alive && setBiases({ daily, weekly })).catch(() => {}); return () => { alive = false; }; }, []);
   return <section className="tjfx-card p-6" data-testid="linked-bias-card">
     <div className="flex items-start gap-3 mb-1"><span className="w-7 h-7 rounded-full bg-[#7C3AED] text-white text-sm font-bold flex items-center justify-center shrink-0">{number}</span><div><h3 className="font-display text-lg font-bold leading-6">Daily / Weekly Bias</h3><p className="text-xs text-[#6D6D82] mt-0.5">Condensed live view from Bias Center — edit the full source there.</p></div></div>
@@ -40,7 +41,7 @@ export function LinkedBiasCard({ number = "1" }) {
         {b?.images?.length>0 && (
           <div className="flex gap-1.5 p-3.5 pb-0 overflow-x-auto">
             {b.images.slice(0,4).map((src,i)=>(
-              <img key={i} src={src} alt="" className="h-20 w-28 object-cover rounded-lg border border-black/5 shrink-0"/>
+              <img key={i} src={src} alt="" onClick={()=>openLightbox(b.images,i)} className="h-20 w-28 object-cover rounded-lg border border-black/5 shrink-0 cursor-zoom-in"/>
             ))}
           </div>
         )}
