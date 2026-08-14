@@ -10,6 +10,33 @@ import { compressImage } from "@/lib/imageUtils";
 import { useAuth } from "@/context/AuthContext";
 import { formatTradeTime } from "@/lib/time";
 
+// Older trades and partially deployed API responses can omit optional fields or
+// return number values as strings. Normalize them at the boundary so one legacy
+// trade cannot crash the entire Trade View route.
+const asArray = (value) => Array.isArray(value) ? value : [];
+const asNumber = (value) => {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : 0;
+};
+const normalizeTrade = (trade) => {
+  const value = trade && typeof trade === "object" ? trade : {};
+  return {
+    ...value,
+    direction: typeof value.direction === "string" ? value.direction.toLowerCase() : "",
+    entry_tags: asArray(value.entry_tags),
+    htf_poi: asArray(value.htf_poi),
+    mood_before: asArray(value.mood_before),
+    mood_during: asArray(value.mood_during),
+    mood_after: asArray(value.mood_after),
+    mistakes: asArray(value.mistakes),
+    strengths: asArray(value.strengths),
+    setup_tags: asArray(value.setup_tags),
+    screenshots: asArray(value.screenshots),
+    net_pnl: asNumber(value.net_pnl),
+    r_multiple: asNumber(value.r_multiple),
+  };
+};
+
 export default function TradeView() {
   const { reload: reloadAccounts } = useAccount();
   const { user } = useAuth();
@@ -27,11 +54,19 @@ export default function TradeView() {
     symbol: [], strategy: [], session: [], htf_poi: [], entry_tag: [], mood: [], mistake: [], strength: [], setup_tag: [],
   });
 
-  const load = () => tradesApi.list().then(setTrades).catch(()=>{});
+  const load = () => tradesApi.list()
+    .then(data => setTrades(asArray(data).map(normalizeTrade)))
+    .catch(() => setTrades([]));
   useEffect(() => {
     load();
     prefsApi.listMany(["symbol","strategy","session","htf_poi","entry_tag","mood","mistake","strength","setup_tag"])
-      .then(prefData => setPresets(p => ({ ...p, ...Object.fromEntries(Object.entries(prefData).map(([k, v]) => [k, v.map(x => x.value)])) })))
+      .then(prefData => setPresets(p => ({
+        ...p,
+        ...Object.fromEntries(Object.entries(prefData || {}).map(([k, values]) => [
+          k,
+          asArray(values).map(item => item?.value).filter(Boolean),
+        ])),
+      })))
       .catch(()=>{});
   }, []);
 
@@ -49,7 +84,7 @@ export default function TradeView() {
   }, [filters]);
 
   const filtered = useMemo(() => {
-    let list = trades;
+    let list = [...trades];
     if (tab==="open") list = list.filter(t=>t.status==="open");
     if (tab==="closed") list = list.filter(t=>t.status==="closed");
     if (tab==="win") list = list.filter(t=>(t.net_pnl||0)>0);
@@ -99,7 +134,7 @@ export default function TradeView() {
       map.get(d).push(t);
     });
     return Array.from(map.entries()).map(([date, dayTrades]) => {
-      const netPnl = dayTrades.reduce((s, t) => s + (t.net_pnl || 0), 0);
+      const netPnl = dayTrades.reduce((s, t) => s + asNumber(t.net_pnl), 0);
       const closed = dayTrades.filter(t => t.status === "closed");
       const wins = closed.filter(t => (t.net_pnl || 0) > 0).length;
       const winRate = closed.length > 0 ? Math.round((wins / closed.length) * 100) : 0;
@@ -126,17 +161,17 @@ export default function TradeView() {
     const closed = trades.filter(t => t.status === "closed");
     const wins = closed.filter(t => (t.net_pnl||0) > 0);
     const losses = closed.filter(t => (t.net_pnl||0) < 0);
-    const totalR = trades.reduce((sum, t) => sum + (t.r_multiple||0), 0);
+    const totalR = trades.reduce((sum, t) => sum + asNumber(t.r_multiple), 0);
     const avgR = trades.length > 0 ? (totalR / trades.length) : 0;
     const winRate = closed.length > 0 ? ((wins.length / closed.length) * 100).toFixed(2) : 0;
-    const totalWinPnL = wins.reduce((sum, t) => sum + (t.net_pnl||0), 0);
-    const totalLossPnL = losses.reduce((sum, t) => sum + Math.abs(t.net_pnl||0), 0);
+    const totalWinPnL = wins.reduce((sum, t) => sum + asNumber(t.net_pnl), 0);
+    const totalLossPnL = losses.reduce((sum, t) => sum + Math.abs(asNumber(t.net_pnl)), 0);
     const profitFactor = totalLossPnL > 0 ? (totalWinPnL / totalLossPnL).toFixed(2) : 0;
     
     const sessionPnL = {};
     trades.forEach(t => {
       if (t.session) {
-        sessionPnL[t.session] = (sessionPnL[t.session] || 0) + (t.r_multiple||0);
+        sessionPnL[t.session] = (sessionPnL[t.session] || 0) + asNumber(t.r_multiple);
       }
     });
     const bestSession = Object.entries(sessionPnL).sort((a, b) => b[1] - a[1])[0] || ["—", 0];
@@ -441,7 +476,7 @@ export default function TradeView() {
                   <h3 className="font-display text-2xl font-bold text-[#16151F]">{(edit||sel).symbol}</h3>
                   <div className="flex items-center gap-2 mt-2">
                     <span className={`px-3 py-1 rounded-lg text-xs font-bold ${(edit||sel).direction === "long" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>
-                      {(edit||sel).direction.toUpperCase()}
+                      {((edit || sel).direction || "—").toUpperCase()}
                     </span>
                     <span className={`px-3 py-1 rounded-lg text-xs font-bold ${((edit||sel).net_pnl||0) > 0 ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>
                       {((edit||sel).net_pnl||0) > 0 ? "+" : ""}{((edit||sel).net_pnl||0).toFixed(2)} USD
@@ -607,9 +642,10 @@ function DayGroup({ group, defaultOpen, onOpen, onDelete, timeFormat }) {
 
 // Premium Trade Card Component
 function PremiumTradeCard({ trade, onOpen, onDelete, style }) {
-  const pnl = trade.net_pnl || 0;
+  const pnl = asNumber(trade.net_pnl);
   const isWin = pnl > 0;
   const thumb = trade.screenshots?.[0];
+  const direction = (trade.direction || "—").toUpperCase();
   
   return (
     <div 
@@ -649,7 +685,7 @@ function PremiumTradeCard({ trade, onOpen, onDelete, style }) {
           <div className="flex items-center gap-2 mb-2">
             <h4 className="font-display font-bold text-lg text-[#16151F]">{trade.symbol}</h4>
             <span className={`px-2 py-1 rounded-lg text-xs font-bold whitespace-nowrap ${trade.direction === "long" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>
-              {trade.direction.toUpperCase()}
+              {direction}
             </span>
           </div>
 
@@ -784,7 +820,7 @@ function ViewBlock({ t, tab = "Overview" }) {
   return (
     <>
       <div className="grid grid-cols-2 gap-3">
-        {[["Direction",t.direction],["Status",t.status],["Session",t.session],["Strategy",t.strategy],["Entry",t.entry_price],["Exit",t.exit_price||"—"],["SL",t.stop_loss||"—"],["TP",t.take_profit||"—"],["Lot",t.lot_size],["Risk %",t.risk_percent],["R Multiple",t.r_multiple||"—"],["Net P&L",`${(t.net_pnl||0)>=0?"+":""}$${(t.net_pnl||0).toFixed(2)}`]].map(([k,v]) => (
+        {[["Direction",t.direction || "—"],["Status",t.status],["Session",t.session],["Strategy",t.strategy],["Entry",t.entry_price],["Exit",t.exit_price||"—"],["SL",t.stop_loss||"—"],["TP",t.take_profit||"—"],["Lot",t.lot_size],["Risk %",t.risk_percent],["R Multiple",t.r_multiple||"—"],["Net P&L",`${asNumber(t.net_pnl)>=0?"+":""}$${asNumber(t.net_pnl).toFixed(2)}`]].map(([k,v]) => (
           <div key={k} className="p-3 rounded-lg bg-[#F6F6FB]"><div className="text-[10px] text-[#6D6D82] font-semibold">{k}</div><div className="font-bold tjfx-mono text-sm">{v}</div></div>
         ))}
       </div>
