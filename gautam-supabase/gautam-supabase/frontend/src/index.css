@@ -339,3 +339,18 @@ h1, h2, h3, h4, h5 { font-family: 'Comfortaa', sans-serif; letter-spacing: -0.01
 .premium-trade-page .psychology-premium .space-y-5 > :not([hidden]) ~ :not([hidden]) { margin-top: 0; }
 .dark .premium-trade-header { background: radial-gradient(circle at 100% 0%, rgba(124,58,237,.24), transparent 36%), linear-gradient(135deg, #0d1722, #09111a); border-color: #213042; }
 .dark .premium-account { background: rgba(124,58,237,.09); border-color: rgba(139,92,246,.24); }
+
+/* Keep the workstation spacious on laptop/desktop screens. The old sidebar
+   squeezed the setup cards while leaving a tall, empty gutter beneath them. */
+@media (min-width: 1280px) {
+  .premium-trade-page fieldset > .grid { display: block; }
+  .premium-trade-page fieldset > .grid > main { width: 100%; }
+  .premium-trade-page fieldset > .grid > aside {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+    align-items: start;
+    margin-top: 1rem;
+  }
+  .premium-trade-page .psychology-premium > .grid { grid-template-columns: 1fr; }
+}

@@ -128,14 +128,14 @@ export default function AddTrade() {
   const removePairedPreset = (field, value) => setT(p => ({ ...p, [field]: p[field].filter(x => x !== value) }));
 
   // Strategy uses the same "pick + Add" builder as HTF POI / Entry Confirmation.
-  // strategyDraft.strategy = base strategy, strategyDraft.type = sub-strategy
+  // strategyDraft.timeframe = base strategy, strategyDraft.type = sub-strategy
   // (reusing PairedPresetBuilder's field names); the sub-strategy is optional,
   // and adding combines them into one string stored in t.strategy — e.g.
   // "Liquidity Sweep + MSS - PDH" — with no extra field needed.
-  const [strategyDraft, setStrategyDraft] = useState({ strategy: "", type: "" });
+  const [strategyDraft, setStrategyDraft] = useState({ timeframe: "", type: "" });
   const addStrategy = () => {
-    if (!strategyDraft.strategy) { toast.error("Choose a strategy"); return; }
-    const combined = strategyDraft.type ? `${strategyDraft.strategy} - ${strategyDraft.type}` : strategyDraft.strategy;
+    if (!strategyDraft.timeframe) { toast.error("Choose a strategy"); return; }
+    const combined = strategyDraft.type ? `${strategyDraft.timeframe} - ${strategyDraft.type}` : strategyDraft.timeframe;
     setT(p => ({ ...p, strategy: combined }));
   };
 
@@ -561,7 +561,7 @@ function AddTradePremium({ t, setT, presets, accounts, computed, recommendedLot,
               <div className="mt-4"><LotCalculator recommendedLot={recommendedLot} computed={computed} onUse={()=>recommendedLot.lot!==null&&setT({...t,lot_size:recommendedLot.lot})}/></div>
             </section>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <PairedPresetBuilder number="2" title="Strategy" description="Core setup and optional sub-strategy." timeframeLabel="Strategy" typeLabel="Sub-strategy (optional)" timeframePlaceholder="Select strategy..." typePlaceholder="Select sub-strategy..." timeframes={presets.strategy} types={draftSubOptions} draft={strategyDraft} onDraftChange={setStrategyDraft} items={t.strategy ? [t.strategy] : []} onAdd={addStrategy} onRemove={()=>setT({...t, strategy:""})} testid="strategy"/>
+              <PairedPresetBuilder number="2" title="Strategy" description="Select the setup and its sub-strategy." timeframeLabel="Strategy" typeLabel="Sub-strategy" timeframePlaceholder="Select strategy..." typePlaceholder="Select sub-strategy..." timeframes={presets.strategy} types={draftSubOptions} draft={strategyDraft} onDraftChange={setStrategyDraft} items={t.strategy ? [t.strategy] : []} onAdd={addStrategy} onRemove={()=>setT({...t, strategy:""})} testid="strategy"/>
               <PairedPresetBuilder number="3" title="HTF Point of Interest" description="The higher-timeframe level that mattered." timeframeLabel="HTF Timeframe" typeLabel="POI Type" timeframes={presets.htf_timeframe} types={presets.htf_poi_type} draft={htfDraft} onDraftChange={setHtfDraft} items={t.htf_poi} onAdd={()=>addPairedPreset("htf_poi",htfDraft,setHtfDraft,"HTF POI")} onRemove={value=>removePairedPreset("htf_poi",value)} testid="htf-poi"/>
             </div>
             <PairedPresetBuilder number="4" title="Entry Confirmation" description="The confirmation that triggered the entry." timeframeLabel="Entry Timeframe" typeLabel="Confirmation Type" timeframes={presets.entry_timeframe} types={presets.entry_confirmation_type} draft={entryDraft} onDraftChange={setEntryDraft} items={t.entry_tags} onAdd={()=>addPairedPreset("entry_tags",entryDraft,setEntryDraft,"entry confirmation")} onRemove={value=>removePairedPreset("entry_tags",value)} testid="entry-confirmation"/>
