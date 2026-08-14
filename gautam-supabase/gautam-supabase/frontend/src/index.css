@@ -354,3 +354,26 @@ h1, h2, h3, h4, h5 { font-family: 'Comfortaa', sans-serif; letter-spacing: -0.01
   }
   .premium-trade-page .psychology-premium > .grid { grid-template-columns: 1fr; }
 }
+
+/* The market-bias panel needs room to be useful. Keep it wide, pair it with
+   psychology, and let screenshots use a calm full-width row below. */
+@media (min-width: 1280px) {
+  .premium-trade-page fieldset > .grid > aside {
+    grid-template-columns: minmax(0, 1.35fr) minmax(360px, 1fr);
+    align-items: stretch;
+  }
+  .premium-trade-page fieldset > .grid > aside > :first-child { min-height: 320px; }
+  .premium-trade-page fieldset > .grid > aside > :last-child { grid-column: 1 / -1; }
+  .premium-trade-page .screenshot-premium { min-height: auto; }
+}
+
+/* A short, scannable final checkpoint instead of a second large form card. */
+.premium-trade-page .review-premium { padding: 1rem 1.15rem !important; }
+.premium-trade-page .review-premium [data-testid="review-card"] { padding: .75rem 1rem; }
+.premium-trade-page .review-premium [data-testid="review-card"] > div:first-child { margin-bottom: .65rem; padding-bottom: .65rem; }
+.premium-trade-page .review-premium [data-testid="review-card"] > div:nth-child(2) { display: none; }
+.premium-trade-page .review-premium [data-testid="review-card"] > div:nth-child(3) { padding: .65rem .8rem; }
+.premium-trade-page .review-premium [data-testid="review-card"] > div:nth-child(3) .text-2xl { font-size: 1.25rem; line-height: 1.35; }
+.premium-trade-page .review-premium .mt-4 { margin-top: .7rem !important; }
+.premium-trade-page .review-premium .mt-4 + .premium-save { margin-top: .75rem !important; }
+.premium-trade-page .space-y-4 > :not([hidden]) ~ :not([hidden]) { margin-top: 12px !important; }
