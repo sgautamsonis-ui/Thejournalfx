@@ -8,12 +8,22 @@ export const api = axios.create({
   baseURL: API,
 });
 
-// Attach the current Supabase access token to every request.
+// Keep the auth token in memory. Calling Supabase getSession for every API
+// request becomes noticeable when a page loads several cards at once.
+let accessToken = null;
+let tokenReady = supabase.auth.getSession().then(({ data }) => {
+  accessToken = data?.session?.access_token || null;
+});
+supabase.auth.onAuthStateChange((_event, session) => {
+  accessToken = session?.access_token || null;
+});
+
+// Attach the current Supabase access token to every request without an extra
+// storage/session lookup after the first request.
 api.interceptors.request.use(async (config) => {
-  const { data } = await supabase.auth.getSession();
-  const token = data?.session?.access_token;
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+  await tokenReady;
+  if (accessToken) {
+    config.headers.Authorization = `Bearer ${accessToken}`;
   }
   return config;
 });

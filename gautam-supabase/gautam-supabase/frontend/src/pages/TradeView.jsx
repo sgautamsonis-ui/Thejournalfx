@@ -7,9 +7,13 @@ import { toast } from "sonner";
 import { computePnl } from "@/lib/pnlCalc";
 import { useLightbox } from "@/components/ImageLightbox";
 import { compressImage } from "@/lib/imageUtils";
+import { useAuth } from "@/context/AuthContext";
+import { formatTradeTime } from "@/lib/time";
 
 export default function TradeView() {
   const { reload: reloadAccounts } = useAccount();
+  const { user } = useAuth();
+  const timeFormat = user?.settings?.time_format || user?.settings?.report_time_format || "12h";
   const [trades, setTrades] = useState([]);
   const [q, setQ] = useState("");
   const [tab, setTab] = useState("all");
@@ -403,6 +407,7 @@ export default function TradeView() {
                 defaultOpen={gi === 0} 
                 onOpen={openTrade} 
                 onDelete={del}
+                timeFormat={timeFormat}
               />
             ))}
           </div>
@@ -557,7 +562,7 @@ function MetricBadge({ label, value, change, icon, isCircle, status }) {
 
 // One collapsible day: a date header (with the day's Net P&L and win rate)
 // that expands below to reveal that day's trades — like TradeZella's Day View.
-function DayGroup({ group, defaultOpen, onOpen, onDelete }) {
+function DayGroup({ group, defaultOpen, onOpen, onDelete, timeFormat }) {
   const [open, setOpen] = React.useState(defaultOpen);
   const isPos = group.netPnl >= 0;
   const parsed = new Date(`${group.date}T00:00:00`);
@@ -649,7 +654,7 @@ function PremiumTradeCard({ trade, onOpen, onDelete, style }) {
           </div>
 
           <div className="text-xs text-[#6D6D82] mb-2 space-y-0.5">
-            <div className="font-medium">{trade.date} • {trade.entry_time || "—"}</div>
+            <div className="font-medium">{trade.date} • {formatTradeTime(trade.entry_time, timeFormat)}</div>
             <div className="text-[11px]">{trade.session || "—"}</div>
           </div>
 

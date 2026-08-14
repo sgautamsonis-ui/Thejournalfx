@@ -20,6 +20,8 @@ import {
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import { toast } from "sonner";
+import { useAuth } from "@/context/AuthContext";
+import { formatTradeTime } from "@/lib/time";
 
 const VIEWS = [
   { id: "mood", label: "Mood Tracker", icon: Smile },
@@ -62,6 +64,8 @@ function fmtMoney(n) {
 
 export default function Tracker() {
   const { activeId } = useAccount();
+  const { user } = useAuth();
+  const timeFormat = user?.settings?.time_format || user?.settings?.report_time_format || "12h";
   const navigate = useNavigate();
   const [view, setView] = useState("mood");
   const [trades, setTrades] = useState([]);
@@ -232,7 +236,7 @@ function DrillDialog({ drill, onClose, navigate }) {
                     onClick={() => navigate("/trades")}
                     className="border-t border-[#E8E8F1] hover:bg-[#F3E8FF]/40 cursor-pointer"
                   >
-                    <td className="py-3 tjfx-mono text-xs text-[#6D6D82]">{trade.date}{trade.entry_time ? ` · ${trade.entry_time}` : ""}</td>
+                    <td className="py-3 tjfx-mono text-xs text-[#6D6D82]">{trade.date}{trade.entry_time ? ` · ${formatTradeTime(trade.entry_time, timeFormat)}` : ""}</td>
                     <td className="py-3 font-semibold tjfx-mono">{trade.symbol}</td>
                     <td className={trade.direction === "long" ? "text-emerald-600" : "text-red-500"}>
                       {trade.direction === "long" ? "↑ Long" : "↓ Short"}
@@ -273,7 +277,7 @@ function DrillDialog({ drill, onClose, navigate }) {
                         {trade.symbol} · {trade.direction === "long" ? "Long" : "Short"}
                       </div>
                       <div className="text-[11px] text-[#6D6D82]">
-                        {trade.date}{trade.entry_time ? ` · ${trade.entry_time}` : ""}
+                        {trade.date}{trade.entry_time ? ` · ${formatTradeTime(trade.entry_time, timeFormat)}` : ""}
                         {trade.r_multiple != null ? ` · ${trade.r_multiple.toFixed(2)}R` : ""}
                       </div>
                     </div>
