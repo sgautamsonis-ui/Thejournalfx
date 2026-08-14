@@ -833,6 +833,7 @@ function DayGroup({ group, defaultOpen, onOpen, onDelete, timeFormat, mistakePre
               onDelete={onDelete}
               mistakePresets={mistakePresets}
               onToggleMistake={onToggleMistake}
+              timeFormat={timeFormat}
               style={{animation: `fadeIn 0.3s ease-out ${i*50}ms both`}}
             />
           ))}
@@ -843,7 +844,7 @@ function DayGroup({ group, defaultOpen, onOpen, onDelete, timeFormat, mistakePre
 }
 
 // Premium Trade Card Component
-function PremiumTradeCard({ trade, onOpen, onDelete, mistakePresets, onToggleMistake, style }) {
+function PremiumTradeCard({ trade, onOpen, onDelete, mistakePresets, onToggleMistake, timeFormat, style }) {
   const pnl = asNumber(trade.net_pnl);
   const isWin = pnl > 0;
   const thumb = trade.screenshots?.[0];
