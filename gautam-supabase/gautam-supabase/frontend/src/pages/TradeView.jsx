@@ -37,7 +37,44 @@ const normalizeTrade = (trade) => {
   };
 };
 
-export default function TradeView() {
+// A production React error normally unmounts the route, which was presenting
+// as a blank Trade View. Keep the failure contained to this page and show a
+// useful recovery action instead of losing the whole workspace.
+class TradeViewErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+
+  componentDidCatch(error, info) {
+    console.error("Trade View render error", error, info);
+  }
+
+  render() {
+    if (!this.state.error) return this.props.children;
+    return (
+      <div className="min-h-screen bg-[#FAFBFF] p-5 flex items-center justify-center">
+        <div className="max-w-md w-full tjfx-card p-6 text-center">
+          <h1 className="font-display text-xl font-bold text-[#16151F]">Trade View could not load</h1>
+          <p className="mt-2 text-sm text-[#6D6D82]">Your trade data is safe. Please reload this page.</p>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="mt-5 h-10 px-4 rounded-xl bg-[#7C3AED] text-sm font-semibold text-white hover:bg-[#6D28D9]"
+          >
+            Reload Trade View
+          </button>
+        </div>
+      </div>
+    );
+  }
+}
+
+function TradeViewContent() {
   const { reload: reloadAccounts } = useAccount();
   const { user } = useAuth();
   const timeFormat = user?.settings?.time_format || user?.settings?.report_time_format || "12h";
@@ -248,7 +285,7 @@ export default function TradeView() {
         payload.r_multiple = sel.r_multiple;
       }
       const updated = await tradesApi.update(edit.id, payload);
-      setSel(updated); setEdit(null);
+      setSel(normalizeTrade(updated)); setEdit(null);
       toast.success("Trade updated");
       reloadAccounts?.();
       load();
@@ -479,7 +516,7 @@ export default function TradeView() {
                       {((edit || sel).direction || "—").toUpperCase()}
                     </span>
                     <span className={`px-3 py-1 rounded-lg text-xs font-bold ${((edit||sel).net_pnl||0) > 0 ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>
-                      {((edit||sel).net_pnl||0) > 0 ? "+" : ""}{((edit||sel).net_pnl||0).toFixed(2)} USD
+                      {asNumber((edit || sel).net_pnl) > 0 ? "+" : ""}{asNumber((edit || sel).net_pnl).toFixed(2)} USD
                     </span>
                   </div>
                 </div>
@@ -929,3 +966,11 @@ const TagBlock = ({ label, items }) => (
     <div className="flex flex-wrap gap-1.5">{items.map(x => <span key={x} className="chip active text-xs">{x}</span>)}</div>
   </div>
 );
+
+export default function TradeView() {
+  return (
+    <TradeViewErrorBoundary>
+      <TradeViewContent />
+    </TradeViewErrorBoundary>
+  );
+}
