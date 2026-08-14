@@ -128,14 +128,14 @@ export default function AddTrade() {
   const removePairedPreset = (field, value) => setT(p => ({ ...p, [field]: p[field].filter(x => x !== value) }));
 
   // Strategy uses the same "pick + Add" builder as HTF POI / Entry Confirmation.
-  // strategyDraft.timeframe = base strategy, strategyDraft.type = sub-strategy
+  // strategyDraft.strategy = base strategy, strategyDraft.type = sub-strategy
   // (reusing PairedPresetBuilder's field names); the sub-strategy is optional,
   // and adding combines them into one string stored in t.strategy — e.g.
   // "Liquidity Sweep + MSS - PDH" — with no extra field needed.
-  const [strategyDraft, setStrategyDraft] = useState({ timeframe: "", type: "" });
+  const [strategyDraft, setStrategyDraft] = useState({ strategy: "", type: "" });
   const addStrategy = () => {
     if (!strategyDraft.strategy) { toast.error("Choose a strategy"); return; }
-    const combined = strategyDraft.type ? `${strategyDraft.timeframe} - ${strategyDraft.type}` : strategyDraft.timeframe;
+    const combined = strategyDraft.type ? `${strategyDraft.strategy} - ${strategyDraft.type}` : strategyDraft.strategy;
     setT(p => ({ ...p, strategy: combined }));
   };
 
