@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { useAccount } from "@/context/AccountContext";
 import { statsApi } from "@/lib/api";
+import AccountSwitcher from "@/components/AccountSwitcher";
 
 // Was previously pinned in the sidebar; now rendered on the Dashboard page
 // itself (below Thought of the Day) so the sidebar can stay a pure nav rail.
@@ -58,8 +59,13 @@ export default function AccountOverview() {
 
   return (
     <div className="tjfx-card px-4 py-3.5 mb-1.5" data-testid="account-overview">
-      <div className="text-[11px] font-semibold text-[#A1A1AA] uppercase tracking-wide mb-2">
-        Account Overview
+      <div className="flex items-center gap-3 mb-2.5">
+        <div className="text-[11px] font-semibold text-[#A1A1AA] uppercase tracking-wide whitespace-nowrap">
+          Account Overview
+        </div>
+        <div className="w-full max-w-[260px]">
+          <AccountSwitcher compact />
+        </div>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-x-6">
         <Row label="Balance" value={`$${balance.toFixed(2)}`} />

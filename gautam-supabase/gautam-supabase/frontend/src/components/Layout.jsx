@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate, Link } from "react-router-dom";
 import { LayoutDashboard, PlusCircle, Target, BookOpen, Activity, Settings, LogOut, TrendingUp, Table2, FileText, NotebookPen, Moon, Sun, ChevronDown, User, Menu, X, AlertTriangle } from "lucide-react";
-import AccountSwitcher from "@/components/AccountSwitcher";
 import CoachWidget from "@/components/CoachWidget";
 import { useAuth } from "@/context/AuthContext";
 import { useAccount } from "@/context/AccountContext";
@@ -126,10 +125,6 @@ function LayoutInner() {
             ))}
           </nav>
 
-        </div>
-
-        <div className="shrink-0 border-t border-[#E8E8F1] bg-white">
-          <div className="px-3 py-3"><AccountSwitcher /></div>
         </div>
 
       </aside>
