@@ -1,0 +1,838 @@
+{
+  "risk": [
+    {
+      "hi": "Trade lagana aur risk ko dil se accept karna — dono alag baatein hain. Yahi psychological gap hi asli farak hai.",
+      "en": "There is a huge psychological gap between assuming you are a risk-taker because you put on trades and fully accepting the risks inherent in each trade.",
+      "source": "Trading in the Zone"
+    },
+    {
+      "hi": "Risk ko accept karna seekhna bhi ek trading skill hai — aur shayad sabse important skill jo aap seekh sakte hain.",
+      "en": "Learning to accept the risk is a trading skill — the most important skill you can learn.",
+      "source": "Trading in the Zone"
+    },
+    {
+      "hi": "Jitna aapne risk accept nahi kiya, utna hi aap us risk se bhagoge.",
+      "en": "To whatever degree you haven't accepted the risk, is the same degree to which you will avoid the risk.",
+      "source": "Trading in the Zone"
+    },
+    {
+      "hi": "Best traders sirf risk lete nahi — woh us risk ko poori tarah accept aur embrace karna seekh chuke hain.",
+      "en": "The best traders not only take the risk, they have also learned to accept and embrace that risk.",
+      "source": "Trading in the Zone"
+    },
+    {
+      "hi": "Trading ki sakht sachai yahi hai — har trade ka result uncertain hota hai.",
+      "en": "The hard, cold reality of trading is that every trade has an uncertain outcome.",
+      "source": "Trading in the Zone"
+    },
+    {
+      "hi": "Jawab simple hai — risk accept karna seekho. Matlab apne trade ke result ko bina dar ya emotional discomfort ke accept karna.",
+      "en": "The answer is: Learn to accept the risk. Accepting the risk means accepting the consequences of your trades without emotional discomfort or fear.",
+      "source": "Trading in the Zone"
+    },
+    {
+      "hi": "Jab aap pros ki tarah risk accept karte ho, to market kuch bhi kare — woh aapko threatening nahi lagega.",
+      "en": "When you accept the risk the way the pros do, you won't perceive anything that the market can do as threatening.",
+      "source": "Trading in the Zone"
+    },
+    {
+      "hi": "Risk relative hota hai, lekin us pal jo usse mehsoos karta hai, uske liye woh bilkul absolute lagta hai.",
+      "en": "Risk is relative, but to the person who perceives it in the moment, it seems absolute and beyond question.",
+      "source": "Trading in the Zone"
+    },
+    {
+      "hi": "Kisi bhi edge ke liye wins aur losses ka distribution random hota hai — ek trade se kuch decide nahi hota.",
+      "en": "There is a random distribution between wins and losses for any given set of variables that define an edge.",
+      "source": "Trading in the Zone"
+    },
+    {
+      "hi": "Mere liye losses sirf business ka cost hain — utna paisa jo mujhe winning trades tak pahuchne ke liye kharch karna padta hai.",
+      "en": "To me, losses are simply the cost of doing business — the amount of money I need to spend to make myself available for the winning trades.",
+      "source": "Trading in the Zone"
+    },
+    {
+      "hi": "Jab aap risk poori tarah accept kar lete ho, to har result ke saath aap shaanti mein rehte ho.",
+      "en": "When you have accepted the risk, you will be at peace with any outcome.",
+      "source": "Trading in the Zone"
+    },
+    {
+      "hi": "Risk ko jaanna aur risk ko accept karna — dono bilkul alag cheezein hain.",
+      "en": "Knowing the risk and accepting the risk are two different things.",
+      "source": "Trading in the Zone"
+    },
+    {
+      "hi": "Agar market genuine edge de raha hai, to risk decide karo aur trade le lo.",
+      "en": "If the market is offering you a legitimate edge, determine the risk and take the trade.",
+      "source": "Trading in the Zone"
+    },
+    {
+      "hi": "3:1 ka risk-to-reward ratio ideal hai — har 3 rupaye profit potential ke liye sirf 1 rupaya risk pe.",
+      "en": "A 3:1 risk-to-reward ratio is ideal — you are only risking one dollar for every three dollars of profit potential.",
+      "source": "Trading in the Zone"
+    },
+    {
+      "hi": "Apne comfort ke liye kabhi apne set kiye hue risk parameters mat badlo.",
+      "en": "What I don't want you to do is change your established risk parameters to satisfy your comfort levels.",
+      "source": "Trading in the Zone"
+    },
+    {
+      "hi": "Maano ya na maano, consistently successful trader banne ke liye sabse mushkil skill hai — profit lena seekhna.",
+      "en": "Believe it or not, of all the skills one needs to learn to be a consistently successful trader, learning to take profits is probably the most difficult to master.",
+      "source": "Trading in the Zone"
+    },
+    {
+      "hi": "Main har trade ka risk pehle hi define kar leta hoon. Ya to poori tarah risk accept karta hoon, ya trade chhod deta hoon.",
+      "en": "I predefine the risk of every trade. I completely accept the risk, or I am willing to let go of the trade.",
+      "source": "Trading in the Zone"
+    },
+    {
+      "hi": "Money management do zaroori cheezon se banta hai — psychological management aur risk management.",
+      "en": "Money management is composed of two essential elements: psychological management and risk management.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "Risk management tabhi possible hai jab trader risk lene se pehle apne psychological factors ko samajh chuka ho.",
+      "en": "Risk management stems from the psychological factors being truly understood by the trader and 'in place' before risk is even considered.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "Risk matlab — kisi zaroorat ko poora karne ki koshish mein apne resources ke net loss ki possibility.",
+      "en": "Risk is the possibility of a net loss of personal resources in the exchange or pursuit of fulfilling a need.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "Market mein aapko apna real risk kabhi pura pata nahi hota — stop-loss laga bhi lo, market gap karke usse bhi cross kar sakta hai.",
+      "en": "With the markets you don't ultimately know what your risk is, even if you are disciplined enough to use stops, because the market could gap through your stops.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "Loss cut na karne ka temptation hamesha rehta hai — aur usse resist karna bahut mushkil hai.",
+      "en": "There is the constant temptation not to cut your losses, which is very difficult to resist.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "Yahi wajah hai ki zyada traders apna profit jaldi cut kar dete hain, aur loss ko chalta rehne dete hain.",
+      "en": "What you have just been given is an example of why the vast majority of traders cut their profits short and let their losses run.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "Ya to market ke wapas aane ki ummeed karte raho, ya loss cut karke agli opportunity ke liye ready ho jao.",
+      "en": "You can wish and hope that the market will come back, or you can cut your loss and make yourself ready to take the next opportunity.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "Agar hum apne aap ko yeh maanne hi nahi dete ki hum losing trade mein hain, to loss cut karna ek choice hi nahi rehta.",
+      "en": "Cutting a loss isn't a choice if we systematically block from our awareness any information that would indicate that we are in a losing trade.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "Trading Rule 1: Har trade lene se pehle yeh define kar lo ki loss kya maana jayega.",
+      "en": "Trading Rule 1: Predefine what a loss is in every potential trade.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "Trading Rule 2: Jaise hi pata chale trade loss mein hai, usko turant exit karo.",
+      "en": "Trading Rule 2: Execute your losing trades immediately upon perception that they exist.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "Jab loss pehle se define ho aur bina hichkichahat exit ho, to sochne-vichaarne ki zaroorat hi nahi rehti.",
+      "en": "When losses are predefined and executed without hesitation, there is nothing to consider, weigh, or judge, and consequently nothing to tempt yourself with.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "Loss ko pehle se define karke jaldi cut karne se hi aap seekh paate ho ki profit ko badhne kaise dena hai.",
+      "en": "By predefining and cutting your losses short, you are making yourself available to learn the best possible way to let your profits grow.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "Har trade mein jitna risk lo, kam se kam shuruaat mein woh amount aisa ho jisse aap poori tarah comfortable ho.",
+      "en": "The amount of money you risk per trade should be an amount that you are completely comfortable with, at least at first.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "Jab bhi winning trade mein ho, market se kuch na kuch profit zaroor nikaalo.",
+      "en": "Always take something out of the markets when you find yourself in a winning trade.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "'Loss mujhe insaan ke roop mein chhota nahi banata.' Jitni jaldi yeh believe karoge, utni aasani se losing trade exit kar paoge.",
+      "en": "'Losses do not diminish me as a person.' The sooner you believe it, the easier it will be to identify and execute a losing trade.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "Stop losses aur sahi position sizing use karke har trade mein apne total capital ka sirf 1% hi risk karo.",
+      "en": "Only risk 1% of your total trading capital per trade by using stop losses and proper position sizing.",
+      "source": "New Trader Rich Trader"
+    },
+    {
+      "hi": "Aapka sabse bada risk factor hota hai — aapki trade ka size.",
+      "en": "The greatest determiner of your risk is the size of your trade.",
+      "source": "New Trader Rich Trader"
+    },
+    {
+      "hi": "Jitna aggressively zyada return ke liye zyada risk loge, utna bada drawdown hone ka chance badhta hai.",
+      "en": "The more aggressively you pursue returns through exposing your account to risk, the greater the likelihood of larger drawdowns in capital.",
+      "source": "New Trader Rich Trader"
+    },
+    {
+      "hi": "Risk ek jangli kutte jaisa hai — ye trader ko kai tarikon se kaat sakta hai.",
+      "en": "Risk is like a wild dog, and it can bite a trader in many ways.",
+      "source": "New Trader Rich Trader"
+    },
+    {
+      "hi": "Stop losses, options, futures aur position sizing jaise risk management tools use karke bade losses ki possibility khatam karo.",
+      "en": "You must eliminate the possibility of large losses in your trading system by implementing the risk management tools of stop losses, option contracts, futures contracts, and position sizing.",
+      "source": "New Trader Rich Trader"
+    },
+    {
+      "hi": "Trade lene se pehle apna stop loss decide karo. Apne stop ka pura maan rakho aur loss cut karo.",
+      "en": "Determine your stop loss before you place a trade. Honor your stop and cut your loss.",
+      "source": "New Trader Rich Trader"
+    },
+    {
+      "hi": "Main kabhi bhi ek trade mein 1% se zyada loss nahi karna chahta.",
+      "en": "I never want to lose more than 1% on any one trade.",
+      "source": "New Trader Rich Trader"
+    },
+    {
+      "hi": "Stop loss us price level se shuru hona chahiye jahan aapko pata chal jaaye ki aap galat ho — fir wahi se position size decide karo.",
+      "en": "A stop loss level should start at the price level that you know you will be proven wrong, and work back to position sizing.",
+      "source": "New Trader Rich Trader"
+    },
+    {
+      "hi": "Free mein paisa nahi milta — profit market mein homework, discipline, himmat, patience aur perseverance se hi kamaya jaata hai.",
+      "en": "There is no free money; profit must be earned through homework, discipline, courage, patience, and perseverance in the market.",
+      "source": "New Trader Rich Trader"
+    },
+    {
+      "hi": "Zindagi mein agar aap baar-baar sab kuch risk pe lagate ho, to ek din sab kuch kho doge.",
+      "en": "In life, if you risk everything enough times, you will eventually lose everything.",
+      "source": "New Trader Rich Trader"
+    },
+    {
+      "hi": "Aap apne business, life, shaadi, dosti ya family mein bhi bahut zyada risk lekar sab kuch kho sakte ho.",
+      "en": "You can risk too much and lose it all in your business, life, marriage, friendships, or family.",
+      "source": "New Trader Rich Trader"
+    },
+    {
+      "hi": "New Traders ko pata nahi hota loss kab cut karein ya profit kab lock karein; Rich Traders ke paas hamesha ek exit plan hota hai.",
+      "en": "New Traders don't know when to cut losses or lock in gains; Rich Traders have an exit plan.",
+      "source": "New Trader Rich Trader"
+    },
+    {
+      "hi": "New Traders apna profit jaldi cut kar dete hain aur loss chalne dete hain; Rich Traders profit ko chalne dete hain aur loss jaldi cut karte hain.",
+      "en": "New Traders cut profits short and let losses run; Rich Traders let profits run and cut losses short.",
+      "source": "New Trader Rich Trader"
+    },
+    {
+      "hi": "Sirf low-risk high-reward trades ya high-probability setups hi dhoondho.",
+      "en": "Only look for low risk/high reward trades or high probability setups.",
+      "source": "New Trader Rich Trader"
+    },
+    {
+      "hi": "Aapka system aapki apni risk tolerance aur return expectations se match hona chahiye.",
+      "en": "Your system must match your own risk tolerance and return expectations.",
+      "source": "New Trader Rich Trader"
+    },
+    {
+      "hi": "Aapke losses hi woh tuition fee hain jo trading seekhne ke liye chukani padti hai.",
+      "en": "Your losses are the tuition you pay to learn how to trade.",
+      "source": "New Trader Rich Trader"
+    }
+  ],
+  "discipline": [
+    {
+      "hi": "Market ki koi zimmedari nahi — bas apne banaye rules follow karna aapki zimmedari hai.",
+      "en": "It has no responsibility other than to follow the rules it has established to facilitate this activity.",
+      "source": "Trading in the Zone"
+    },
+    {
+      "hi": "Agar lagta hai kuch galat ho hi nahi sakta, tabhi hum apne rules aur boundaries bhool jaate hain.",
+      "en": "If nothing can go wrong, there's no need for rules or boundaries to govern your behavior.",
+      "source": "Trading in the Zone"
+    },
+    {
+      "hi": "Responsibility lena hi winning attitude ki neev hai.",
+      "en": "Taking responsibility is the cornerstone of a winning attitude.",
+      "source": "Trading in the Zone"
+    },
+    {
+      "hi": "Apna winning attitude banana — sirf aapki hi zimmedari hai.",
+      "en": "You are responsible for developing your own winning attitude.",
+      "source": "Trading in the Zone"
+    },
+    {
+      "hi": "Apne rules mein sakht raho, aur apne expectations mein flexible.",
+      "en": "We have to be rigid in our rules and flexible in our expectations.",
+      "source": "Trading in the Zone"
+    },
+    {
+      "hi": "Rules mein sakht rehna zaroori hai — isi se self-trust banta hai jo hamesha aapko protect karta hai.",
+      "en": "We need to be rigid in our rules so that we gain a sense of self-trust that can, and will always, protect us in an environment that has few, if any, boundaries.",
+      "source": "Trading in the Zone"
+    },
+    {
+      "hi": "Aam trader isse ulta karta hai — apne rules mein flexible aur expectations mein sakht.",
+      "en": "The typical trader does just the opposite: he is flexible in his rules and rigid in his expectations.",
+      "source": "Trading in the Zone"
+    },
+    {
+      "hi": "Agar aap sach mein maante ki aapko pata nahi kya hoga, to kya loss cut karne mein hichkichaoge?",
+      "en": "Would you ever hesitate to cut a loss, if you really believed you didn't know?",
+      "source": "Trading in the Zone"
+    },
+    {
+      "hi": "Self-discipline ek technique hai naya mental framework banane ki — yeh koi janamjaat guna nahi hai.",
+      "en": "Self-discipline is a technique to create a new mental framework — it is not a personality trait; people aren't born with self-discipline.",
+      "source": "Trading in the Zone"
+    },
+    {
+      "hi": "Jab principles aapki pehchaan ban jaate hain, tab self-discipline ki zaroorat hi nahi rehti — consistency khud-ba-khud aati hai.",
+      "en": "Once the principles become who you are, you will no longer need self-discipline, because the process of being consistent will become effortless.",
+      "source": "Trading in the Zone"
+    },
+    {
+      "hi": "Rules simple hain — apna system bilkul waise hi trade karo jaise design kiya tha.",
+      "en": "The rules are simple: trade your system exactly as you have designed it.",
+      "source": "Trading in the Zone"
+    },
+    {
+      "hi": "Khud ko monitor karo aur self-discipline use karke apne objective pe wapas focus karo.",
+      "en": "Monitor yourself and use the technique of self-discipline to refocus on your objective.",
+      "source": "Trading in the Zone"
+    },
+    {
+      "hi": "Badlaav ki shuruaat aapki chahat se hoti hai — aur us chahat pe baar-baar focus karne ki willingness se.",
+      "en": "The process of transformation starts with your desire and your willingness to refocus on the object of your desire.",
+      "source": "Trading in the Zone"
+    },
+    {
+      "hi": "Toh maine apne liye ek rule banaya... aur maine kabhi yeh rule nahi tora.",
+      "en": "So I made a rule for myself... and I never broke this rule.",
+      "source": "Trading in the Zone"
+    },
+    {
+      "hi": "Trading mein apne khud ke rules banane padte hain — aur unhe follow karne ka discipline bhi rakhna padta hai.",
+      "en": "In the trading environment, you will have to make up your own rules and then have the discipline to abide by them.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "Discipline ke bina aap apne hi impulses ke reham par ho — bilkul out of control.",
+      "en": "Without the discipline, you will be at the mercy of your own unrestrained impulses and basically out of control.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "Self-discipline se jo self-trust banta hai, uske bina aap apne hi unpredictable behaviour se darte rahoge.",
+      "en": "Consequently, without the self-trust that develops from self-discipline, you will fear the unpredictability of your own behavior.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "Agar aapko khud pe bharosa hai ki aap har market condition mein sahi action loge, to market aapka kuch nahi bigaad sakta.",
+      "en": "The market can't do anything to you if you trust yourself to act appropriately under any market condition.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "Jitna zyada maine apne rules follow kiye, utna zyada khud pe bharosa badhta gaya.",
+      "en": "The more I followed my rules, the more I trusted myself.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "Usse apne liye pakke trading rules banane honge, aur unhe follow karna bhi seekhna hoga.",
+      "en": "He will also need to establish some definite trading rules to guide his own behavior and learn how to adhere to those rules.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "Agar uske paas pakke rules hote, to loss kabhi itna badhne hi nahi deta ki dard hi usse trade se bahar nikale.",
+      "en": "If he had been operating out of a definite set of trading rules, he would have never let the loss accumulate to the point where pain took him out of the trade.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "Self-discipline ek shabd hai jo yeh describe karta hai ki apne actions par conscious control kaise liya jaaye.",
+      "en": "Self-discipline is a word used to describe a process of learning how to take conscious control of your actions.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "Likhne ka amal hamare thoughts ko us direction mein focus karta hai jo hum banana chahte hain — aur woh thoughts hi mind ko badal dete hain.",
+      "en": "The act of writing forces us to focus our thoughts in a manner consistent with what we want to create, and those thoughts alter the mental landscape.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "Self-discipline bas ek mental technique hai — apne goals ke liye jo seekhna ya karna hai, uspe focused rehne ki.",
+      "en": "Self-discipline is simply a mental technique to stay focused on what you need to learn, or do, to accomplish your goals.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "Yeh commitment karo ki apna system bilkul rules ke hisaab se hi trade karoge.",
+      "en": "Make a commitment to trade this system exactly according to the rules.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "Yahin par mental discipline use karke perfect execution ko habit banaya jaata hai.",
+      "en": "This is where you employ mental discipline to make flawless execution a habit.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "Jab aisa ho jaata hai, to habit ki taakat aapke liye kaam karti hai, aur struggle khatam ho jaata hai.",
+      "en": "When that happens, you will have the force of habit working for you, and the struggle will cease.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "Zyada hamesha behtar nahi hota — yeh sirf confusion aur overload banata hai jo aakhir mein loss deta hai.",
+      "en": "More is not better — it just creates confusion and overload that will ultimately lead to losses.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "Aapko woh system dhoondhna hoga jo aapki apni loss-tolerance ke saath match kare.",
+      "en": "You also need to find a system that suits your unique tolerance for taking a loss.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "Aise result ke liye ek proven strategy chahiye jo discipline ke sath follow ki jaaye.",
+      "en": "Achieving this kind of result requires a proven strategy that is followed with discipline.",
+      "source": "New Trader Rich Trader"
+    },
+    {
+      "hi": "Objective traders ke paas ek measurable method, system, rules aur principles hote hain jinse woh trade karte hain.",
+      "en": "Objective traders have a quantified method, system, rules, and principles that they use to trade.",
+      "source": "New Trader Rich Trader"
+    },
+    {
+      "hi": "Jab bhi discipline toota ho, aur plan se hat ke trade liya ho — usko note karo aur reason bhi likho.",
+      "en": "Record breaches of discipline and why you traded off the plan.",
+      "source": "New Trader Rich Trader"
+    },
+    {
+      "hi": "Professional hone ka matlab hai — apna kaam karna, chahe mood kaisa bhi ho.",
+      "en": "Being a professional means doing your job no matter how you feel.",
+      "source": "New Trader Rich Trader"
+    },
+    {
+      "hi": "Fir aapka kaam sirf itna hai — apne plan ko follow karo, market hours mein use badlo mat, chahe kuch bhi feel ho.",
+      "en": "Then your job is to follow that plan and not change it during market hours, no matter how you feel.",
+      "source": "New Trader Rich Trader"
+    },
+    {
+      "hi": "Lekin aapko apne discipline aur confidence ko bhi test karna hoga — system ko bilkul waisa hi trade karke jaisa plan kiya tha.",
+      "en": "But you also need to test your discipline and confidence in trading the system exactly as you planned.",
+      "source": "New Trader Rich Trader"
+    },
+    {
+      "hi": "Har trade mein same position size use karke apne wins aur losses ko balance karo.",
+      "en": "Balance your wins and losses by trading the same position size in capital on every trade.",
+      "source": "New Trader Rich Trader"
+    },
+    {
+      "hi": "Ek trading system ki success seedhe trader ke discipline pe depend karti hai.",
+      "en": "A trading system's success is directly influenced by a trader's discipline.",
+      "source": "New Trader Rich Trader"
+    },
+    {
+      "hi": "Disciplined trader kisi bhi edge wale system se paisa bana sakta hai; bina discipline ke trader kisi se nahi bana sakta, kyunki woh use follow hi nahi karega.",
+      "en": "Disciplined traders can make money trading any system with an edge, but traders without discipline can't make money trading any system, because they're unlikely to follow it.",
+      "source": "New Trader Rich Trader"
+    },
+    {
+      "hi": "Jab aap ek proven system ko discipline ke sath follow karte ho, to long-term mein sahi hone ka chance zyada hota hai.",
+      "en": "You have a good chance of being right over the long-term when you follow a proven system with discipline.",
+      "source": "New Trader Rich Trader"
+    },
+    {
+      "hi": "Zindagi mein kisi bhi cheez mein success ke liye chahiye — risk control, sahi mindset, achha method, discipline, himmat, loss limit karna, aur winners ko chalne dena.",
+      "en": "Success at anything in life requires controlling risk, the right mindset, a successful method, supply and demand, discipline, courage, limiting losses, and letting winners run.",
+      "source": "New Trader Rich Trader"
+    },
+    {
+      "hi": "Fear ya greed ko kabhi aisa kuch karne mat do jo nuksaandeh ho — hamesha apne plan pe tike raho.",
+      "en": "Don't let fear or greed make you do something destructive; always stick to your plan.",
+      "source": "New Trader Rich Trader"
+    },
+    {
+      "hi": "Jo log apni galti pehchan ke jaldi loss cut kar lete hain, woh un logon se zyada successful hote hain jo saalon barbaad hoti situation mein phase rehte hain.",
+      "en": "People who realize they have made a mistake and cut their losses quickly will be more successful than people who waste years on a situation that continuously gets worse.",
+      "source": "New Trader Rich Trader"
+    },
+    {
+      "hi": "Trading plan hona aapko un traders se edge deta hai jo emotion, prediction aur opinion ke bharose trade karte hain.",
+      "en": "Having a trading plan gives you an edge over the traders that rely on emotion, predictions, and opinions to make trading decisions.",
+      "source": "New Trader Rich Trader"
+    },
+    {
+      "hi": "Jab tak entries, exits aur risk management ke rules wala plan na ho, tab tak trade mat karo.",
+      "en": "Don't trade unless you have a plan with rules on entries, exits, and risk management.",
+      "source": "New Trader Rich Trader"
+    },
+    {
+      "hi": "Ye ek daily habit banao — apni soch se pehle hi decide karo ki din kaisa jaana hai.",
+      "en": "Make it a daily habit to determine every event in your life in advance, through your thoughts.",
+      "source": "The Secret"
+    },
+    {
+      "hi": "Sabse pehla kaam — un cheezon ki list banana shuru karo jinke liye aap grateful ho.",
+      "en": "The very first thing is to start making a list of things to be grateful for.",
+      "source": "The Secret"
+    },
+    {
+      "hi": "Agar sirf ek hi cheez karni ho, to gratitude ko apni zindagi ka tareeka bana lo.",
+      "en": "If you only do one thing with the knowledge of The Secret, use gratitude until it becomes your way of life.",
+      "source": "The Secret"
+    },
+    {
+      "hi": "Har subah bistar se uthne se pehle, aane wale din ke liye pehle hi gratitude mehsoos karne ki aadat banao.",
+      "en": "Each morning before you get out of bed, make it a habit to feel the feelings of gratitude in advance for the great day ahead.",
+      "source": "The Secret"
+    },
+    {
+      "hi": "Gratitude ka attitude rakhna bahut zaroori hai.",
+      "en": "It's important to have an attitude of gratitude.",
+      "source": "The Secret"
+    }
+  ],
+  "psychology": [
+    {
+      "hi": "Hamari physical shakal chhod ke, hamari soch hi hai jo humein sabse alag banati hai.",
+      "en": "Other than our physical features, the way we think is what makes us unique.",
+      "source": "Trading in the Zone"
+    },
+    {
+      "hi": "Dar insaan ko jakad deta hai — na aap doosri possibilities dekh paate ho, na unpe sahi action le paate ho.",
+      "en": "Fear is immobilizing — you can't perceive other possibilities or act on them properly.",
+      "source": "Trading in the Zone"
+    },
+    {
+      "hi": "Yahi baat dar ko itna khatarnak banati hai.",
+      "en": "That's what makes fear so insidious.",
+      "source": "Trading in the Zone"
+    },
+    {
+      "hi": "Loss hona aur galat sabit hona — trading ki natural aur anivarya sachai hai.",
+      "en": "Losing and being wrong are inevitable realities of trading.",
+      "source": "Trading in the Zone"
+    },
+    {
+      "hi": "Euphoria ki sabse badi pehchaan yahi hai — itna overconfidence ki lagta hai kuch galat ho hi nahi sakta.",
+      "en": "One of the primary characteristics of euphoria is that it creates a sense of supreme confidence where the possibility of anything going wrong is virtually inconceivable.",
+      "source": "Trading in the Zone"
+    },
+    {
+      "hi": "Jab loss hota hai, hum aksar blame market pe daal dete hain — apni responsibility accept karne se bachte hain.",
+      "en": "When you lose, there are any number of ways in which we can shift the blame to the market and not accept responsibility.",
+      "source": "Trading in the Zone"
+    },
+    {
+      "hi": "Dard ka darr hi fear paida karta hai, aur fear hi zyadatar galtiyon ki jad hai.",
+      "en": "The threat of pain generates fear, and fear is the source of most of the errors you are likely to make.",
+      "source": "Trading in the Zone"
+    },
+    {
+      "hi": "Agar darr hi nahi hai, to himmat ki zaroorat nahi. Agar reckless hone ka darr nahi, to self-control ki bhi zaroorat nahi.",
+      "en": "If you're not afraid, you don't need courage. If you're not afraid of your potential to get reckless, you have no need for self-control.",
+      "source": "Trading in the Zone"
+    },
+    {
+      "hi": "Hamara state of mind hamesha hamare liye ek absolute sach hota hai.",
+      "en": "Our state of mind is always the absolute truth.",
+      "source": "Trading in the Zone"
+    },
+    {
+      "hi": "Agar main confident mehsoos karta hoon, to main confident hoon.",
+      "en": "If I feel confident, then I am confident.",
+      "source": "Trading in the Zone"
+    },
+    {
+      "hi": "Objectivity ek aisa state of mind hai jahan aap market ke baare mein seekhi har cheez ko consciously access kar paate ho.",
+      "en": "Objectivity is a state of mind where you have conscious access to everything you have learned about the nature of market movement.",
+      "source": "Trading in the Zone"
+    },
+    {
+      "hi": "Jab bahar ki duniya humaari expectation ke against jaati hai, to emotional pain ek universal response hota hai.",
+      "en": "Emotional pain is the universal response when the outside world expresses itself in a way that doesn't reflect what we expect or believe to be true.",
+      "source": "Trading in the Zone"
+    },
+    {
+      "hi": "Ek winning trade lagana — ya poori winning streak bhi — iske liye koi skill ki zaroorat nahi hoti.",
+      "en": "Putting on a winning trade — or even a series of winning trades — requires absolutely no skill.",
+      "source": "Trading in the Zone"
+    },
+    {
+      "hi": "Market ka har pal apne aap mein unique hota hai.",
+      "en": "Every moment in the market is unique.",
+      "source": "Trading in the Zone"
+    },
+    {
+      "hi": "Jo cheez great athletes ko baaki sab se alag karti hai, woh hai — galti karne ka darr na hona.",
+      "en": "What separates the consistently great athletes and performers from everyone else is their distinct lack of fear of making a mistake.",
+      "source": "Trading in the Zone"
+    },
+    {
+      "hi": "Consistent winner banna hai to galtiyon ko us negative nazariye se dekhna chhodna hoga jisse zyadatar log dekhte hain.",
+      "en": "If you're going to become a consistent winner, mistakes can't exist in the kind of negatively charged context in which they are held by most people.",
+      "source": "Trading in the Zone"
+    },
+    {
+      "hi": "Jitna self-trust badhega, utna hi self-confidence bhi badhega.",
+      "en": "As your sense of self-trust increases, so will your sense of self-confidence.",
+      "source": "Trading in the Zone"
+    },
+    {
+      "hi": "Ek baar belief ban jaaye to woh khatam nahi hoti — sirf badli ya replace ki ja sakti hai.",
+      "en": "I believe that once a belief has been formed, it cannot be destroyed — it can only be transformed or replaced.",
+      "source": "Trading in the Zone"
+    },
+    {
+      "hi": "Har badi invention un logon ke dimaag se aayi jo apni seekhi hui limits se bahar sochne ko taiyaar the.",
+      "en": "Every invention or development in the evolution of humanity was born in the minds of people who were willing to think outside the boundaries dictated by what they had learned to believe.",
+      "source": "Trading in the Zone"
+    },
+    {
+      "hi": "Belief kuch bhi ho, believe kiye jaane ka ehsaas hamesha achha lagta hai.",
+      "en": "It doesn't matter what the belief is; the experience of being believed feels good.",
+      "source": "Trading in the Zone"
+    },
+    {
+      "hi": "Self-confidence matlab fear ka na hona, aur self-trust matlab sahi waqt pe sahi kaam bina hichkichahat karna.",
+      "en": "I am defining self-confidence as an absence of fear, and self-trust as knowing what to do at the moment it needs to be done, and then doing it without hesitation.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "Koi bhi hichkichahat sirf self-doubt aur fear ko janam deti hai.",
+      "en": "Any hesitation will only create self-doubt and fear.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "Confidence aur fear ek jaise hi states of mind hain — bas unke beech ka farak degree ka hai.",
+      "en": "Confidence and fear are states of mind that are similar in nature, only separated by degree.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "Jaise-jaise confidence badhta hai, waise-waise confusion, anxiety aur fear apne aap kam hote jaate hain.",
+      "en": "As a person's level of confidence increases, his or her degree of confusion, anxiety, and fear dissipates proportionately.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "Main losses ko avoid karne ki koshish mein khud hi unhe create kar raha tha.",
+      "en": "I created my losses instead of avoiding them, simply because I was trying to avoid them.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "Jaise hi loss ka darr kam hua, market bhi mujhe alag lagne laga — kyunki main khud badal gaya tha.",
+      "en": "As my fear of losing dissipated, I was seeing and experiencing a different market — because I was different.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "Asal mein aap market se nahi darte — aap darte ho apni us kamzori se, ki sahi waqt pe sahi kaam nahi kar paoge.",
+      "en": "Essentially, what you fear is not the markets but rather your inability to do what you need to do, when you need to do it, without hesitation.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "Greed ki jad hoti hai — kami aur insecurity mein believe karna.",
+      "en": "Greed is founded in a belief in scarcity and insecurity.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "Success, confidence aur satisfaction — teeno ek doosre ke saath jude hue hain.",
+      "en": "Success, confidence, and satisfaction are all synonymous.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "Dar humein aisa mehsoos karata hai jaise humare paas koi choice hi nahi hai.",
+      "en": "Fear causes us to act without a perception of choice.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "Agar humein hamesha yeh dar rahe ki market humara paisa cheen lega, to winning trade mein ruke rehna choice hi nahi rehta.",
+      "en": "Staying in a winner isn't a choice if we are consumed with the fear that the market is going to take away our money.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "In blind spots se bachne ke liye humein bina dar ke trade karna seekhna hoga.",
+      "en": "To prevent these blind spots in our perception, we have to learn to trade without fear.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "Galti tab tak resolve nahi hoti jab tak hum us experience se seekh na le lein.",
+      "en": "A mistake isn't resolved until we evolve in our understanding to the point where we can garner the insight that is available from the experience.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "Dar ek sikoadne wali taakat hai jo seekhne ke process ko rok deti hai.",
+      "en": "Fear is a contracting force that stifles the learning process.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "Wisdom tab paida hoti hai jab hum kisi cheez ko samajhte hain, bina uske saath judi negative energy ya dar ke.",
+      "en": "Wisdom is the by-product that results when we retain a distinction about the nature of the environment without the negative energy or fear associated with it.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "Jisne sach mein apna dar paar kar liya, woh doosron ko neeche nahi dekhta — kyunki usko ab kisi baat ka dar hi nahi.",
+      "en": "Anyone who has truly transcended a fear doesn't look down upon those who haven't, because they don't have anything to fear.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "Jitni jaldi aap responsibility accept karoge, utni jaldi pata chalega ki market mein safal hone ke liye kaunsi skills chahiye.",
+      "en": "The sooner you accept that responsibility, the easier it will be to identify what skills you need to learn to interact with the markets more successfully.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "Successful trader banne ke liye — bina dar ke trade karna zaroori hai.",
+      "en": "To be a successful trader you need to trade without fear.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "Jab bilkul dar na ho, to log aksar reckless ho jaate hain.",
+      "en": "Getting reckless is exactly what people have a tendency to do if they don't feel any fear.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "Loss accept na karne ke alawa, sabse zyada psychological damage 'missed opportunity' ka afsos karta hai.",
+      "en": "Except for the inability to accept a loss, there isn't anything that has the potential to cause more psychological damage than a belief in missed opportunities.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "Jaise-jaise paisa banate ho, confidence badhta hai — aur jaise confidence badhta hai, aur zyada paisa banta hai.",
+      "en": "As you make money, you will gain in your confidence — and as you gain in confidence, you will make more money.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "Sabse pehle aap confidence ki neev banate ho — jab seekhte ho ki aap sahi se andaza laga sakte ho ki aage kya hoga.",
+      "en": "First, you will be building a base of confidence as you learn that you can, in fact, accurately assess what will most likely happen next.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "Yaad rakho — dar hi woh ek cheez hai jo humein kuch naya seekhne se rokta hai.",
+      "en": "Keep in mind that fear is really the only thing that keeps us from learning anything new.",
+      "source": "The Disciplined Trader"
+    },
+    {
+      "hi": "Uska excitement har fear aur doubt ko dimaag ke peeche dhakel deta tha.",
+      "en": "His excitement pushed any fear or doubt to the back of his mind.",
+      "source": "New Trader Rich Trader"
+    },
+    {
+      "hi": "Fear trader ko jakad sakta hai, lekin thoda fear aapko greed se bacha bhi sakta hai.",
+      "en": "Fear can cripple a trader, but it's also helpful if you have enough fear to keep you safe from greed.",
+      "source": "New Trader Rich Trader"
+    },
+    {
+      "hi": "Agar aap bahut stressed ho, to iski wajah usually apne system pe kam faith, ya apni knowledge/ability pe kam confidence hi hoti hai.",
+      "en": "If you're stressed out of your mind, then your lack of faith in your system, or your lack of confidence in your knowledge or abilities, are likely the cause.",
+      "source": "New Trader Rich Trader"
+    },
+    {
+      "hi": "Hamesha dhyan rakho ki ego aapki trading pe hawi na ho — aur greed aur fear pe bhi nazar rakho.",
+      "en": "You must always be watchful of an inflated ego taking over your trading, and be on the lookout for greed and fear.",
+      "source": "New Trader Rich Trader"
+    },
+    {
+      "hi": "Iske ulat, ek gambler emotions mein poori tarah doob jaata hai.",
+      "en": "In contrast, the gambler can become consumed by emotion.",
+      "source": "New Trader Rich Trader"
+    },
+    {
+      "hi": "Trader hone ke naate aapka pehla kaam hai — sahi trading process pe focus karna, profit pe nahi.",
+      "en": "Your first job as a trader is to focus on the correct trading process, not profits.",
+      "source": "New Trader Rich Trader"
+    },
+    {
+      "hi": "Apne system pe faith banana bhi zaroori hai, taaki loss ke daur mein bhi aap use trade karte raho.",
+      "en": "It's also crucial to develop faith in your system so you can continue trading it, even when it's losing.",
+      "source": "New Trader Rich Trader"
+    },
+    {
+      "hi": "Trader ban ke aap risk ko respect karna seekhte ho.",
+      "en": "You learn to respect risk as a trader.",
+      "source": "New Trader Rich Trader"
+    },
+    {
+      "hi": "Trading mein jeetne ke liye ek winner ki tarah sochna aur act karna hoga, whiner ki tarah nahi.",
+      "en": "To win at trading, you must think and act like a winner, not a whiner.",
+      "source": "New Trader Rich Trader"
+    },
+    {
+      "hi": "Zindagi ho ya trading — success ke liye sahi mindset sabse zaroori hai.",
+      "en": "In life, as in trading, the right mindset is crucial for success.",
+      "source": "New Trader Rich Trader"
+    },
+    {
+      "hi": "Patience ka matlab kuch na karna nahi hai — ye pata hona hai ki aap kya dhoondh rahe ho, aur sahi waqt pe action lena hai.",
+      "en": "Patience is not inaction; it's knowing what you're looking for and acting at the right time.",
+      "source": "New Trader Rich Trader"
+    },
+    {
+      "hi": "Zindagi mein patience ka bahut bada fayda milta hai.",
+      "en": "Patience can pay big dividends in life.",
+      "source": "New Trader Rich Trader"
+    },
+    {
+      "hi": "Trader ke liye haarna seekhna mushkil hota hai, lekin loss accept karke aage badhna hi padta hai.",
+      "en": "It can be difficult for a trader to learn to lose, but you must accept the loss and move on.",
+      "source": "New Trader Rich Trader"
+    },
+    {
+      "hi": "Jab aap ek losing trade mein phas jaate ho, to woh usually ek emotional mistake hoti hai, samajh ki nahi.",
+      "en": "When you get trapped in a losing trade it's usually an emotional mistake rather than one of intelligence.",
+      "source": "New Trader Rich Trader"
+    },
+    {
+      "hi": "Shuruaat mein trades chhoti rakho, to losing trade accept karke exit karna aasan ho jaata hai.",
+      "en": "The smaller you keep your trades at the beginning, the easier it will be to accept a losing trade and exit.",
+      "source": "New Trader Rich Trader"
+    },
+    {
+      "hi": "Loss lene ke baad woh mujhe kabhi pareshaan nahi karta.",
+      "en": "A loss never bothers me after I take it.",
+      "source": "New Trader Rich Trader"
+    },
+    {
+      "hi": "Aap wahi bante ho jo sabse zyada sochte ho — aur wahi cheezein bhi aapki taraf aati hain.",
+      "en": "You become what you think about most, but you also attract what you think about most.",
+      "source": "The Secret"
+    },
+    {
+      "hi": "Jispe aap sabse zyada sochte ya focus karte ho, wahi aapki zindagi banti jaati hai.",
+      "en": "What you think about the most or focus on the most is what will appear as your life.",
+      "source": "The Secret"
+    },
+    {
+      "hi": "Apne feelings ke prati aware raho — kyunki yahi sabse tez tarika hai ye jaanne ka ki aap kya soch rahe ho.",
+      "en": "You want to become aware of how you're feeling, and get in tune with how you're feeling, because it is the fastest way for you to know what you're thinking.",
+      "source": "The Secret"
+    },
+    {
+      "hi": "Jaise hi koi doubt wala thought aaye, usse turant chhod do.",
+      "en": "The moment a thought of doubt comes, release it immediately.",
+      "source": "The Secret"
+    },
+    {
+      "hi": "Expectation ek powerful force hoti hai — ye cheezon ko aapki taraf khींchti hai.",
+      "en": "Expectation is a powerful attractive force, because it draws things to you.",
+      "source": "The Secret"
+    },
+    {
+      "hi": "Jo already aapke paas hai aur jiske liye aap grateful ho, uspe focus karo.",
+      "en": "Focus on what you already have that you're grateful for.",
+      "source": "The Secret"
+    },
+    {
+      "hi": "Jaise hi aap apne paas jo hai uske liye alag feel karna shuru karte ho, aur achhi cheezein aane lagti hain.",
+      "en": "As soon as you start to feel different about what you already have, you will start to attract more of the good things.",
+      "source": "The Secret"
+    },
+    {
+      "hi": "Usse bahar niklo aur jo already hai uske liye grateful raho, aur usse sach mein enjoy karo.",
+      "en": "Come out of that and focus on what you're grateful for already, and really enjoy it.",
+      "source": "The Secret"
+    },
+    {
+      "hi": "Bura feel karte hue ek sath achhe thoughts rakhna namumkin hai.",
+      "en": "It is impossible to feel bad and at the same time be having good thoughts.",
+      "source": "The Secret"
+    },
+    {
+      "hi": "Jab aap kisi cheez pe focus karte ho, chahe woh kuch bhi ho, aap use apni zindagi mein bulate ho.",
+      "en": "When you focus on something, no matter what it happens to be, you really are calling that into existence.",
+      "source": "The Secret"
+    }
+  ]
+}

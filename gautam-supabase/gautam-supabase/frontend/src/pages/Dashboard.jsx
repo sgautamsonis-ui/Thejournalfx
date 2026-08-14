@@ -19,6 +19,54 @@ import { Link, useNavigate } from "react-router-dom";
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, useSortable, rectSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { getThoughtOfTheDay } from "@/lib/thoughtOfDay";
+
+// Fixed (non-customizable) daily section shown above the widget grid — a new
+// quote per category is picked automatically based on today's date, no API
+// call or backend job needed. See src/lib/thoughtOfDay.js for the rotation
+// logic and src/data/thoughtOfDayQuotes.json for the quote pool.
+const TOTD_CATEGORIES = [
+  { key: "risk", label: "Risk Management" },
+  { key: "discipline", label: "Discipline" },
+  { key: "psychology", label: "Psychology" },
+];
+
+function ThoughtOfTheDay() {
+  const totd = useMemo(() => getThoughtOfTheDay(), []);
+  const dateLabel = useMemo(
+    () => new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }),
+    []
+  );
+  return (
+    <div className="mb-4" data-testid="thought-of-the-day">
+      <div className="flex items-center gap-2 mb-2.5">
+        <div className="w-[22px] h-[22px] rounded-[7px] bg-[#F3E8FF] flex items-center justify-center">
+          <Sparkles className="w-3 h-3 text-[#7C3AED]" />
+        </div>
+        <div className="font-display text-[13.5px] font-bold">Thought of the Day</div>
+        <div className="ml-auto text-[10.5px] text-[#A1A1AA]">{dateLabel}</div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        {TOTD_CATEGORIES.map(({ key, label }) => {
+          const q = totd[key];
+          if (!q) return null;
+          return (
+            <div
+              key={key}
+              className="bg-white border border-[#E8E8F1] rounded-2xl p-3.5 border-l-[3px] border-l-[#7C3AED] shadow-[0_3px_14px_rgba(22,21,31,0.025)]"
+              data-testid={`totd-${key}`}
+            >
+              <div className="text-[9.5px] font-bold uppercase tracking-wide text-[#7C3AED] mb-1.5">{label}</div>
+              <div className="text-[12px] leading-[1.45] font-semibold text-[#16151F]">"{q.hi}"</div>
+              <div className="text-[9.5px] leading-[1.4] text-[#6D6D82] italic mt-1">{q.en}</div>
+              <div className="text-[9px] text-[#A1A1AA] mt-1.5">— {q.source}</div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 // =============== WIDGET REGISTRY ===============
 const WIDGETS = [
@@ -1080,6 +1128,8 @@ export default function Dashboard() {
 
   return (
     <div className="p-5 max-w-[1800px] mx-auto" data-testid="dashboard-page">
+      <ThoughtOfTheDay />
+
       {/* Customize Panel */}
       {customize && (
         <div className="tjfx-card p-4 mb-4" data-testid="customize-panel">
