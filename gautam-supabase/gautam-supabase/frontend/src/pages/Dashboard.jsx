@@ -11,7 +11,7 @@ import {
   AreaChart, Area, ReferenceLine
 } from "recharts";
 import { 
-  Target, Settings2, Eye, EyeOff, 
+  Target, Sparkles, Settings2, Eye, EyeOff, 
   ArrowUp, ArrowDown, Trophy, Calendar, Flame, PiggyBank, GripVertical,
   ChevronDown, AlertCircle, CheckCircle2
 } from "lucide-react";
