@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { tradesApi, prefsApi, uploadApi } from "@/lib/api";
 import { useAccount } from "@/context/AccountContext";
 import { Search, Trash2, X, PlusCircle, Filter, Pencil, Save, ChevronDown, Upload, Clipboard, Image as ImageIcon, TrendingUp, Star, Copy, Eye, RotateCcw, MessageCircle, Download } from "lucide-react";
@@ -75,10 +75,12 @@ class TradeViewErrorBoundary extends React.Component {
 }
 
 function TradeViewContent() {
-  const { reload: reloadAccounts } = useAccount();
+  const { reload: reloadAccounts, activeId } = useAccount();
   const { user } = useAuth();
   const timeFormat = user?.settings?.time_format || user?.settings?.report_time_format || "12h";
   const [trades, setTrades] = useState([]);
+  const [loadingTrades, setLoadingTrades] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [q, setQ] = useState("");
   const [tab, setTab] = useState("all");
   const [sel, setSel] = useState(null);
@@ -91,9 +93,28 @@ function TradeViewContent() {
     symbol: [], strategy: [], session: [], htf_poi: [], entry_tag: [], mood: [], mistake: [], strength: [], setup_tag: [],
   });
 
-  const load = () => tradesApi.list()
-    .then(data => setTrades(asArray(data).map(normalizeTrade)))
-    .catch(() => setTrades([]));
+  const load = useCallback(async () => {
+    setLoadingTrades(true);
+    setLoadError("");
+    try {
+      const data = await tradesApi.list(activeId);
+      setTrades(asArray(data).map(normalizeTrade));
+    } catch (error) {
+      setTrades([]);
+      const status = error?.response?.status;
+      if (status === 401) {
+        setLoadError("Your session has expired. Please sign in again and retry.");
+      } else if (status === 403) {
+        setLoadError("The trade service denied this request. Check the backend CORS settings.");
+      } else if (status) {
+        setLoadError(`The trade service returned error ${status}. Please retry.`);
+      } else {
+        setLoadError("Could not connect to the trade service. Check the backend URL and its CORS settings.");
+      }
+    } finally {
+      setLoadingTrades(false);
+    }
+  }, [activeId]);
   useEffect(() => {
     load();
     prefsApi.listMany(["symbol","strategy","session","htf_poi","entry_tag","mood","mistake","strength","setup_tag"])
@@ -105,7 +126,7 @@ function TradeViewContent() {
         ])),
       })))
       .catch(()=>{});
-  }, []);
+  }, [load]);
 
   const emptyFilters = { symbols: [], directions: [], sessions: [], strategies: [], htf_poi: [], entry_tags: [], moods: [], mistakes: [], strengths: [], setup_tags: [], result: "", dateFrom: "", dateTo: "", minR: "", maxR: "", minPnl: "", maxPnl: "" };
   const [filters, setFilters] = useState(emptyFilters);
@@ -368,6 +389,12 @@ function TradeViewContent() {
 
       {/* Main Content */}
       <div className="p-5 max-w-[1500px] mx-auto space-y-4">
+        {loadError && (
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 flex items-center justify-between gap-3 text-sm text-red-700">
+            <span>{loadError}</span>
+            <button type="button" onClick={load} className="shrink-0 rounded-lg bg-red-600 px-3 py-1.5 font-semibold text-white hover:bg-red-700">Retry</button>
+          </div>
+        )}
         {/* Search & Filter Bar */}
         <div className="tjfx-card p-4 space-y-3">
           <div className="flex gap-3 items-center flex-wrap">
@@ -461,7 +488,9 @@ function TradeViewContent() {
         </div>
 
         {/* Trades Grid */}
-        {filtered.length === 0 ? (
+        {loadingTrades ? (
+          <div className="tjfx-card p-16 text-center text-sm text-[#6D6D82]">Loading trades…</div>
+        ) : filtered.length === 0 ? (
           <div className="tjfx-card p-16 text-center">
             <div className="text-6xl mb-4">📭</div>
             <h3 className="text-lg font-semibold text-[#16151F] mb-2">No trades found</h3>
