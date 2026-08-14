@@ -51,7 +51,7 @@ export default function AddTrade() {
 
   // preferences pulled from Settings
   const [presets, setPresets] = useState({
-    symbol: [], strategy: [], session: [], mood: [], mistake: [], strength: [], setup_tag: [],
+    symbol: [], strategy: [], sub_strategy: [], session: [], mood: [], mistake: [], strength: [],
     htf_poi_type: BUILDER_DEFAULTS.htf_poi_type, htf_timeframe: BUILDER_DEFAULTS.htf_timeframe,
     entry_confirmation_type: BUILDER_DEFAULTS.entry_confirmation_type, entry_timeframe: BUILDER_DEFAULTS.entry_timeframe,
   });
@@ -60,7 +60,7 @@ export default function AddTrade() {
   const [moodDraft, setMoodDraft] = useState({ before: "", during: "", after: "" });
 
   useEffect(() => {
-    const kinds = ["symbol","strategy","session","mood","mistake","strength","setup_tag","htf_poi_type","htf_timeframe","entry_confirmation_type","entry_timeframe"];
+    const kinds = ["symbol","strategy","sub_strategy","session","mood","mistake","strength","htf_poi_type","htf_timeframe","entry_confirmation_type","entry_timeframe"];
     const cacheKey = "tjfx-preference-cache-v1";
     try {
       const cached = JSON.parse(localStorage.getItem(cacheKey) || "null");
@@ -522,6 +522,16 @@ function ChipRow({ label, items, selected, onToggle }) {
 
 function AddTradeWorkspace({ t, setT, presets, accounts, computed, recommendedLot, htfDraft, setHtfDraft, entryDraft, setEntryDraft, moodDraft, setMoodDraft, addPairedPreset, removePairedPreset, toggle, saving, save, onFile, uploadingCount, tradeLocked, drawdownInfo }) {
   const chooseStrategy = (strategy) => setT({ ...t, strategy });
+  // t.strategy stores the final combined tag (e.g. "Liquidity Sweep + MSS - PDL"),
+  // so the base strategy and the chosen sub-strategy are both derived from it —
+  // no separate field needed, and it saves/loads as one plain string like before.
+  const baseStrategy = presets.strategy.find(s => t.strategy === s || t.strategy.startsWith(s + " - ")) || t.strategy;
+  const currentSub = baseStrategy && t.strategy.startsWith(baseStrategy + " - ") ? t.strategy.slice((baseStrategy + " - ").length) : "";
+  const subOptions = (presets.sub_strategy || [])
+    .filter(v => v.split("::")[0] === baseStrategy)
+    .map(v => v.split("::").slice(1).join("::"))
+    .filter(Boolean);
+  const chooseSub = (sub) => setT({ ...t, strategy: currentSub === sub ? baseStrategy : `${baseStrategy} - ${sub}` });
   return (
     <div className="add-trade-page compact-add-trade p-4 sm:p-5 lg:p-6 max-w-[1500px] mx-auto space-y-4" data-testid="add-trade-page">
       <header className="flex flex-wrap items-center justify-between gap-4">
@@ -534,7 +544,18 @@ function AddTradeWorkspace({ t, setT, presets, accounts, computed, recommendedLo
       <fieldset disabled={tradeLocked} className={tradeLocked ? "opacity-50 pointer-events-none" : ""}>
           <LinkedBiasCard number="1" />
 
-          <section className="tjfx-card p-5"><SectionHeading number="2" title="Strategy" subtitle="Choose or add your trading model" /><select value={t.strategy} onChange={e=>chooseStrategy(e.target.value)} className={inp}><option value="">Select strategy...</option>{presets.strategy.map(x=><option key={x}>{x}</option>)}</select><div className="flex flex-wrap gap-2 mt-4">{presets.strategy.slice(0,6).map(x=><Chip key={x} label={x} active={t.strategy===x} onClick={()=>chooseStrategy(x)}/>)}</div></section>
+          <section className="tjfx-card p-5">
+            <SectionHeading number="2" title="Strategy" subtitle="Choose or add your trading model" />
+            <select value={baseStrategy} onChange={e=>chooseStrategy(e.target.value)} className={inp}><option value="">Select strategy...</option>{presets.strategy.map(x=><option key={x}>{x}</option>)}</select>
+            <div className="flex flex-wrap gap-2 mt-4">{presets.strategy.slice(0,6).map(x=><Chip key={x} label={x} active={baseStrategy===x} onClick={()=>chooseStrategy(x)}/>)}</div>
+            {subOptions.length>0 && (
+              <div className="mt-4 pt-4 border-t border-[#E8E8F1]">
+                <div className="text-[12px] text-[#6D6D82] mb-2">Sub-strategy <span className="text-[#A1A1AA]">(optional — combines into one tag)</span></div>
+                <div className="flex flex-wrap gap-2">{subOptions.map(x=><Chip key={x} label={x} active={currentSub===x} onClick={()=>chooseSub(x)}/>)}</div>
+                {currentSub && <div className="mt-3 inline-flex items-center text-xs font-semibold px-2.5 py-1 rounded-full bg-[#F3E8FF] text-[#7C3AED]" data-testid="combined-strategy-tag">{t.strategy}</div>}
+              </div>
+            )}
+          </section>
 
           <PairedPresetBuilder number="3" title="HTF Points of Interest" description="Select a timeframe and POI type, then add it to this trade." timeframeLabel="HTF Timeframe" typeLabel="POI Type" timeframes={presets.htf_timeframe} types={presets.htf_poi_type} draft={htfDraft} onDraftChange={setHtfDraft} items={t.htf_poi} onAdd={()=>addPairedPreset("htf_poi",htfDraft,setHtfDraft,"HTF POI")} onRemove={value=>removePairedPreset("htf_poi",value)} testid="htf-poi"/>
 
@@ -563,7 +584,6 @@ function AddTradeWorkspace({ t, setT, presets, accounts, computed, recommendedLo
               onAdd={()=>{ if (moodDraft.after && !t.mood_after.includes(moodDraft.after)) toggle("mood_after", moodDraft.after); setMoodDraft({...moodDraft, after:""}); }}
               onRemove={v=>toggle("mood_after", v)} testid="mood-after"
             />
-            <div><ChipRow label="Setup Tags" items={presets.setup_tag} selected={t.setup_tags} onToggle={x=>toggle("setup_tags",x)}/></div>
             <div>
               <div className="text-[12px] text-[#6D6D82] mb-2">Notes</div>
               <textarea value={t.notes} onChange={e=>setT({...t,notes:e.target.value})} rows={4} className="w-full p-3 rounded-xl border border-[#E8E8F1] focus:border-[#7C3AED] outline-none text-sm" placeholder="Notes (pre-trade mindset, execution and lessons)"/>

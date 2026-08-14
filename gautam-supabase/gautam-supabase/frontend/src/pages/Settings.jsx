@@ -53,7 +53,6 @@ const PRESET_KINDS = [
   { kind: "entry_confirmation_type", label: "Entry Confirmation Types", hint: "Second dropdown in the Entry Confirmation builder" },
   { kind: "entry_timeframe", label: "Entry Timeframes", hint: "First dropdown in the Entry Confirmation builder" },
   { kind: "mood", label: "Psychology Moods", hint: "Mood chips in Add Trade" },
-  { kind: "setup_tag", label: "Tags", hint: "Optional setup tags in Add Trade" },
   { kind: "mistake", label: "Mistakes", hint: "Mistake tracker chips" },
   { kind: "strength", label: "Strengths", hint: "Strengths chips in Add Trade" },
   { kind: "session", label: "Sessions", hint: "Session dropdown" },
@@ -199,7 +198,12 @@ export default function Settings() {
 
           {tab==="Trade Presets" && (
             <div className="space-y-5">
-              {PRESET_KINDS.map(k => <PresetManager key={k.kind} kind={k.kind} label={k.label} hint={k.hint}/>)}
+              {PRESET_KINDS.map(k => (
+                <React.Fragment key={k.kind}>
+                  <PresetManager kind={k.kind} label={k.label} hint={k.hint}/>
+                  {k.kind==="strategy" && <StrategySubPresetManager/>}
+                </React.Fragment>
+              ))}
             </div>
           )}
 
@@ -437,6 +441,99 @@ function PresetManager({ kind, label, hint }) {
           )
         ))}
         {items.length===0 && <div className="text-sm text-[#6D6D82]">No items — defaults will seed on next load.</div>}
+      </div>
+    </div>
+  );
+}
+
+// Sub-strategies belong to a parent strategy (e.g. "Liquidity Sweep + MSS" →
+// PDL / PDH / PML / PMH / HTF POI / Session High). They're stored using the
+// existing flat `preferences` table (kind="sub_strategy") with the parent
+// baked into the value as "Parent::Child" — no schema change needed. In Add
+// Trade, picking one combines with the base strategy into a single tag like
+// "Liquidity Sweep + MSS - PDL".
+function StrategySubPresetManager() {
+  const [strategies, setStrategies] = useState([]);
+  const [items, setItems] = useState([]);
+  const [parent, setParent] = useState("");
+  const [val, setVal] = useState("");
+  const [edit, setEdit] = useState({ id: null, val: "" });
+
+  const load = () => Promise.all([prefsApi.list("strategy"), prefsApi.list("sub_strategy")])
+    .then(([s, sub]) => { setStrategies(s); setItems(sub); if (!parent && s[0]) setParent(s[0].value); })
+    .catch(()=>{});
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
+
+  const add = async () => {
+    if (!parent || !val.trim()) return;
+    try {
+      const created = await prefsApi.create("sub_strategy", `${parent}::${val.trim()}`);
+      setItems(current => [...current, created]);
+      setVal("");
+      localStorage.removeItem("tjfx-preference-cache-v1");
+      toast.success("Sub-strategy added");
+    } catch (error) {
+      toast.error(error?.response?.data?.detail || "Could not add this item.");
+    }
+  };
+  const startEdit = (it) => setEdit({ id: it.id, val: it.value.split("::").slice(1).join("::") });
+  const saveEdit = async (it) => {
+    if (!edit.val.trim()) return;
+    try {
+      const parentName = it.value.split("::")[0];
+      const updated = await prefsApi.update("sub_strategy", edit.id, `${parentName}::${edit.val.trim()}`);
+      setItems(current => current.map(item => item.id === updated.id ? updated : item));
+      localStorage.removeItem("tjfx-preference-cache-v1");
+      setEdit({ id: null, val: "" });
+      toast.success("Sub-strategy updated");
+    } catch (error) { toast.error(error?.response?.data?.detail || "Could not update this item"); }
+  };
+  const del = async (id) => {
+    try { await prefsApi.delete("sub_strategy", id); setItems(current => current.filter(item => item.id !== id)); localStorage.removeItem("tjfx-preference-cache-v1"); toast.success("Sub-strategy deleted"); }
+    catch (error) { toast.error(error?.response?.data?.detail || "Could not delete this item"); }
+  };
+
+  const grouped = strategies.map(s => ({ strategy: s.value, subs: items.filter(it => it.value.split("::")[0] === s.value) }));
+
+  return (
+    <div className="tjfx-card p-6" data-testid="preset-sub_strategy">
+      <div className="flex items-baseline justify-between mb-1">
+        <h3 className="font-display text-lg font-bold">Sub-strategies</h3>
+        <span className="text-[11px] text-[#A1A1AA]">{items.length} items</span>
+      </div>
+      <p className="text-xs text-[#6D6D82] mb-4">Nested under a strategy — e.g. "Liquidity Sweep + MSS" → PDL, PDH, PML, PMH, HTF POI, Session High. Picking one in Add Trade combines it into a single tag.</p>
+      <div className="flex gap-2 mb-4">
+        <select value={parent} onChange={e=>setParent(e.target.value)} className="h-10 px-3 rounded-xl border border-[#E8E8F1] focus:border-[#7C3AED] outline-none text-sm bg-white" data-testid="sub-strategy-parent-select">
+          {strategies.length===0 && <option value="">Add a strategy first</option>}
+          {strategies.map(s => <option key={s.id} value={s.value}>{s.value}</option>)}
+        </select>
+        <input value={val} onChange={e=>setVal(e.target.value)} onKeyDown={e=>e.key==="Enter"&&add()} placeholder="Add sub-strategy (e.g. PDL)" className="flex-1 h-10 px-3 rounded-xl border border-[#E8E8F1] focus:border-[#7C3AED] outline-none text-sm" data-testid="sub-strategy-input"/>
+        <button onClick={add} className="h-10 px-4 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-sm font-semibold flex items-center gap-1"><Plus className="w-4 h-4"/> Add</button>
+      </div>
+      <div className="space-y-3">
+        {grouped.filter(g => g.subs.length>0).map(g => (
+          <div key={g.strategy}>
+            <div className="text-[11px] font-semibold text-[#7C3AED] mb-1.5">{g.strategy}</div>
+            <div className="flex flex-wrap gap-2">
+              {g.subs.map(it => (
+                edit.id===it.id ? (
+                  <div key={it.id} className="flex items-center gap-1 h-8 rounded-full border border-[#7C3AED] bg-white px-2">
+                    <input value={edit.val} onChange={e=>setEdit({...edit,val:e.target.value})} className="text-sm outline-none w-28"/>
+                    <button onClick={()=>saveEdit(it)} className="text-emerald-600"><Check className="w-4 h-4"/></button>
+                    <button onClick={()=>setEdit({id:null,val:""})} className="text-[#6D6D82]"><X className="w-4 h-4"/></button>
+                  </div>
+                ) : (
+                  <div key={it.id} className="chip active flex items-center gap-1.5 pr-1">
+                    <span>{it.value.split("::").slice(1).join("::")}</span>
+                    <button onClick={()=>startEdit(it)} className="w-5 h-5 rounded-full hover:bg-white/60 flex items-center justify-center"><Pencil className="w-3 h-3"/></button>
+                    <button onClick={()=>del(it.id)} className="w-5 h-5 rounded-full hover:bg-red-100 hover:text-red-600 flex items-center justify-center"><X className="w-3 h-3"/></button>
+                  </div>
+                )
+              ))}
+            </div>
+          </div>
+        ))}
+        {items.length===0 && <div className="text-sm text-[#6D6D82]">No sub-strategies yet.</div>}
       </div>
     </div>
   );

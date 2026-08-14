@@ -421,6 +421,14 @@ async def delete_bias(bias_id: str, user=Depends(get_current_user)):
 # ---------- Preferences (user-managed dropdowns) ----------
 DEFAULT_PREFS = {
     "strategy": ["MSS + FVG","BOS + OB","Judas Swing","Silver Bullet","Turtle Soup","Liquidity Sweep + MSS","IFVG Reversal","OB Retest"],
+    # Sub-strategies nested under a parent strategy. Stored as "Parent::Child" in
+    # the flat preferences table (kind="sub_strategy") — Add Trade combines the
+    # picked child with the base strategy into one tag, e.g. "Liquidity Sweep + MSS - PDL".
+    "sub_strategy": [
+        "Liquidity Sweep + MSS::PDL","Liquidity Sweep + MSS::PDH",
+        "Liquidity Sweep + MSS::PML","Liquidity Sweep + MSS::PMH",
+        "Liquidity Sweep + MSS::HTF POI","Liquidity Sweep + MSS::Session High",
+    ],
     "htf_poi": ["Weekly Demand","Weekly Supply","Weekly OB","Weekly FVG","Daily Demand","Daily Supply","Daily OB","Daily FVG","H4 OB","H4 FVG","Liquidity Sweep","Premium","Discount"],
     "entry_tag": ["MSS","BOS","CHOCH","FVG","IFVG","Order Block","Breaker","Displacement","Equal Highs","Equal Lows","SMT"],
     "mood": ["Focused","Calm","Confident","Patient","FOMO","Greedy","Frustrated","Fearful","Neutral","Revenge","Tired"],
