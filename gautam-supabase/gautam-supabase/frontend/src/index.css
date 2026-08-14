@@ -340,6 +340,51 @@ h1, h2, h3, h4, h5 { font-family: 'Comfortaa', sans-serif; letter-spacing: -0.01
 .dark .premium-trade-header { background: radial-gradient(circle at 100% 0%, rgba(124,58,237,.24), transparent 36%), linear-gradient(135deg, #0d1722, #09111a); border-color: #213042; }
 .dark .premium-account { background: rgba(124,58,237,.09); border-color: rgba(139,92,246,.24); }
 
+/* Reports: intentionally plain and easy to scan. */
+.reports-simple { background: #fafafa !important; }
+.reports-simple .reports-premium-shell { max-width: 1180px; }
+.reports-simple .reports-hero {
+  padding: 0 0 1rem;
+  border: 0;
+  border-bottom: 1px solid #e8e8f1;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.reports-simple .reports-hero h1 { font-size: 1.65rem; }
+.reports-simple .reports-hero p { font-size: .875rem; }
+.reports-simple .reports-hero button { height: 2.4rem; border-radius: 10px; box-shadow: none; }
+.reports-simple .reports-sidebar {
+  gap: 0;
+  padding: 0 !important;
+  border: 1px solid #e8e8f1;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: none;
+  overflow: hidden;
+}
+.reports-simple .reports-sidebar .tjfx-card {
+  min-height: 0;
+  padding: 1rem !important;
+  border: 0;
+  border-radius: 0;
+  background: #fff;
+}
+.reports-simple .reports-sidebar .tjfx-card + .tjfx-card { border-top: 0; border-left: 1px solid #e8e8f1; }
+.reports-simple .reports-sidebar label { letter-spacing: .06em; }
+.reports-simple .reports-sidebar .space-y-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .55rem .9rem;
+}
+.reports-simple .reports-sidebar .space-y-2 > :not([hidden]) ~ :not([hidden]) { margin-top: 0; }
+.reports-simple .reports-sidebar input[type="checkbox"] { accent-color: #7c3aed; }
+.reports-simple .reports-preview > .tjfx-card { border-radius: 14px; box-shadow: none; }
+@media (max-width: 640px) {
+  .reports-simple .reports-sidebar .tjfx-card + .tjfx-card { border-left: 0; border-top: 1px solid #e8e8f1; }
+  .reports-simple .reports-sidebar .space-y-2 { grid-template-columns: 1fr; }
+}
+
 /* Keep the workstation spacious on laptop/desktop screens. The old sidebar
    squeezed the setup cards while leaving a tall, empty gutter beneath them. */
 @media (min-width: 1280px) {

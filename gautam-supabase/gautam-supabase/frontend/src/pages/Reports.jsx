@@ -381,7 +381,7 @@ Recommendations:
   };
 
   return (
-    <div className={`compact-reports ${previewOnly ? "report-preview-only" : "report-config"} min-h-screen bg-[#F6F6FB] p-4 sm:p-6 lg:p-8`} data-testid="reports-page">
+    <div className={`compact-reports reports-simple ${previewOnly ? "report-preview-only" : "report-config"} min-h-screen bg-[#F6F6FB] p-4 sm:p-6 lg:p-8`} data-testid="reports-page">
       <div className="max-w-7xl mx-auto space-y-4 reports-premium-shell">
         {/* HEADER */}
         <div className="reports-hero flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
