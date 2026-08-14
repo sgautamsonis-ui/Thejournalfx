@@ -138,7 +138,7 @@ export default function Reports() {
   const [customFrom, setCustomFrom] = useState(initialConfig.customFrom || toDateStr(new Date()));
   const [customTo, setCustomTo] = useState(initialConfig.customTo || toDateStr(new Date()));
   const style = "professional";
-  const timeFormat24 = user?.settings?.report_time_format === "24h";
+  const timeFormat24 = (user?.settings?.time_format || user?.settings?.report_time_format) === "24h";
   const [aiSummary, setAiSummary] = useState(null);
 
   const [includes, setIncludes] = useState({
@@ -382,15 +382,15 @@ Recommendations:
 
   return (
     <div className={`compact-reports ${previewOnly ? "report-preview-only" : "report-config"} min-h-screen bg-[#F6F6FB] p-4 sm:p-6 lg:p-8`} data-testid="reports-page">
-      <div className="max-w-7xl mx-auto space-y-6">
+      <div className="max-w-7xl mx-auto space-y-4 reports-premium-shell">
         {/* HEADER */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="reports-hero flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="font-display text-2xl sm:text-3xl font-bold text-[#16151F]">
-              Reports & Export
+              Reports
             </h1>
             <p className="text-[#6D6D82] mt-1 text-sm sm:text-base">
-              Generate comprehensive trading reports with AI insights
+              Build a polished report, review it instantly, then export when you’re ready.
             </p>
           </div>
           <div className="flex flex-col sm:flex-row gap-2">

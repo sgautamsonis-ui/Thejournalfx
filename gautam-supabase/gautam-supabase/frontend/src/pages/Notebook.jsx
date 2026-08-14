@@ -52,13 +52,13 @@ export default function Notebook() {
   const rest = entries.filter(e => !e.pinned);
 
   return (
-    <div className="p-5 max-w-[1200px] mx-auto space-y-4" data-testid="notebook-page">
-      <div>
-        <h1 className="font-display text-3xl font-bold">Notebook & Rules</h1>
-        <p className="text-[#6D6D82] mt-1">Write your rules, capture lessons, build checklists. They sync to Add Trade automatically.</p>
+    <div className="notebook-premium p-4 sm:p-6 max-w-[1280px] mx-auto space-y-4" data-testid="notebook-page">
+      <div className="notebook-hero">
+        <div><div className="notebook-eyebrow">Trading playbook</div><h1 className="font-display text-3xl font-bold mt-1">Notebook & Rules</h1><p className="text-[#6D6D82] mt-1 text-sm">Capture what works, protect your rules, and keep checklists close to every trade.</p></div>
+        <div className="notebook-count"><BookOpen className="w-4 h-4"/><span>{entries.length}</span> {kind}{entries.length === 1 ? "" : "s"}</div>
       </div>
 
-      <div className="flex gap-1 bg-[#F6F6FB] p-1 rounded-xl w-fit">
+      <div className="notebook-tabs flex gap-1 bg-[#F6F6FB] p-1 rounded-xl w-fit">
         {KINDS.map(k => (
           <button key={k.id} onClick={()=>setKind(k.id)} data-testid={`notebook-tab-${k.id}`}
             className={`px-4 h-9 text-sm rounded-lg font-medium flex items-center gap-2 ${kind===k.id?"bg-white shadow text-[#7C3AED]":"text-[#6D6D82]"}`}>
@@ -68,8 +68,8 @@ export default function Notebook() {
       </div>
 
       {/* Draft */}
-      <div className="tjfx-card p-6 space-y-3">
-        <div className="font-display font-bold">Add new {kind}</div>
+      <div className="notebook-composer tjfx-card p-5 space-y-3">
+        <div className="flex items-center justify-between gap-3"><div><div className="font-display font-bold">Add new {kind}</div><div className="text-[11px] text-[#6D6D82] mt-1">This stays in your private trading playbook.</div></div><span className="text-[11px] uppercase tracking-wider font-bold text-[#7C3AED]">New entry</span></div>
         <input value={draft.title} onChange={e=>setDraft({...draft,title:e.target.value})} placeholder={kind==="rule"?"e.g. Never risk more than 1% per trade":kind==="lesson"?"e.g. My best entries come after a clear MSS":"Checklist title, e.g. Pre-trade checklist"} className={inp} data-testid="notebook-title"/>
         {kind!=="checklist" && (
           <textarea value={draft.body} onChange={e=>setDraft({...draft,body:e.target.value})} rows={3} placeholder="Details, context or examples..." className="w-full p-3 rounded-xl border border-[#E8E8F1] focus:border-[#7C3AED] outline-none text-sm"/>
@@ -92,12 +92,12 @@ export default function Notebook() {
       {pinned.length>0 && (
         <div>
           <div className="text-xs font-semibold text-[#7C3AED] uppercase tracking-wide mb-2 flex items-center gap-1"><Pin className="w-3 h-3"/> Pinned</div>
-          <div className="grid md:grid-cols-2 gap-4">{pinned.map(e => <EntryCard key={e.id} e={e} onDelete={remove} onTogglePin={togglePin} onToggleItem={toggleItem}/>)}</div>
+          <div className="notebook-grid grid md:grid-cols-2 gap-3">{pinned.map(e => <EntryCard key={e.id} e={e} onDelete={remove} onTogglePin={togglePin} onToggleItem={toggleItem}/>)}</div>
         </div>
       )}
       <div>
         {rest.length===0 && pinned.length===0 && <div className="tjfx-card p-8 text-center text-[#6D6D82]"><BookOpen className="w-10 h-10 mx-auto text-[#7C3AED] mb-2"/>No {kind}s yet. Add your first one above.</div>}
-        <div className="grid md:grid-cols-2 gap-4">{rest.map(e => <EntryCard key={e.id} e={e} onDelete={remove} onTogglePin={togglePin} onToggleItem={toggleItem}/>)}</div>
+        <div className="notebook-grid grid md:grid-cols-2 gap-3">{rest.map(e => <EntryCard key={e.id} e={e} onDelete={remove} onTogglePin={togglePin} onToggleItem={toggleItem}/>)}</div>
       </div>
     </div>
   );
@@ -105,7 +105,7 @@ export default function Notebook() {
 
 function EntryCard({ e, onDelete, onTogglePin, onToggleItem }) {
   return (
-    <div className="tjfx-card p-5 tjfx-card-hover">
+    <div className="notebook-entry tjfx-card p-4 tjfx-card-hover">
       <div className="flex items-start justify-between gap-3">
         <div className="font-display font-bold text-[15px] leading-snug">{e.title}</div>
         <div className="flex gap-1 shrink-0">

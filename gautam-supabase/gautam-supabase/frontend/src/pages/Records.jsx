@@ -74,13 +74,13 @@ export default function Records() {
   }, [edit]);
 
   return (
-    <div className="p-5 max-w-[1300px] mx-auto space-y-3" data-testid="records-page">
-      <div>
-        <h1 className="font-display text-3xl font-bold">Bias Records</h1>
-        <p className="text-[#6D6D82] mt-1">Every plan you've written. Click any record to view or edit.</p>
+    <div className="records-premium p-4 sm:p-6 max-w-[1300px] mx-auto space-y-3" data-testid="records-page">
+      <div className="records-hero">
+        <div><div className="records-eyebrow">Market intelligence</div><h1 className="font-display text-3xl font-bold mt-1">Bias Records</h1><p className="text-[#6D6D82] mt-1 text-sm">Every plan you’ve written, ready to review before the next session.</p></div>
+        <div className="records-stats"><span><b>{items.length}</b> total</span><span><b>{items.filter(x => x.type === "weekly").length}</b> weekly</span><span><b>{items.filter(x => x.type === "daily").length}</b> daily</span></div>
       </div>
 
-      <div className="tjfx-card p-4 flex flex-col md:flex-row gap-3">
+      <div className="records-toolbar tjfx-card p-3 flex flex-col md:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#A1A1AA]"/>
           <input value={q} onChange={e=>setQ(e.target.value)} className="w-full h-10 pl-10 pr-3 rounded-xl border border-[#E8E8F1] focus:border-[#7C3AED] outline-none text-sm" placeholder="Search narrative, direction, session..."/>
@@ -96,7 +96,7 @@ export default function Records() {
         {filtered.length===0 && <div className="tjfx-card p-8 text-center text-[#6D6D82]">No records match.</div>}
         {filtered.map(b => (
           <button key={b.id} onClick={()=>openRec(b)} data-testid={`record-card-${b.id}`}
-            className="tjfx-card w-full p-4 text-left tjfx-card-hover flex items-center gap-4 flex-wrap md:flex-nowrap">
+            className="record-row tjfx-card w-full p-3.5 text-left tjfx-card-hover flex items-center gap-4 flex-wrap md:flex-nowrap">
             <div className="flex flex-col items-start gap-0.5 shrink-0 w-24">
               <div className="text-[11px] uppercase tracking-wide text-[#7C3AED] font-semibold">{b.type}</div>
               <div className="tjfx-mono text-sm text-[#16151F] font-semibold">{b.date}</div>

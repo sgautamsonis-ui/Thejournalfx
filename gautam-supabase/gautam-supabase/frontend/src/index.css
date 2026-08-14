@@ -146,6 +146,43 @@ h1, h2, h3, h4, h5 { font-family: 'Comfortaa', sans-serif; letter-spacing: -0.01
 .compact-reports .tjfx-card { padding: 1rem !important; }
 .compact-reports .space-y-6 { --tw-space-y-reverse: 0; margin-top: 0; }
 
+/* Premium compact workspaces: Records, Notebook and Reports ---------------- */
+.notebook-hero, .records-hero, .reports-hero {
+  display: flex; align-items: end; justify-content: space-between; gap: 1rem;
+}
+.notebook-eyebrow, .records-eyebrow {
+  color: var(--tjfx-primary); font-size: 10px; font-weight: 700;
+  letter-spacing: .14em; text-transform: uppercase;
+}
+.notebook-count, .records-stats {
+  display: flex; align-items: center; gap: .45rem; color: var(--tjfx-text-2);
+  font-size: 11px; font-weight: 600; white-space: nowrap;
+}
+.notebook-count { padding: .55rem .75rem; border: 1px solid var(--tjfx-border); border-radius: 999px; background: #fff; }
+.notebook-count span, .records-stats b { color: var(--tjfx-primary); font-size: 13px; }
+.records-stats { gap: 0; border: 1px solid var(--tjfx-border); border-radius: 12px; overflow: hidden; background: #fff; }
+.records-stats span { padding: .55rem .7rem; border-left: 1px solid var(--tjfx-border); }
+.records-stats span:first-child { border-left: 0; }
+.notebook-premium .tjfx-card, .records-premium .tjfx-card { border-radius: 18px; box-shadow: 0 3px 14px rgba(22,21,31,.025); }
+.notebook-tabs { border: 1px solid var(--tjfx-border); }
+.notebook-composer { border-color: rgba(124,58,237,.18) !important; background: linear-gradient(135deg, #fff 0%, #fcfaff 100%); }
+.notebook-entry { min-height: 0; }
+.notebook-entry:hover { border-color: rgba(124,58,237,.28); }
+.records-toolbar { border-radius: 16px !important; }
+.record-row { border-radius: 16px !important; }
+.record-row:hover { border-color: rgba(124,58,237,.3); }
+.reports-hero { padding: 1.1rem 1.2rem; border: 1px solid var(--tjfx-border); border-radius: 18px; background: linear-gradient(135deg, #fff, #fcfaff); box-shadow: 0 3px 14px rgba(22,21,31,.025); }
+.compact-reports .reports-sidebar { gap: .6rem; padding: .6rem !important; border-radius: 16px; }
+.compact-reports .reports-sidebar .tjfx-card { border-radius: 12px; }
+.compact-reports .reports-preview > .tjfx-card { border-radius: 18px; box-shadow: 0 3px 14px rgba(22,21,31,.025); }
+.compact-reports .reports-preview .bg-\[\#F6F6FB\] { padding: .75rem !important; }
+@media (max-width: 640px) {
+  .notebook-hero, .records-hero { align-items: start; flex-direction: column; }
+  .records-stats { width: 100%; justify-content: space-between; }
+  .records-stats span { flex: 1; text-align: center; }
+  .reports-hero { padding: .9rem; }
+}
+
 /* Reports settings sit in one horizontal control bar. The report itself opens
    in its own focused browser tab, so the setup page stays clean and compact. */
 .compact-reports .reports-workspace { display: block; }
