@@ -38,13 +38,6 @@ export function LinkedBiasCard({ number = "1" }) {
       return (
       <div key={label} className={`rounded-2xl border overflow-hidden ${tint}`}>
         <div className="p-3.5 flex items-center justify-between border-b border-black/5"><b className="text-sm">{label} Bias</b><span className={`text-[11px] font-bold uppercase px-2 py-0.5 rounded-full ${dir==="bullish"?"bg-emerald-500 text-white":dir==="bearish"?"bg-red-500 text-white":"bg-[#E8E8F1] text-[#6D6D82]"}`}>{dir || "Not set"}</span></div>
-        {b?.images?.length>0 && (
-          <div className="flex gap-1.5 p-3.5 pb-0 overflow-x-auto">
-            {b.images.slice(0,4).map((src,i)=>(
-              <img key={i} src={src} alt="" onClick={()=>openLightbox(b.images,i)} className="h-20 w-28 object-cover rounded-lg border border-black/5 shrink-0 cursor-zoom-in"/>
-            ))}
-          </div>
-        )}
         <div className="p-3.5 text-sm text-[#6D6D82] space-y-2.5">
           {bullets.length > 0 ? (
             <ul className="space-y-1 list-disc list-inside text-[13px]">
@@ -61,6 +54,11 @@ export function LinkedBiasCard({ number = "1" }) {
             </div>
           )}
         </div>
+        {b?.images?.length>0 && (
+          <div className="px-3.5 pb-3.5 pt-0">
+            <img src={b.images[0]} alt={`${label} bias chart`} onClick={()=>openLightbox(b.images,0)} className="w-full h-44 object-cover rounded-xl border border-black/5 cursor-zoom-in"/>
+          </div>
+        )}
       </div>
     );})}</div>
   </section>;

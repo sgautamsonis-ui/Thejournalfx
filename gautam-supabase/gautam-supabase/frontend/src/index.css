@@ -360,12 +360,15 @@ h1, h2, h3, h4, h5 { font-family: 'Comfortaa', sans-serif; letter-spacing: -0.01
 @media (min-width: 1280px) {
   .premium-trade-page fieldset > .grid > aside {
     grid-template-columns: minmax(0, 1.35fr) minmax(360px, 1fr);
-    align-items: stretch;
+    align-items: start;
+    gap: .5rem;
   }
-  .premium-trade-page fieldset > .grid > aside > :first-child { min-height: 320px; }
+  .premium-trade-page fieldset > .grid > aside > :first-child { min-height: 0; }
   .premium-trade-page fieldset > .grid > aside > :last-child { grid-column: 1 / -1; }
   .premium-trade-page .screenshot-premium { min-height: auto; }
 }
+
+.premium-trade-page [data-testid="linked-bias-card"] .grid { gap: .5rem; }
 
 /* A short, scannable final checkpoint instead of a second large form card. */
 .premium-trade-page .review-premium { padding: 1rem 1.15rem !important; }
