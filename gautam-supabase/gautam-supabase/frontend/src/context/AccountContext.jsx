@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { accountsApi, statsApi } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import { getEffectiveDailyDollarLimit } from "@/lib/propFirm";
 
 const AccountCtx = createContext(null);
 const KEY = "tjfx.activeAccount";
@@ -34,7 +35,9 @@ export function AccountProvider({ children }) {
 
   useEffect(() => {
     let live = true;
-    const limit = activeId !== "all" ? user?.settings?.account_limits?.[activeId]?.daily : null;
+    const account = accounts.find(a => a.id === activeId);
+    const limits = activeId !== "all" ? user?.settings?.account_limits?.[activeId] : null;
+    const limit = getEffectiveDailyDollarLimit(limits, account);
     if (!limit) {
       setDailyDrawdownLocked(false);
       setDailyDrawdownInfo({ used: 0, limit: null });
@@ -47,7 +50,7 @@ export function AccountProvider({ children }) {
       setDailyDrawdownLocked(used >= Number(limit));
     }).catch(() => { if (live) setDailyDrawdownLocked(false); });
     return () => { live = false; };
-  }, [activeId, user?.settings?.account_limits, statsRefresh]);
+  }, [activeId, user?.settings?.account_limits, statsRefresh, accounts]);
 
   return (
     <AccountCtx.Provider value={{ accounts, activeId, active, setActive, reload, loading, dailyDrawdownLocked, dailyDrawdownInfo }}>

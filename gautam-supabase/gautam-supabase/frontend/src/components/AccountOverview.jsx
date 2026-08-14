@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useAccount } from "@/context/AccountContext";
 import { statsApi } from "@/lib/api";
 import AccountSwitcher from "@/components/AccountSwitcher";
+import { getActivePropFirmPhase } from "@/lib/propFirm";
 
 // Rich "Account Overview" hero card — balance + live sparkline on the left,
 // win-rate gauge + drawdown bars + risk-per-trade on the right. Every number
@@ -35,6 +36,24 @@ export default function AccountOverview() {
   const weeklyLimit = limits?.weekly;
   const riskPercent = Number(user?.settings?.risk_percent ?? 1);
 
+  // Prop Firm accounts swap the Weekly Drawdown tile for Max Drawdown (and
+  // add a Profit Target bar below) driven by whichever step is currently
+  // active — see lib/propFirm.js.
+  const isPropFirm = active?.account_type === "Prop Firm" && !!limits?.propFirmType;
+  const phase = isPropFirm ? getActivePropFirmPhase(limits) : null;
+  const startingBalance = Number(active?.starting_balance ?? active?.balance ?? 0);
+  const effectiveDailyLimit = isPropFirm
+    ? (phase?.dailyDrawdown ? (phase.dailyDrawdown / 100) * startingBalance : null)
+    : dailyLimit;
+  const secondaryLabel = isPropFirm ? "Max Drawdown" : "Weekly Drawdown";
+  const secondaryUsed = isPropFirm ? Math.min(0, totalPnl) : weeklyDD;
+  const secondaryLimit = isPropFirm
+    ? (phase?.maxDrawdown ? (phase.maxDrawdown / 100) * startingBalance : null)
+    : weeklyLimit;
+  const targetLimit = isPropFirm && phase?.hasTarget && phase?.profitTarget
+    ? (phase.profitTarget / 100) * startingBalance
+    : null;
+
   // Rebuild an absolute equity curve (in account-currency terms, not just
   // cumulative P&L) from the running total the backend already computed —
   // shift stats.equity_curve up by the account's opening balance so the last
@@ -57,8 +76,8 @@ export default function AccountOverview() {
     return (todaysPnl / base) * 100;
   }, [balance, todaysPnl]);
 
-  const dailyPct = dailyLimit ? Math.min(100, (Math.abs(dailyDD) / dailyLimit) * 100) : 0;
-  const weeklyPct = weeklyLimit ? Math.min(100, (Math.abs(weeklyDD) / weeklyLimit) * 100) : 0;
+  const dailyPct = effectiveDailyLimit ? Math.min(100, (Math.abs(dailyDD) / effectiveDailyLimit) * 100) : 0;
+  const weeklyPct = secondaryLimit ? Math.min(100, (Math.abs(secondaryUsed) / secondaryLimit) * 100) : 0;
 
   // Derived "account health" — not a fabricated label, computed from the
   // real drawdown usage + win rate we already have.
@@ -95,7 +114,7 @@ export default function AccountOverview() {
     <div className="tjfx-card px-5 py-4 mb-4" data-testid="account-overview">
       <div className="flex items-center gap-3 mb-4 flex-wrap">
         <div className="text-[11px] font-semibold text-[#A1A1AA] uppercase tracking-wide whitespace-nowrap">
-          Account Overview
+          Account Overview{isPropFirm && phase?.stepLabel ? ` · ${phase.stepLabel}` : ""}
         </div>
         <div className="w-full max-w-[260px]">
           <AccountSwitcher compact />
@@ -175,8 +194,8 @@ export default function AccountOverview() {
           <div className="text-[10px] text-[#6D6D82] uppercase tracking-wide mt-2">Win Rate</div>
         </div>
 
-        <DrawdownTileUnified label="Daily Drawdown" used={dailyDD} limit={dailyLimit} pct={dailyPct} fmt={fmt} />
-        <DrawdownTileUnified label="Weekly Drawdown" used={weeklyDD} limit={weeklyLimit} pct={weeklyPct} fmt={fmt} />
+        <DrawdownTileUnified label="Daily Drawdown" used={dailyDD} limit={effectiveDailyLimit} pct={dailyPct} fmt={fmt} />
+        <DrawdownTileUnified label={secondaryLabel} used={secondaryUsed} limit={secondaryLimit} pct={weeklyPct} fmt={fmt} />
 
         <div className="flex flex-col items-center justify-center px-3 py-4 text-center">
           <div className="text-[10px] text-[#6D6D82] uppercase tracking-wide">Risk Per Trade</div>
@@ -187,6 +206,20 @@ export default function AccountOverview() {
           </Link>
         </div>
       </div>
+
+      {targetLimit && (
+        <div className="mt-4 rounded-xl bg-[#F6F6FB] px-3 py-2.5">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[10px] font-semibold text-[#6D6D82] uppercase tracking-wide">Profit Target</span>
+            <span className="text-[12px] font-semibold tjfx-mono text-[#16151F]">
+              ${Math.max(0, totalPnl).toFixed(0)} <span className="text-[#A1A1AA] font-normal">/ ${targetLimit.toFixed(0)}</span>
+            </span>
+          </div>
+          <div className="h-1.5 w-full rounded-full bg-[#E8E8F1] overflow-hidden">
+            <div className="h-full rounded-full bg-[#7C3AED]" style={{ width: `${Math.min(100, (Math.max(0, totalPnl) / targetLimit) * 100)}%` }} />
+          </div>
+        </div>
+      )}
 
       {/* These performance KPIs belong to Account Overview. Win Rate intentionally
           stays only in the circular gauge above, so the same metric is not shown twice. */}
