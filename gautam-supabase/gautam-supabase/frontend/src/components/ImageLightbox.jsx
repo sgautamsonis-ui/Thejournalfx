@@ -31,7 +31,15 @@ export function LightboxProvider({ children }) {
 
 export function useLightbox() {
   const ctx = useContext(LightboxCtx);
-  if (!ctx) throw new Error("useLightbox must be used inside <LightboxProvider>");
+  // A route must never fail just because an older deployment is missing the
+  // provider at the app root. This can happen briefly when the lazy-loaded
+  // Trade View chunk is newer than the main app bundle. Images remain visible
+  // on the page; only the optional zoom modal is unavailable until the next
+  // complete deployment loads the provider.
+  if (!ctx) {
+    console.warn("Lightbox is unavailable because LightboxProvider is not mounted.");
+    return () => {};
+  }
   return ctx;
 }
 
