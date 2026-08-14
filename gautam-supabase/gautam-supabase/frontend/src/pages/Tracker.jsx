@@ -1,861 +1,128 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { tradesApi } from "@/lib/api";
 import { useAccount } from "@/context/AccountContext";
 import { useNavigate } from "react-router-dom";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
-} from "@/components/ui/dropdown-menu";
-import {
-  PieChart, Pie, Cell, ResponsiveContainer, Tooltip, LineChart, Line, XAxis, YAxis,
-  CartesianGrid, BarChart, Bar, ReferenceLine,
-} from "recharts";
-import {
-  ChevronDown, Smile, LineChart as LineChartIcon, CalendarDays, Clock,
-  Trophy, TrendingDown, Target as TargetIcon, Sparkles, Sun, Moon, Globe,
-  Download, Loader2,
-} from "lucide-react";
-import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
-import { toast } from "sonner";
-import { useAuth } from "@/context/AuthContext";
-import { formatTradeTime } from "@/lib/time";
+import { Area, AreaChart, Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { BarChart3, CalendarDays, ChevronDown, Clock3, Crosshair, Filter, Gem, LineChart, Smile, Sparkles, Target, Trophy, TrendingDown, TrendingUp } from "lucide-react";
 
-const VIEWS = [
-  { id: "mood", label: "Mood Tracker", icon: Smile },
-  { id: "strategy", label: "Strategy Tracker", icon: LineChartIcon },
-  { id: "day", label: "Best Day of Week", icon: CalendarDays },
-  { id: "time", label: "Best Time", icon: Clock },
+const PURPLE = "#7C3AED";
+const GREEN = "#16A34A";
+const RED = "#DC2626";
+const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const TABS = [
+  ["overview", "Overview", BarChart3], ["mood", "Mood", Smile], ["strategy", "Strategy", Target],
+  ["symbol", "Symbol", Crosshair], ["time", "Best Time", Clock3], ["day", "Best Day", CalendarDays],
 ];
 
-const DAY_ORDER = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-
-const MOOD_EMOJI = {
-  Calm: "😌", Focused: "🎯", Confident: "😎", Neutral: "😐", FOMO: "😰",
-  Anxious: "😟", Revenge: "😡", Patient: "🧘", Greedy: "🤑", Frustrated: "😤",
-  Fearful: "😨", Tired: "🥱",
+const money = (value = 0) => `${value >= 0 ? "+" : "-"}$${Math.abs(value).toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
+const pct = (value) => `${Number(value || 0).toFixed(0)}%`;
+const safeNumber = (value) => Number(value) || 0;
+const dateLabel = (date) => {
+  const parsed = new Date(`${date}T00:00:00`);
+  return Number.isNaN(parsed.getTime()) ? date : parsed.toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
 };
+const hourFrom = (trade) => Number(String(trade.entry_time || "").split(":")[0]);
+const dayFrom = (trade) => {
+  const parsed = new Date(`${trade.date}T00:00:00`);
+  return Number.isNaN(parsed.getTime()) ? "Unknown" : DAYS[(parsed.getDay() + 6) % 7];
+};
+const tone = (value) => value >= 0 ? "text-emerald-600" : "text-red-600";
 
-const PALETTE = ["#22C55E", "#3B82F6", "#EAB308", "#94A3B8", "#8B5CF6", "#F97316", "#EF4444", "#06B6D4", "#EC4899"];
-
-function sessionOfHour(hr) {
-  // Rough global session bands in a 24h clock (broad/illustrative bands).
-  if (hr >= 0 && hr < 7) return "Asian";
-  if (hr >= 7 && hr < 12) return "London";
-  if (hr >= 12 && hr < 16) return "Overlap";
-  if (hr >= 16 && hr < 21) return "New York";
-  return "Asian";
+function buildGroup(trades, label) {
+  const pnl = trades.reduce((total, trade) => total + safeNumber(trade.net_pnl), 0);
+  const wins = trades.filter((trade) => safeNumber(trade.net_pnl) > 0).length;
+  const losses = trades.filter((trade) => safeNumber(trade.net_pnl) < 0).length;
+  const rr = trades.filter((trade) => trade.r_multiple !== null && trade.r_multiple !== undefined);
+  return { label, trades, total: trades.length, pnl, wins, losses, winRate: trades.length ? (wins / trades.length) * 100 : 0, avgRR: rr.length ? rr.reduce((total, trade) => total + safeNumber(trade.r_multiple), 0) / rr.length : 0 };
 }
 
-function dowOf(dateStr) {
-  try {
-    const d = new Date(dateStr + "T00:00:00");
-    if (isNaN(d.getTime())) return null;
-    return DAY_ORDER[(d.getDay() + 6) % 7]; // Mon..Sun
-  } catch { return null; }
-}
-
-function fmtMoney(n) {
-  const v = n || 0;
-  return `${v >= 0 ? "+" : ""}$${v.toFixed(2)}`;
+function groupBy(trades, getKey) {
+  const groups = new Map();
+  trades.forEach((trade) => {
+    const key = getKey(trade) || "Not tagged";
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(trade);
+  });
+  return [...groups.entries()].map(([label, list]) => buildGroup(list, label)).sort((a, b) => b.pnl - a.pnl);
 }
 
 export default function Tracker() {
   const { activeId } = useAccount();
-  const { user } = useAuth();
-  const timeFormat = user?.settings?.time_format || user?.settings?.report_time_format || "12h";
   const navigate = useNavigate();
-  const [view, setView] = useState("mood");
-  const [trades, setTrades] = useState([]);
+  const [allTrades, setAllTrades] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [drill, setDrill] = useState(null); // { title, trades: [] }
+  const [range, setRange] = useState("all");
+  const [tab, setTab] = useState("overview");
 
   useEffect(() => {
     setLoading(true);
-    tradesApi.list(activeId).then(setTrades).catch(() => setTrades([])).finally(() => setLoading(false));
+    tradesApi.list(activeId).then(setAllTrades).catch(() => setAllTrades([])).finally(() => setLoading(false));
   }, [activeId]);
 
-  const closed = useMemo(() => trades.filter(t => t.status === "closed"), [trades]);
-  const totalPnl = useMemo(() => closed.reduce((s, t) => s + (t.net_pnl || 0), 0), [closed]);
+  const trades = useMemo(() => {
+    const closed = allTrades.filter((trade) => trade.status === "closed");
+    if (range === "all") return closed;
+    const today = new Date(); today.setHours(23, 59, 59, 999);
+    const from = new Date(today); from.setDate(today.getDate() - Number(range) + 1); from.setHours(0, 0, 0, 0);
+    return closed.filter((trade) => new Date(`${trade.date}T00:00:00`) >= from);
+  }, [allTrades, range]);
 
-  const activeView = VIEWS.find(v => v.id === view) || VIEWS[0];
+  const analytics = useMemo(() => makeAnalytics(trades), [trades]);
+  const selectedSection = { overview: <Overview analytics={analytics} />, mood: <Mood analytics={analytics} />, strategy: <Strategy analytics={analytics} />, symbol: <Symbols analytics={analytics} />, time: <BestTime analytics={analytics} />, day: <BestDays analytics={analytics} /> }[tab];
 
-  return (
-    <div className="p-5 max-w-[1300px] mx-auto space-y-4" data-testid="tracker-page">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="font-display text-3xl font-bold">Tracker</h1>
-          <p className="text-[#6D6D82] mt-1">Slice your trades by mood, strategy, day and time — click anything to see the trades behind it.</p>
-        </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              data-testid="tracker-view-select"
-              className="h-11 px-4 rounded-xl border border-[#E8E8F1] hover:border-[#7C3AED] bg-white text-sm font-semibold flex items-center gap-2 shadow-sm"
-            >
-              <activeView.icon className="w-4 h-4 text-[#7C3AED]" />
-              {activeView.label}
-              <ChevronDown className="w-4 h-4 text-[#6D6D82]" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            {VIEWS.map(v => (
-              <DropdownMenuItem key={v.id} onClick={() => setView(v.id)} data-testid={`tracker-view-${v.id}`}>
-                <v.icon className="w-4 h-4 mr-2 text-[#7C3AED]" /> {v.label}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
+  return <div className="p-4 md:p-6 max-w-[1500px] mx-auto space-y-4" data-testid="tracker-page">
+    <header className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+      <div><h1 className="font-display text-2xl md:text-3xl font-bold tracking-tight">Trading Tracker</h1><p className="text-sm text-[#6D6D82] mt-0.5">Track. Analyze. Improve. Repeat.</p></div>
+      <div className="flex gap-2">
+        <label className="h-10 px-3 rounded-xl border border-[#E8E8F1] bg-white flex items-center gap-2 text-sm font-semibold"><CalendarDays className="w-4 h-4 text-[#7C3AED]" /><select aria-label="Date range" value={range} onChange={(event) => setRange(event.target.value)} className="bg-transparent outline-none pr-1"><option value="all">All time</option><option value="30">Last 30 days</option><option value="90">Last 90 days</option><option value="365">Last year</option></select><ChevronDown className="w-3.5 h-3.5 text-[#6D6D82]" /></label>
+        <button onClick={() => navigate("/trades")} className="h-10 px-3 rounded-xl border border-[#E8E8F1] bg-white hover:border-[#7C3AED] text-sm font-semibold flex items-center gap-2"><Filter className="w-4 h-4 text-[#7C3AED]" />Trades</button>
       </div>
-
-      {loading ? (
-        <div className="tjfx-card p-10 text-center text-sm text-[#6D6D82]">Loading your trades...</div>
-      ) : closed.length === 0 ? (
-        <div className="tjfx-card p-10 text-center text-sm text-[#6D6D82]">No closed trades yet — log some trades to see your tracker.</div>
-      ) : (
-        <>
-          {view === "mood" && <MoodTracker trades={closed} onDrill={setDrill} />}
-          {view === "strategy" && <StrategyTracker trades={closed} onDrill={setDrill} />}
-          {view === "day" && <DayTracker trades={closed} onDrill={setDrill} />}
-          {view === "time" && <TimeTracker trades={closed} onDrill={setDrill} />}
-        </>
-      )}
-
-      <DrillDialog drill={drill} onClose={() => setDrill(null)} navigate={navigate} />
-    </div>
-  );
+    </header>
+    {loading ? <Loading /> : trades.length === 0 ? <Empty navigate={navigate} /> : <>
+      <TopDeck analytics={analytics} />
+      <nav className="tjfx-card p-1.5 flex overflow-x-auto gap-1" aria-label="Tracker sections">{TABS.map(([id, label, Icon]) => <button key={id} onClick={() => setTab(id)} className={`h-9 px-3 rounded-lg shrink-0 text-sm font-semibold flex items-center gap-1.5 transition-colors ${tab === id ? "bg-[#F3E8FF] text-[#6D28D9]" : "text-[#6D6D82] hover:bg-[#F8F7FB]"}`}><Icon className="w-4 h-4" />{label}</button>)}</nav>
+      {selectedSection}
+    </>}
+  </div>;
 }
 
-/* ---------------- shared bits ---------------- */
-
-function KPI({ label, value, icon: Icon, color = "text-[#16151F]" }) {
-  return (
-    <div className="tjfx-card p-6 tjfx-card-hover">
-      <div className="flex items-start justify-between mb-3">
-        <div className="text-[13px] text-[#6D6D82] font-medium">{label}</div>
-        {Icon && <div className="w-8 h-8 rounded-xl bg-[#F3E8FF] flex items-center justify-center"><Icon className="w-4 h-4 text-[#7C3AED]" /></div>}
-      </div>
-      <div className={`tjfx-mono text-2xl font-semibold ${color}`}>{value}</div>
-    </div>
-  );
+function makeAnalytics(trades) {
+  const summary = buildGroup(trades, "All trades");
+  const symbols = groupBy(trades, (trade) => trade.symbol || "Unknown symbol");
+  const strategies = groupBy(trades, (trade) => trade.strategy || "No strategy");
+  const moods = groupBy(trades.flatMap((trade) => [...new Set([...(trade.mood_before || []), ...(trade.mood_during || []), ...(trade.mood_after || [])])].map((mood) => ({ ...trade, _mood: mood }))), (trade) => trade._mood);
+  const days = DAYS.map((day) => buildGroup(trades.filter((trade) => dayFrom(trade) === day), day));
+  const hours = Array.from({ length: 24 }, (_, hour) => buildGroup(trades.filter((trade) => hourFrom(trade) === hour), `${String(hour).padStart(2, "0")}:00`));
+  const dates = [...new Set(trades.map((trade) => trade.date).filter(Boolean))].sort().map((date) => ({ date, label: dateLabel(date), pnl: trades.filter((trade) => trade.date === date).reduce((total, trade) => total + safeNumber(trade.net_pnl), 0) })).map((point, index, array) => ({ ...point, equity: array.slice(0, index + 1).reduce((total, item) => total + item.pnl, 0) }));
+  const grossWin = trades.filter((trade) => safeNumber(trade.net_pnl) > 0).reduce((total, trade) => total + safeNumber(trade.net_pnl), 0);
+  const grossLoss = Math.abs(trades.filter((trade) => safeNumber(trade.net_pnl) < 0).reduce((total, trade) => total + safeNumber(trade.net_pnl), 0));
+  const bestDay = [...days].sort((a, b) => b.pnl - a.pnl)[0];
+  const bestMonth = groupBy(trades, (trade) => String(trade.date || "").slice(0, 7)).map((item) => ({ ...item, display: item.label ? new Date(`${item.label}-01T00:00:00`).toLocaleDateString("en-IN", { month: "short", year: "numeric" }) : "Unknown" }))[0];
+  return { summary, symbols, strategies, moods, days, hours, dates, bestDay, bestMonth, profitFactor: grossLoss ? grossWin / grossLoss : grossWin ? Infinity : 0 };
 }
 
-function ClickableRow({ onClick, color, label, emoji, right }) {
-  return (
-    <button
-      onClick={onClick}
-      className="w-full flex items-center justify-between py-3 px-2 -mx-2 rounded-xl hover:bg-[#F3E8FF]/50 transition-colors text-left"
-      data-testid="tracker-row"
-    >
-      <div className="flex items-center gap-2 min-w-0">
-        {color && <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: color }} />}
-        {emoji && <span className="text-base leading-none">{emoji}</span>}
-        <span className="font-medium text-sm truncate">{label}</span>
-      </div>
-      <div className="tjfx-mono text-xs text-[#6D6D82] shrink-0">{right}</div>
-    </button>
-  );
+function TopDeck({ analytics }) {
+  const { summary, strategies, moods, bestDay, bestMonth } = analytics;
+  const bestStrategy = strategies[0]; const bestMood = moods[0];
+  return <section className="grid xl:grid-cols-[1.05fr_1.95fr] gap-4">
+    <Card className="p-4 border-[#D8B4FE] bg-gradient-to-br from-[#FCF9FF] to-[#F5EDFF]"><div className="flex gap-2 items-center text-[#6D28D9] font-bold text-sm"><Gem className="w-4 h-4" />TRADER DNA</div><div className="mt-2 divide-y divide-[#E9D5FF] text-sm">{[["Best Strategy", bestStrategy?.label || "—"], ["Best Mood", bestMood?.label || "—"], ["Best Symbol", analytics.symbols[0]?.label || "—"], ["Best Day", bestDay?.label || "—"], ["Best Month", bestMonth?.display || "—"], ["Avg RR", `${summary.avgRR.toFixed(2)}R`]].map(([label, value]) => <div className="py-2 flex justify-between gap-3" key={label}><span className="text-[#6D6D82]">{label}</span><b className="text-right">{value}</b></div>)}</div></Card>
+    <div className="grid sm:grid-cols-2 gap-4"><Metric label="Net P&L" value={money(summary.pnl)} good={summary.pnl >= 0} icon={TrendingUp} spark={analytics.dates.map((d) => d.equity)} /><Metric label="Win Rate" value={pct(summary.winRate)} good={summary.winRate >= 50} icon={Trophy} ring={summary.winRate} /><Metric label="Avg RR" value={`${summary.avgRR.toFixed(2)}R`} good={summary.avgRR >= 0} icon={Target} spark={analytics.hours.map((h) => h.avgRR)} /><Metric label="Total Trades" value={summary.total} good icon={BarChart3} spark={analytics.dates.map((d) => d.pnl)} /></div>
+  </section>;
 }
 
-function DrillDialog({ drill, onClose, navigate }) {
-  const [exporting, setExporting] = useState(false);
-  const printRef = useRef(null);
+function Overview({ analytics }) { const { summary } = analytics; return <section className="grid lg:grid-cols-2 gap-4"><Card title="Equity Curve" subtitle={money(summary.pnl)} subtitleTone={summary.pnl >= 0}><Chart type="area" data={analytics.dates} dataKey="equity" /></Card><Card title="Performance Summary"><div className="grid sm:grid-cols-[170px_1fr] gap-3 items-center"><div className="h-44"><ResponsiveContainer><PieChart><Pie data={[{ name: "Win", value: summary.wins }, { name: "Loss", value: summary.losses }, { name: "Breakeven", value: Math.max(0, summary.total - summary.wins - summary.losses) }]} dataKey="value" innerRadius={45} outerRadius={68} paddingAngle={3}>{[GREEN, RED, "#C4C4D0"].map((fill, index) => <Cell key={fill} fill={fill} />)}</Pie><Tooltip /></PieChart></ResponsiveContainer></div><div className="space-y-2 text-sm"><StatLine label="Win" value={`${summary.wins} (${pct(summary.winRate)})`} dot={GREEN} /><StatLine label="Loss" value={`${summary.losses}`} dot={RED} /><StatLine label="Profit factor" value={Number.isFinite(analytics.profitFactor) ? analytics.profitFactor.toFixed(2) : "∞"} /><StatLine label="Expectancy" value={money(summary.total ? summary.pnl / summary.total : 0)} /><StatLine label="Average R" value={`${summary.avgRR.toFixed(2)}R`} /></div></div></Card><Mood analytics={analytics} compact /><Strategy analytics={analytics} compact /><Symbols analytics={analytics} compact /><BestTime analytics={analytics} compact /><BestDays analytics={analytics} compact /><Insights analytics={analytics} /></section>; }
+function Mood({ analytics, compact = false }) { const rows = analytics.moods.slice(0, compact ? 4 : 8); return <Card title="Mood Analytics"><RankRows rows={rows} empty="No mood tags added yet." /><div className="grid grid-cols-2 gap-2 mt-3"><MiniResult label="Best Mood" item={analytics.moods[0]} /><MiniResult label="Needs care" item={[...analytics.moods].sort((a,b)=>a.pnl-b.pnl)[0]} bad /></div></Card>; }
+function Strategy({ analytics, compact = false }) { return <Card title="Strategy Performance"><RankRows rows={analytics.strategies.slice(0, compact ? 4 : 8)} empty="No strategy data added yet." /><div className="mt-3"><MiniResult label="Best Strategy" item={analytics.strategies[0]} /></div></Card>; }
+function Symbols({ analytics, compact = false }) { return <Card title="Best Symbols"><div className="space-y-1">{analytics.symbols.slice(0, compact ? 4 : 10).map((item, index) => <button key={item.label} className="w-full rounded-lg px-2 py-2 hover:bg-[#F8F7FB] flex items-center justify-between text-left" onClick={() => {}}><span className="flex gap-2 items-center"><span className="w-5 text-xs text-[#7C3AED] font-bold">#{index + 1}</span><b className="text-sm">{item.label}</b><small className="text-[#6D6D82]">{item.total} trades</small></span><b className={`tjfx-mono text-sm ${tone(item.pnl)}`}>{money(item.pnl)}</b></button>)}</div><div className="mt-3"><MiniResult label="Most Profitable" item={analytics.symbols[0]} /></div></Card>; }
+function BestTime({ analytics, compact = false }) { const hours = analytics.hours; const best = [...hours].sort((a,b)=>b.pnl-a.pnl)[0]; return <Card title="Best Trading Time"><div className="grid grid-cols-12 gap-1 mt-1">{hours.map((hour) => <div key={hour.label} title={`${hour.label}: ${money(hour.pnl)}`} className="aspect-square rounded-sm" style={{ background: hour.total ? hour.pnl >= 0 ? `rgba(22,163,74,${Math.min(.88,.18 + Math.abs(hour.pnl)/(Math.max(...hours.map(h=>Math.abs(h.pnl)),1))*.7)})` : `rgba(220,38,38,${Math.min(.88,.18 + Math.abs(hour.pnl)/(Math.max(...hours.map(h=>Math.abs(h.pnl)),1))*.7)})` : "#F1F1F5" }} />)}</div><div className="flex justify-between text-[10px] text-[#6D6D82] mt-1"><span>00:00</span><span>12:00</span><span>23:00</span></div><div className="grid grid-cols-2 gap-2 mt-3"><MiniResult label="Best Time" item={best} /><MiniResult label="Most Active" item={[...hours].sort((a,b)=>b.total-a.total)[0]} /></div></Card>; }
+function BestDays({ analytics, compact = false }) { const days = analytics.days; return <Card title="Best Days"><div className="h-32"><ResponsiveContainer><BarChart data={days}><XAxis dataKey="label" tick={{ fontSize: 10 }} interval={0} axisLine={false} tickLine={false}/><YAxis hide/><Tooltip formatter={(value) => money(value)} /><Bar dataKey="pnl" radius={[5,5,0,0]}>{days.map((day) => <Cell key={day.label} fill={day.pnl >= 0 ? GREEN : RED} />)}</Bar></BarChart></ResponsiveContainer></div><div className="grid grid-cols-2 gap-2 mt-2"><MiniResult label="Best Day" item={analytics.bestDay} /><MiniResult label="Worst Day" item={[...days].sort((a,b)=>a.pnl-b.pnl)[0]} bad /></div></Card>; }
+function Insights({ analytics }) { const bestSymbol = analytics.symbols[0]; const bestStrategy = analytics.strategies[0]; return <Card className="lg:col-span-2 bg-gradient-to-r from-[#FBF8FF] to-white" title="AI Insights"><div className="grid md:grid-cols-[auto_1fr_1fr] gap-3 items-start"><div className="w-11 h-11 rounded-2xl bg-[#7C3AED] text-white grid place-items-center"><Sparkles className="w-5 h-5" /></div><div><b className="text-sm">You perform best when:</b><ul className="mt-1 text-sm text-[#535368] space-y-1"><li>✓ Trading {bestStrategy?.label || "your tagged strategy"}</li><li>✓ Focusing on {bestSymbol?.label || "your strongest symbols"}</li><li>✓ Keeping risk-reward above {analytics.summary.avgRR.toFixed(2)}R</li></ul></div><div><b className="text-sm">Next focus:</b><p className="mt-1 text-sm text-[#535368]">Review losing trades and tag mood, strategy and session consistently. Your Tracker becomes sharper after every closed trade.</p></div></div></Card>; }
 
-  // Exports a detailed PDF for just this mood/strategy/day/time slice — every
-  // trade in the drill (Date, Pair, Dir, P&L, R) plus each trade's screenshot,
-  // rendered off-screen and captured with html2canvas → jsPDF.
-  const exportPdf = async () => {
-    const node = printRef.current;
-    if (!node || !drill) return;
-    setExporting(true);
-    try {
-      const canvas = await html2canvas(node, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
-      const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF("p", "mm", "a4");
-      const pageW = pdf.internal.pageSize.getWidth();
-      const pageH = pdf.internal.pageSize.getHeight();
-      const imgW = pageW;
-      const imgH = (canvas.height * imgW) / canvas.width;
-      let heightLeft = imgH;
-      let position = 0;
-      pdf.addImage(imgData, "PNG", 0, position, imgW, imgH);
-      heightLeft -= pageH;
-      while (heightLeft > 0) {
-        position = heightLeft - imgH;
-        pdf.addPage();
-        pdf.addImage(imgData, "PNG", 0, position, imgW, imgH);
-        heightLeft -= pageH;
-      }
-      const safeTitle = (drill.title || "tracker-report").replace(/[^a-z0-9]+/gi, "_").toLowerCase();
-      pdf.save(`TheJournalFX_${safeTitle}.pdf`);
-      toast.success("PDF downloaded");
-    } catch (e) {
-      toast.error("Export failed");
-    } finally {
-      setExporting(false);
-    }
-  };
-
-  return (
-    <Dialog open={!!drill} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-2xl bg-white" data-testid="tracker-drill-dialog">
-        <DialogHeader>
-          <div className="flex items-center justify-between gap-3 pr-6">
-            <DialogTitle>{drill?.title}</DialogTitle>
-            {(drill?.trades || []).length > 0 && (
-              <button
-                onClick={exportPdf}
-                disabled={exporting}
-                data-testid="tracker-drill-export-pdf"
-                className="h-8 px-3 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs font-semibold flex items-center gap-1.5 disabled:opacity-60 shrink-0"
-              >
-                {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-                Export PDF
-              </button>
-            )}
-          </div>
-        </DialogHeader>
-        {(drill?.trades || []).length > 0 ? (
-          <div className="overflow-x-auto scroll-thin max-h-[60vh]">
-            <table className="w-full text-sm">
-              <thead className="text-[#6D6D82] border-b border-[#E8E8F1]">
-                <tr className="text-left">
-                  <th className="py-2 font-medium">Date</th>
-                  <th className="py-2 font-medium">Pair</th>
-                  <th className="py-2 font-medium">Dir</th>
-                  <th className="py-2 font-medium">P&L</th>
-                  <th className="py-2 font-medium">R</th>
-                </tr>
-              </thead>
-              <tbody>
-                {drill.trades.map(trade => (
-                  <tr
-                    key={trade.id}
-                    onClick={() => navigate("/trades")}
-                    className="border-t border-[#E8E8F1] hover:bg-[#F3E8FF]/40 cursor-pointer"
-                  >
-                    <td className="py-3 tjfx-mono text-xs text-[#6D6D82]">{trade.date}{trade.entry_time ? ` · ${formatTradeTime(trade.entry_time, timeFormat)}` : ""}</td>
-                    <td className="py-3 font-semibold tjfx-mono">{trade.symbol}</td>
-                    <td className={trade.direction === "long" ? "text-emerald-600" : "text-red-500"}>
-                      {trade.direction === "long" ? "↑ Long" : "↓ Short"}
-                    </td>
-                    <td className={`py-3 tjfx-mono font-medium ${(trade.net_pnl || 0) >= 0 ? "text-emerald-600" : "text-red-500"}`}>
-                      {fmtMoney(trade.net_pnl)}
-                    </td>
-                    <td className="py-3 tjfx-mono">{trade.r_multiple != null ? `${trade.r_multiple.toFixed(2)}R` : "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="py-8 text-center text-sm text-[#6D6D82]">No trades found.</div>
-        )}
-      </DialogContent>
-
-      {/* Off-screen printable version used only for the PDF export (detailed rows + screenshots) */}
-      {drill && (
-        <div style={{ position: "fixed", left: -9999, top: 0, width: 800 }}>
-          <div ref={printRef} className="bg-white p-6" style={{ width: 800 }}>
-            <div className="flex items-center gap-2 mb-1">
-              <div className="w-9 h-9 rounded-xl bg-[#7C3AED] flex items-center justify-center text-white font-bold">↗</div>
-              <div>
-                <div className="font-bold text-[15px]">TheJournalFX</div>
-                <div className="text-[10px] text-[#6D6D82]">Journal • Analyze • Improve</div>
-              </div>
-            </div>
-            <div className="text-[18px] font-bold mt-4 mb-1">{drill.title}</div>
-            <div className="text-[11px] text-[#6D6D82] mb-4">Generated {new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</div>
-            <div className="space-y-4">
-              {drill.trades.map((trade) => (
-                <div key={trade.id} className="border border-[#E8E8F1] rounded-lg p-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <div>
-                      <div className="font-semibold text-[13px]">
-                        {trade.symbol} · {trade.direction === "long" ? "Long" : "Short"}
-                      </div>
-                      <div className="text-[11px] text-[#6D6D82]">
-                        {trade.date}{trade.entry_time ? ` · ${formatTradeTime(trade.entry_time, timeFormat)}` : ""}
-                        {trade.r_multiple != null ? ` · ${trade.r_multiple.toFixed(2)}R` : ""}
-                      </div>
-                    </div>
-                    <div className={`text-[13px] font-semibold ${(trade.net_pnl || 0) >= 0 ? "text-[#10B981]" : "text-[#EF4444]"}`}>
-                      {fmtMoney(trade.net_pnl)}
-                    </div>
-                  </div>
-                  {trade.screenshots?.length > 0 && (
-                    <div className="grid grid-cols-3 gap-2 mt-2">
-                      {trade.screenshots.map((s, i) => (
-                        <img key={i} src={s} alt="" crossOrigin="anonymous" className="w-full h-24 object-cover rounded-md border border-[#E8E8F1]" />
-                      ))}
-                    </div>
-                  )}
-                  {trade.notes && (
-                    <div className="text-[11px] text-[#6D6D82] whitespace-pre-wrap border-t border-[#E8E8F1] pt-2 mt-2">
-                      {trade.notes}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-    </Dialog>
-  );
-}
-
-function statsFor(list) {
-  const wins = list.filter(t => (t.net_pnl || 0) > 0);
-  const total = list.length;
-  const pnl = list.reduce((s, t) => s + (t.net_pnl || 0), 0);
-  const wr = total ? Math.round((wins.length / total) * 1000) / 10 : 0;
-  const rr = list.filter(t => t.r_multiple != null);
-  const avgRR = rr.length ? Math.round((rr.reduce((s, t) => s + t.r_multiple, 0) / rr.length) * 100) / 100 : 0;
-  return { total, pnl, wr, avgRR };
-}
-
-/* ---------------- Mood Tracker ---------------- */
-
-const POSITIVE_MOODS = new Set(["Calm", "Focused", "Confident", "Patient"]);
-const NEGATIVE_MOODS = new Set(["FOMO", "Anxious", "Revenge", "Greedy", "Frustrated", "Fearful", "Tired"]);
-
-function MoodTracker({ trades, onDrill }) {
-  const byMood = useMemo(() => {
-    const map = {};
-    trades.forEach(t => {
-      const moods = new Set([...(t.mood_before || []), ...(t.mood_during || []), ...(t.mood_after || [])]);
-      moods.forEach(m => {
-        if (!map[m]) map[m] = [];
-        map[m].push(t);
-      });
-    });
-    return Object.entries(map)
-      .map(([mood, list]) => ({ mood, ...statsFor(list), list }))
-      .sort((a, b) => b.pnl - a.pnl);
-  }, [trades]);
-
-  const best = byMood.slice().sort((a, b) => b.wr - a.wr)[0];
-  const worst = byMood.slice().sort((a, b) => a.wr - b.wr)[0];
-  const mostFrequent = byMood.slice().sort((a, b) => b.total - a.total)[0];
-
-  const totalTagged = byMood.reduce((s, m) => s + m.total, 0) || 1;
-  const donutData = byMood.map((m, i) => ({ name: m.mood, value: m.total, color: PALETTE[i % PALETTE.length] }));
-
-  // Impact score: weighted win-rate deviation from 50, scaled -100..100
-  const impactScore = Math.max(-100, Math.min(100, Math.round(
-    byMood.reduce((s, m) => s + (m.wr - 50) * (m.total / totalTagged), 0) * 2
-  )));
-
-  // Trend by day: how many trades that day were tagged with a "positive"
-  // vs "negative" mood — shown as counts (not %) so the chart is readable
-  // even on days with just 1-2 trades.
-  const trendByDate = useMemo(() => {
-    const map = {};
-    trades.forEach(t => {
-      const d = t.date;
-      if (!d) return;
-      const moods = new Set([...(t.mood_before || []), ...(t.mood_during || []), ...(t.mood_after || [])]);
-      const pos = [...moods].some(m => POSITIVE_MOODS.has(m));
-      const neg = [...moods].some(m => NEGATIVE_MOODS.has(m));
-      if (!map[d]) map[d] = { pos: 0, neg: 0, total: 0 };
-      map[d].total++;
-      if (pos) map[d].pos++;
-      if (neg) map[d].neg++;
-    });
-    return Object.entries(map).sort(([a], [b]) => a.localeCompare(b)).map(([date, v]) => {
-      const parsed = new Date(`${date}T00:00:00`);
-      const label = isNaN(parsed.getTime()) ? date : parsed.toLocaleDateString("en-US", { day: "numeric", month: "short" });
-      return { date, label, positive: v.pos, negative: v.neg, neutral: Math.max(0, v.total - v.pos - v.neg) };
-    });
-  }, [trades]);
-
-  const positiveDays = trendByDate.filter(d => d.positive > d.negative).length;
-  const negativeDays = trendByDate.filter(d => d.negative > d.positive).length;
-  const neutralDays = trendByDate.length - positiveDays - negativeDays;
-
-  const openMood = (m) => onDrill({ title: `${MOOD_EMOJI[m.mood] || ""} ${m.mood} — ${m.total} trades`, trades: m.list });
-
-  return (
-    <div className="space-y-5">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        <div className="tjfx-card p-5 bg-emerald-50/40 tjfx-card-hover cursor-pointer" onClick={() => best && openMood(best)}>
-          <div className="text-[12px] text-[#6D6D82] font-medium mb-2">Best Mood</div>
-          <div className="flex items-center gap-2">
-            <span className="text-2xl">{best ? (MOOD_EMOJI[best.mood] || "🙂") : "—"}</span>
-            <div className="font-display text-lg font-bold">{best?.mood || "—"}</div>
-          </div>
-          <div className="text-xs text-emerald-700 font-semibold mt-1">{best?.wr || 0}% Win Rate</div>
-        </div>
-        <div className="tjfx-card p-5 bg-red-50/40 tjfx-card-hover cursor-pointer" onClick={() => worst && openMood(worst)}>
-          <div className="text-[12px] text-[#6D6D82] font-medium mb-2">Worst Mood</div>
-          <div className="flex items-center gap-2">
-            <span className="text-2xl">{worst ? (MOOD_EMOJI[worst.mood] || "😕") : "—"}</span>
-            <div className="font-display text-lg font-bold">{worst?.mood || "—"}</div>
-          </div>
-          <div className="text-xs text-red-600 font-semibold mt-1">{worst?.wr || 0}% Win Rate</div>
-        </div>
-        <div className="tjfx-card p-5 bg-[#F3E8FF]/40 tjfx-card-hover cursor-pointer" onClick={() => mostFrequent && openMood(mostFrequent)}>
-          <div className="text-[12px] text-[#6D6D82] font-medium mb-2">Most Frequent</div>
-          <div className="flex items-center gap-2">
-            <span className="text-2xl">{mostFrequent ? (MOOD_EMOJI[mostFrequent.mood] || "🎯") : "—"}</span>
-            <div className="font-display text-lg font-bold">{mostFrequent?.mood || "—"}</div>
-          </div>
-          <div className="text-xs text-[#7C3AED] font-semibold mt-1">{mostFrequent?.total || 0} Trades</div>
-        </div>
-      </div>
-
-      <div className="grid md:grid-cols-[1.4fr_1fr] gap-5">
-        <div className="tjfx-card p-6">
-          <h3 className="font-display text-lg font-bold mb-3">Mood Performance Overview</h3>
-          {byMood.length === 0 ? <div className="text-sm text-[#6D6D82]">No mood data tagged yet.</div> : (
-            <div className="divide-y divide-[#F0F0F5]">
-              {byMood.map((m, i) => (
-                <ClickableRow
-                  key={m.mood}
-                  onClick={() => openMood(m)}
-                  color={PALETTE[i % PALETTE.length]}
-                  emoji={MOOD_EMOJI[m.mood]}
-                  label={m.mood}
-                  right={<>{m.total}t · {m.wr}%WR · <span className={m.pnl >= 0 ? "text-emerald-600" : "text-red-500"}>{fmtMoney(m.pnl)}</span></>}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="space-y-5">
-          <div className="tjfx-card p-6">
-            <h3 className="font-display text-lg font-bold mb-2">Mood Impact Score</h3>
-            <div className="text-center py-2">
-              <div className={`tjfx-mono text-4xl font-bold ${impactScore >= 0 ? "text-[#7C3AED]" : "text-red-500"}`}>{impactScore >= 0 ? "+" : ""}{impactScore}</div>
-              <div className="text-xs text-[#6D6D82] mt-1">{impactScore >= 20 ? "Good" : impactScore >= 0 ? "Fair" : "Needs Work"}</div>
-            </div>
-          </div>
-          <div className="tjfx-card p-6">
-            <h3 className="font-display text-lg font-bold mb-3">Mood Distribution</h3>
-            <div style={{ width: "100%", height: 180 }}>
-              <ResponsiveContainer>
-                <PieChart>
-                  <Pie data={donutData} dataKey="value" nameKey="name" innerRadius={45} outerRadius={70} paddingAngle={2} onClick={(d) => openMood(byMood.find(m => m.mood === d.name))} cursor="pointer">
-                    {donutData.map((d, i) => <Cell key={i} fill={d.color} />)}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid md:grid-cols-[1.4fr_1fr] gap-5">
-        <div className="tjfx-card p-6">
-          <h3 className="font-display text-lg font-bold mb-1">Mood Trends</h3>
-          <div className="text-xs text-[#6D6D82] mb-3">Number of trades per day tagged with a positive or negative mood</div>
-          <div style={{ width: "100%", height: 220 }}>
-            <ResponsiveContainer>
-              <BarChart data={trendByDate}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#F0F0F5" />
-                <XAxis dataKey="label" tick={{ fontSize: 10 }} minTickGap={20} />
-                <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
-                <Tooltip labelFormatter={(_, p) => p?.[0]?.payload?.label || ""} formatter={(v, n) => [v, n === "positive" ? "Positive trades" : "Negative trades"]} />
-                <ReferenceLine y={0} stroke="#16151F" strokeWidth={1.5} />
-                <Bar dataKey="positive" name="positive" fill="#22C55E" radius={[4, 4, 0, 0]} barSize={14} maxBarSize={14} />
-                <Bar dataKey="negative" name="negative" fill="#EF4444" radius={[4, 4, 0, 0]} barSize={14} maxBarSize={14} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="flex gap-4 mt-2 text-xs text-[#6D6D82]">
-            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full inline-block" style={{background:"#22C55E"}}/> Positive trades</span>
-            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full inline-block" style={{background:"#EF4444"}}/> Negative trades</span>
-          </div>
-          <div className="flex gap-2 mt-3 text-xs">
-            <div className="flex-1 rounded-lg bg-emerald-50 text-emerald-700 py-2 text-center font-semibold">Positive Days {positiveDays}</div>
-            <div className="flex-1 rounded-lg bg-[#F6F6FB] text-[#6D6D82] py-2 text-center font-semibold">Neutral Days {neutralDays}</div>
-            <div className="flex-1 rounded-lg bg-red-50 text-red-600 py-2 text-center font-semibold">Negative Days {negativeDays}</div>
-          </div>
-        </div>
-
-        <div className="tjfx-card p-6">
-          <h3 className="font-display text-lg font-bold mb-3 flex items-center gap-2"><Sparkles className="w-4 h-4 text-[#7C3AED]" /> Insights</h3>
-          <div className="space-y-2">
-            {best && <InsightRow ok label={`You perform best when you're ${best.mood.toLowerCase()}.`} sub={`${best.wr}% win rate`} />}
-            {worst && <InsightRow label={`${worst.mood} is hurting your account.`} sub={`${fmtMoney(worst.pnl)} impact`} />}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function InsightRow({ label, sub, ok }) {
-  return (
-    <div className={`flex items-center justify-between p-3 rounded-xl ${ok ? "bg-emerald-50/50" : "bg-red-50/50"}`}>
-      <div>
-        <div className="text-sm font-medium">{label}</div>
-        <div className="text-xs text-[#6D6D82]">{sub}</div>
-      </div>
-    </div>
-  );
-}
-
-/* ---------------- Strategy Tracker ---------------- */
-
-function StrategyTracker({ trades, onDrill }) {
-  const byStrategy = useMemo(() => {
-    const map = {};
-    trades.forEach(t => {
-      const s = t.strategy || "Unspecified";
-      if (!map[s]) map[s] = [];
-      map[s].push(t);
-    });
-    return Object.entries(map)
-      .map(([strategy, list]) => ({ strategy, ...statsFor(list), list }))
-      .sort((a, b) => b.pnl - a.pnl);
-  }, [trades]);
-
-  const best = byStrategy[0];
-  const worst = byStrategy[byStrategy.length - 1];
-  const mostUsed = byStrategy.slice().sort((a, b) => b.total - a.total)[0];
-  const avgWinRate = byStrategy.length ? Math.round((byStrategy.reduce((s, x) => s + x.wr, 0) / byStrategy.length) * 10) / 10 : 0;
-
-  const donutData = byStrategy.map((s, i) => ({ name: s.strategy, value: s.total, color: PALETTE[i % PALETTE.length] }));
-  const openStrategy = (s) => onDrill({ title: `${s.strategy} — ${s.total} trades`, trades: s.list });
-
-  return (
-    <div className="space-y-5">
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <KPI label="Total Strategies" value={byStrategy.length} icon={LineChartIcon} />
-        <KPI label="Best Performing" value={best?.strategy || "—"} icon={Trophy} color="text-emerald-600" />
-        <KPI label="Worst Performing" value={worst?.strategy || "—"} icon={TrendingDown} color="text-red-500" />
-        <KPI label="Most Used" value={mostUsed?.strategy || "—"} icon={TargetIcon} />
-        <KPI label="Avg Win Rate" value={`${avgWinRate}%`} icon={Sparkles} />
-      </div>
-
-      <div className="grid md:grid-cols-[1.4fr_1fr] gap-5">
-        <div className="tjfx-card p-6">
-          <h3 className="font-display text-lg font-bold mb-3">Strategy Performance Overview</h3>
-          {byStrategy.length === 0 ? <div className="text-sm text-[#6D6D82]">No strategies tagged yet.</div> : (
-            <div className="divide-y divide-[#F0F0F5]">
-              {byStrategy.map((s, i) => (
-                <ClickableRow
-                  key={s.strategy}
-                  onClick={() => openStrategy(s)}
-                  color={PALETTE[i % PALETTE.length]}
-                  label={s.strategy}
-                  right={<>{s.total}t · {s.wr}%WR · {s.avgRR}R · <span className={s.pnl >= 0 ? "text-emerald-600" : "text-red-500"}>{fmtMoney(s.pnl)}</span></>}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-        <div className="tjfx-card p-6">
-          <h3 className="font-display text-lg font-bold mb-3">Strategy Usage</h3>
-          <div style={{ width: "100%", height: 200 }}>
-            <ResponsiveContainer>
-              <PieChart>
-                <Pie data={donutData} dataKey="value" nameKey="name" innerRadius={50} outerRadius={75} paddingAngle={2} onClick={(d) => openStrategy(byStrategy.find(s => s.strategy === d.name))} cursor="pointer">
-                  {donutData.map((d, i) => <Cell key={i} fill={d.color} />)}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid md:grid-cols-2 gap-5">
-        <div className="tjfx-card p-6">
-          <h3 className="font-display text-lg font-bold mb-3">Net P&L by Strategy</h3>
-          <div style={{ width: "100%", height: 220 }}>
-            <ResponsiveContainer>
-              <BarChart data={byStrategy} onClick={(e) => e?.activePayload?.[0] && openStrategy(e.activePayload[0].payload)}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#F0F0F5" />
-                <XAxis dataKey="strategy" tick={{ fontSize: 10 }} interval={0} angle={-15} textAnchor="end" height={50} />
-                <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip />
-                <Bar dataKey="pnl" radius={[4, 4, 0, 0]} cursor="pointer" barSize={28} maxBarSize={28}>
-                  {byStrategy.map((s, i) => <Cell key={i} fill={s.pnl >= 0 ? "#22C55E" : "#EF4444"} />)}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-        <div className="tjfx-card p-6">
-          <h3 className="font-display text-lg font-bold mb-1">Win Rate vs Avg RR</h3>
-          <div className="text-xs text-[#6D6D82] mb-2">Win rate (%) and average R per strategy</div>
-          <div style={{ width: "100%", height: 220 }}>
-            <ResponsiveContainer>
-              <BarChart data={byStrategy} onClick={(e) => e?.activePayload?.[0] && openStrategy(e.activePayload[0].payload)}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#F0F0F5" />
-                <XAxis dataKey="strategy" tick={{ fontSize: 10 }} interval={0} angle={-15} textAnchor="end" height={50} />
-                <YAxis yAxisId="left" tick={{ fontSize: 10 }} domain={[0, 100]} />
-                <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} />
-                <Tooltip formatter={(v, n) => [n === "wr" ? `${v}%` : `${v}R`, n === "wr" ? "Win Rate" : "Avg RR"]} labelFormatter={() => ""} />
-                <Bar yAxisId="left" dataKey="wr" name="wr" fill="#7C3AED" radius={[4, 4, 0, 0]} cursor="pointer" barSize={14} maxBarSize={14} />
-                <Bar yAxisId="right" dataKey="avgRR" name="avgRR" fill="#F59E0B" radius={[4, 4, 0, 0]} cursor="pointer" barSize={14} maxBarSize={14} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="flex gap-4 mt-2 text-xs text-[#6D6D82]">
-            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full inline-block" style={{background:"#7C3AED"}}/> Win Rate %</span>
-            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full inline-block" style={{background:"#F59E0B"}}/> Avg RR</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="tjfx-card p-6">
-        <h3 className="font-display text-lg font-bold mb-3">Strategy by Session</h3>
-        <StrategyBySession trades={trades} strategies={byStrategy} onDrill={onDrill} />
-      </div>
-    </div>
-  );
-}
-
-function StrategyBySession({ trades, strategies, onDrill }) {
-  const sessions = useMemo(() => {
-    const set = new Set(trades.map(t => t.session).filter(Boolean));
-    return Array.from(set);
-  }, [trades]);
-
-  if (strategies.length === 0 || sessions.length === 0) return <div className="text-sm text-[#6D6D82]">No session data yet.</div>;
-
-  const cellFor = (strategy, session) => {
-    const list = strategy.list.filter(t => t.session === session);
-    const s = statsFor(list);
-    return { ...s, list };
-  };
-
-  const colorFor = (wr) => wr >= 60 ? "bg-emerald-50 text-emerald-700" : wr >= 40 ? "bg-amber-50 text-amber-700" : "bg-red-50 text-red-600";
-
-  return (
-    <div className="overflow-x-auto scroll-thin">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="text-left text-[#6D6D82]">
-            <th className="py-2 font-medium">Strategy</th>
-            {sessions.map(s => <th key={s} className="py-2 font-medium text-center">{s}</th>)}
-          </tr>
-        </thead>
-        <tbody>
-          {strategies.map(strat => (
-            <tr key={strat.strategy} className="border-t border-[#E8E8F1]">
-              <td className="py-2.5 font-medium">{strat.strategy}</td>
-              {sessions.map(session => {
-                const c = cellFor(strat, session);
-                return (
-                  <td key={session} className="py-2 text-center">
-                    <button
-                      onClick={() => c.total > 0 && onDrill({ title: `${strat.strategy} · ${session} — ${c.total} trades`, trades: c.list })}
-                      disabled={c.total === 0}
-                      className={`tjfx-mono text-xs font-semibold px-2 py-1 rounded-lg ${c.total ? colorFor(c.wr) : "text-[#A1A1AA]"}`}
-                    >
-                      {c.total ? `${c.wr}%` : "—"}
-                    </button>
-                  </td>
-                );
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-/* ---------------- Best Day of Week ---------------- */
-
-function DayTracker({ trades, onDrill }) {
-  const byDay = useMemo(() => {
-    const map = {};
-    DAY_ORDER.forEach(d => map[d] = []);
-    trades.forEach(t => {
-      const d = dowOf(t.date);
-      if (!d) return;
-      map[d].push(t);
-    });
-    return DAY_ORDER.map(day => ({ day, ...statsFor(map[day]), list: map[day] }));
-  }, [trades]);
-
-  const withTrades = byDay.filter(d => d.total > 0);
-  const best = withTrades.slice().sort((a, b) => b.pnl - a.pnl)[0];
-  const worst = withTrades.slice().sort((a, b) => a.pnl - b.pnl)[0];
-  const busiest = withTrades.slice().sort((a, b) => b.total - a.total)[0];
-
-  const openDay = (d) => onDrill({ title: `${d.day} — ${d.total} trades`, trades: d.list });
-  const maxAbsPnl = Math.max(1, ...byDay.map(d => Math.abs(d.pnl)));
-
-  return (
-    <div className="space-y-5">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        <div className="tjfx-card p-5 bg-emerald-50/40 tjfx-card-hover cursor-pointer" onClick={() => best && openDay(best)}>
-          <div className="text-[12px] text-[#6D6D82] font-medium mb-2">Best Day</div>
-          <div className="font-display text-lg font-bold">{best?.day || "—"}</div>
-          <div className="text-xs text-emerald-700 font-semibold mt-1">{best ? fmtMoney(best.pnl) : "—"} · {best?.wr || 0}% WR</div>
-        </div>
-        <div className="tjfx-card p-5 bg-red-50/40 tjfx-card-hover cursor-pointer" onClick={() => worst && openDay(worst)}>
-          <div className="text-[12px] text-[#6D6D82] font-medium mb-2">Worst Day</div>
-          <div className="font-display text-lg font-bold">{worst?.day || "—"}</div>
-          <div className="text-xs text-red-600 font-semibold mt-1">{worst ? fmtMoney(worst.pnl) : "—"} · {worst?.wr || 0}% WR</div>
-        </div>
-        <div className="tjfx-card p-5 bg-[#F3E8FF]/40 tjfx-card-hover cursor-pointer" onClick={() => busiest && openDay(busiest)}>
-          <div className="text-[12px] text-[#6D6D82] font-medium mb-2">Busiest Day</div>
-          <div className="font-display text-lg font-bold">{busiest?.day || "—"}</div>
-          <div className="text-xs text-[#7C3AED] font-semibold mt-1">{busiest?.total || 0} Trades</div>
-        </div>
-      </div>
-
-      <div className="grid md:grid-cols-[1.3fr_1fr] gap-5">
-        <div className="tjfx-card p-6">
-          <h3 className="font-display text-lg font-bold mb-3">Performance by Day of Week</h3>
-          <div className="divide-y divide-[#F0F0F5]">
-            {byDay.map((d, i) => (
-              <ClickableRow
-                key={d.day}
-                onClick={() => d.total > 0 && openDay(d)}
-                color={PALETTE[i % PALETTE.length]}
-                label={d.day}
-                right={d.total ? <>{d.total}t · {d.wr}%WR · <span className={d.pnl >= 0 ? "text-emerald-600" : "text-red-500"}>{fmtMoney(d.pnl)}</span></> : "No trades"}
-              />
-            ))}
-          </div>
-        </div>
-        <div className="tjfx-card p-6">
-          <h3 className="font-display text-lg font-bold mb-3">Net P&L by Day</h3>
-          <div style={{ width: "100%", height: 260 }}>
-            <ResponsiveContainer>
-              <BarChart data={byDay} layout="vertical" margin={{ left: 10 }} onClick={(e) => e?.activePayload?.[0]?.payload?.total > 0 && openDay(e.activePayload[0].payload)}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#F0F0F5" horizontal={false} />
-                <XAxis type="number" tick={{ fontSize: 10 }} />
-                <YAxis type="category" dataKey="day" width={70} tick={{ fontSize: 11 }} />
-                <Tooltip />
-                <Bar dataKey="pnl" radius={[0, 6, 6, 0]} cursor="pointer">
-                  {byDay.map((d, i) => <Cell key={i} fill={d.pnl >= 0 ? "#22C55E" : "#EF4444"} fillOpacity={maxAbsPnl ? 0.4 + 0.6 * (Math.abs(d.pnl) / maxAbsPnl) : 1} />)}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function hour12Label(h) {
-  const period = h < 12 ? "am" : "pm";
-  let hr = h % 12;
-  if (hr === 0) hr = 12;
-  return `${hr}${period}`;
-}
-
-/* ---------------- Best Time (24h + sessions) ---------------- */
-
-function TimeTracker({ trades, onDrill }) {
-  const byHour = useMemo(() => {
-    const map = {};
-    for (let h = 0; h < 24; h++) map[h] = [];
-    trades.forEach(t => {
-      const et = t.entry_time;
-      if (!et || typeof et !== "string" || !et.includes(":")) return;
-      const hr = parseInt(et.split(":")[0], 10) % 24;
-      if (isNaN(hr)) return;
-      map[hr].push(t);
-    });
-    return Array.from({ length: 24 }, (_, h) => ({ hour: h, label: `${String(h).padStart(2, "0")}:00`, label12: hour12Label(h), ...statsFor(map[h]), list: map[h] }));
-  }, [trades]);
-
-  const withTrades = byHour.filter(h => h.total > 0);
-  const best = withTrades.slice().sort((a, b) => b.pnl - a.pnl)[0];
-  const worst = withTrades.slice().sort((a, b) => a.pnl - b.pnl)[0];
-  const busiest = withTrades.slice().sort((a, b) => b.total - a.total)[0];
-
-  const bySession = useMemo(() => {
-    const map = {};
-    trades.forEach(t => {
-      let session = t.session;
-      if (!session && t.entry_time && t.entry_time.includes(":")) {
-        session = sessionOfHour(parseInt(t.entry_time.split(":")[0], 10) % 24);
-      }
-      session = session || "Unspecified";
-      if (!map[session]) map[session] = [];
-      map[session].push(t);
-    });
-    return Object.entries(map).map(([session, list]) => ({ session, ...statsFor(list), list })).sort((a, b) => b.pnl - a.pnl);
-  }, [trades]);
-
-  const openHour = (h) => onDrill({ title: `${h.label} — ${h.total} trades`, trades: h.list });
-  const openSession = (s) => onDrill({ title: `${s.session} Session — ${s.total} trades`, trades: s.list });
-
-  const maxAbs = Math.max(1, ...byHour.map(h => Math.abs(h.pnl)));
-  const sessionIcon = (s) => s === "Asian" ? Moon : s === "London" ? Globe : s === "New York" ? Sun : Clock;
-
-  return (
-    <div className="space-y-5">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        <div className="tjfx-card p-5 bg-emerald-50/40 tjfx-card-hover cursor-pointer" onClick={() => best && openHour(best)}>
-          <div className="text-[12px] text-[#6D6D82] font-medium mb-2">Best Hour</div>
-          <div className="font-display text-lg font-bold tjfx-mono">{best?.label || "—"}</div>
-          <div className="text-xs text-emerald-700 font-semibold mt-1">{best ? fmtMoney(best.pnl) : "—"} · {best?.wr || 0}% WR</div>
-        </div>
-        <div className="tjfx-card p-5 bg-red-50/40 tjfx-card-hover cursor-pointer" onClick={() => worst && openHour(worst)}>
-          <div className="text-[12px] text-[#6D6D82] font-medium mb-2">Worst Hour</div>
-          <div className="font-display text-lg font-bold tjfx-mono">{worst?.label || "—"}</div>
-          <div className="text-xs text-red-600 font-semibold mt-1">{worst ? fmtMoney(worst.pnl) : "—"} · {worst?.wr || 0}% WR</div>
-        </div>
-        <div className="tjfx-card p-5 bg-[#F3E8FF]/40 tjfx-card-hover cursor-pointer" onClick={() => busiest && openHour(busiest)}>
-          <div className="text-[12px] text-[#6D6D82] font-medium mb-2">Busiest Hour</div>
-          <div className="font-display text-lg font-bold tjfx-mono">{busiest?.label || "—"}</div>
-          <div className="text-xs text-[#7C3AED] font-semibold mt-1">{busiest?.total || 0} Trades</div>
-        </div>
-      </div>
-
-      <div className="tjfx-card p-6">
-        <h3 className="font-display text-lg font-bold mb-1">24-Hour Performance</h3>
-        <div className="text-xs text-[#6D6D82] mb-3">Click a bar to see its trades</div>
-        <div style={{ width: "100%", height: 260 }}>
-          <ResponsiveContainer>
-            <BarChart data={byHour} onClick={(e) => e?.activePayload?.[0]?.payload?.total > 0 && openHour(e.activePayload[0].payload)}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#F0F0F5" />
-              <XAxis dataKey="label12" tick={{ fontSize: 9 }} interval={1} />
-              <YAxis tick={{ fontSize: 10 }} />
-              <Tooltip labelFormatter={(_, p) => p?.[0]?.payload?.label12 || ""} />
-              <ReferenceLine y={0} stroke="#16151F" strokeWidth={1.5} />
-              <Bar dataKey="pnl" radius={[4, 4, 0, 0]} cursor="pointer" barSize={16} maxBarSize={16}>
-                {byHour.map((h, i) => <Cell key={i} fill={h.total === 0 ? "#E8E8F1" : h.pnl >= 0 ? "#22C55E" : "#EF4444"} fillOpacity={h.total ? 0.4 + 0.6 * (Math.abs(h.pnl) / maxAbs) : 1} />)}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      <div className="tjfx-card p-6">
-        <h3 className="font-display text-lg font-bold mb-3">By Session</h3>
-        {bySession.length === 0 ? <div className="text-sm text-[#6D6D82]">No session data yet.</div> : (
-          <div className="grid sm:grid-cols-2 gap-3">
-            {bySession.map((s, i) => {
-              const Icon = sessionIcon(s.session);
-              return (
-                <button key={s.session} onClick={() => openSession(s)} className="text-left rounded-2xl border border-[#E8E8F1] p-4 hover:border-[#7C3AED] transition-colors" data-testid="tracker-session-card">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-xl bg-[#F3E8FF] flex items-center justify-center"><Icon className="w-4 h-4 text-[#7C3AED]" /></div>
-                      <div className="font-semibold text-sm">{s.session}</div>
-                    </div>
-                    <span className={`tjfx-mono text-xs font-semibold ${s.pnl >= 0 ? "text-emerald-600" : "text-red-500"}`}>{fmtMoney(s.pnl)}</span>
-                  </div>
-                  <div className="flex justify-between text-xs text-[#6D6D82] tjfx-mono">
-                    <span>{s.total} trades</span>
-                    <span>{s.wr}% WR</span>
-                    <span>{s.avgRR}R avg</span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
+function Card({ title, subtitle, subtitleTone, children, className = "" }) { return <section className={`tjfx-card p-4 ${className}`}><div className="flex items-start justify-between gap-2 mb-3">{title && <div><h2 className="font-display font-bold text-sm uppercase tracking-wide">{title}</h2>{subtitle && <b className={`tjfx-mono text-xl ${subtitleTone ? "text-emerald-600" : "text-red-600"}`}>{subtitle}</b>}</div>}</div>{children}</section>; }
+function Metric({ label, value, good, icon: Icon, spark, ring }) { return <Card className="min-h-[132px]"><div className="flex justify-between"><span className="text-sm text-[#6D6D82]">{label}</span><Icon className="w-4 h-4 text-[#7C3AED]" /></div><div className={`tjfx-mono text-2xl font-bold mt-1 ${good ? "text-emerald-600" : "text-red-600"}`}>{value}</div>{ring !== undefined ? <div className="w-12 h-12 mt-1 rounded-full grid place-items-center text-[10px] font-bold" style={{ background: `conic-gradient(${GREEN} ${ring}%, #ECECF2 0)`, boxShadow:"inset 0 0 0 7px white" }}>{pct(ring)}</div> : <div className="h-9 mt-2"><ResponsiveContainer><AreaChart data={spark.map((value,index)=>({index,value}))}><Area type="monotone" dataKey="value" stroke={good ? GREEN : RED} fill={good ? "#DCFCE7" : "#FEE2E2"} strokeWidth={2}/></AreaChart></ResponsiveContainer></div>}</Card>; }
+function Chart({ data, dataKey }) { return <div className="h-52"><ResponsiveContainer><AreaChart data={data}><defs><linearGradient id="eq" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor={PURPLE} stopOpacity=".28"/><stop offset="100%" stopColor={PURPLE} stopOpacity="0"/></linearGradient></defs><XAxis dataKey="label" tick={{fontSize:10}} axisLine={false} tickLine={false}/><YAxis tick={{fontSize:10}} width={40} axisLine={false} tickLine={false}/><Tooltip formatter={(value)=>money(value)} /><Area type="monotone" dataKey={dataKey} stroke={PURPLE} fill="url(#eq)" strokeWidth={2.5}/></AreaChart></ResponsiveContainer></div>; }
+function RankRows({ rows, empty }) { const max = Math.max(...rows.map((row)=>Math.abs(row.pnl)), 1); return rows.length ? <div className="space-y-2">{rows.map((row) => <div key={row.label}><div className="flex justify-between gap-2 text-sm"><span className="truncate font-medium">{row.label}</span><span className={`tjfx-mono ${tone(row.pnl)}`}>{money(row.pnl)}</span></div><div className="mt-1 h-1.5 bg-[#F0F0F5] rounded-full overflow-hidden"><div className="h-full rounded-full bg-[#7C3AED]" style={{width:`${Math.max(8,Math.abs(row.pnl)/max*100)}%`}} /></div><small className="text-[#8B8B9A]">{row.total} trades · {pct(row.winRate)} WR · {row.avgRR.toFixed(2)}R</small></div>)}</div> : <p className="text-sm text-[#8B8B9A]">{empty}</p>; }
+function MiniResult({ label, item, bad }) { return <div className={`rounded-xl border p-2.5 ${bad ? "border-red-100 bg-red-50/30" : "border-emerald-100 bg-emerald-50/30"}`}><small className="text-[#6D6D82] block">{label}</small><b className="text-sm block truncate">{item?.label || "—"}</b><span className={`tjfx-mono text-xs ${item ? tone(item.pnl) : "text-[#6D6D82]"}`}>{item ? money(item.pnl) : "No data"}</span></div>; }
+function StatLine({ label, value, dot }) { return <div className="flex justify-between items-center border-b border-[#F0F0F5] pb-1.5 last:border-0"><span className="text-[#6D6D82] flex items-center gap-2">{dot && <i className="w-2 h-2 rounded-full" style={{background:dot}} />}{label}</span><b className="tjfx-mono">{value}</b></div>; }
+function Loading() { return <div className="tjfx-card p-12 text-center text-sm text-[#6D6D82]">Loading your trading performance…</div>; }
+function Empty({ navigate }) { return <div className="tjfx-card p-12 text-center"><LineChart className="w-8 h-8 text-[#7C3AED] mx-auto mb-3"/><h2 className="font-display font-bold text-xl">Your tracker is ready</h2><p className="text-sm text-[#6D6D82] mt-1">Add closed trades with symbol, strategy and mood to unlock the complete analysis.</p><button onClick={() => navigate("/add-trade")} className="mt-4 h-10 px-4 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-sm font-bold">Add your first trade</button></div>; }
