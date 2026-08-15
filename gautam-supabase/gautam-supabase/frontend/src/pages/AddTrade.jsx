@@ -9,7 +9,7 @@ import { AttachmentPanel, LinkedBiasCard } from "@/components/TradePanels";
 import { compressImage } from "@/lib/imageUtils";
 import { formatTradeTime } from "@/lib/time";
 
-const MAX_IMAGES = 14;
+const MAX_IMAGES = 15;
 const BUILDER_DEFAULTS = {
   htf_timeframe: ["Monthly", "Weekly", "Daily", "4H", "1H"],
   htf_poi_type: ["Bullish OB", "Bearish OB", "Bullish FVG", "Bearish FVG", "Demand", "Supply", "Liquidity", "Breaker", "IFVG"],
