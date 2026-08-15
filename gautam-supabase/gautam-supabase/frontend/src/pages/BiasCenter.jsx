@@ -221,7 +221,7 @@ export default function BiasCenter() {
   const addNote = () => setB(p => ({...p, notes: [...p.notes, ""]}));
 
   return (
-    <div className="compact-bias-page p-5 max-w-[1000px] mx-auto space-y-2" data-testid="bias-page">
+    <div className="compact-bias-page p-3 sm:p-4 lg:p-5 max-w-[1000px] mx-auto space-y-2" data-testid="bias-page">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <div className="flex items-center gap-2">

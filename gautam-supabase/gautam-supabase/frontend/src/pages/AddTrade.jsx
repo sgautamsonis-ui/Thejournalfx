@@ -341,7 +341,7 @@ export default function AddTrade() {
               {recommendedLot.lot !== null ? <button type="button" onClick={()=>setT({...t,lot_size:recommendedLot.lot})} className="mt-3 text-xs font-semibold text-[#6D28D9] hover:text-[#4C1D95]">Use recommended lot size</button> : <div className="mt-3 text-xs text-[#6D6D82]">Enter Entry Price, Stop Loss and Risk % to calculate the lot size.</div>}
             </div>
 
-            <div className="mt-5 grid grid-cols-4 gap-4 p-4 rounded-2xl bg-[#F6F6FB]">
+            <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 rounded-2xl bg-[#F6F6FB]">
               <div><div className="text-[11px] text-[#6D6D82]">Net P&L</div><div data-testid="calc-pnl" className={`tjfx-mono text-xl font-semibold ${computed.pnl>=0?"text-emerald-600":"text-red-500"}`}>{computed.pnl>=0?"+":""}${computed.pnl}</div></div>
               <div><div className="text-[11px] text-[#6D6D82]">R Multiple</div><div data-testid="calc-r" className="tjfx-mono text-xl font-semibold">{computed.r}R</div></div>
               <div><div className="text-[11px] text-[#6D6D82]">Risk</div><div data-testid="calc-risk" className="tjfx-mono text-xl font-semibold">${computed.risk}</div></div>

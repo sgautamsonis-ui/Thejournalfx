@@ -465,10 +465,10 @@ function TradeViewContent() {
     <div className="compact-trade-view min-h-screen bg-gradient-to-b from-white to-[#FAFBFF]" data-testid="trade-view-page">
       {/* Header */}
       <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-[#E8E8F1]/50">
-        <div className="p-5 max-w-[1500px] mx-auto">
-          <div className="flex items-start justify-between mb-4">
+        <div className="p-3 sm:p-4 lg:p-5 max-w-[1500px] mx-auto">
+          <div className="flex items-start justify-between flex-wrap gap-3 mb-4">
             <div>
-              <h1 className="font-display text-3xl font-bold text-[#16151F]">Trade View</h1>
+              <h1 className="font-display text-2xl sm:text-3xl font-bold text-[#16151F]">Trade View</h1>
               <p className="text-[#6D6D82] text-sm mt-1">All your trades. All your lessons.</p>
             </div>
             <div className="flex gap-2">
@@ -520,7 +520,7 @@ function TradeViewContent() {
       </div>
 
       {/* Main Content */}
-      <div className="p-5 max-w-[1500px] mx-auto space-y-4">
+      <div className="p-3 sm:p-4 lg:p-5 max-w-[1500px] mx-auto space-y-4">
         {loadError && (
           <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 flex items-center justify-between gap-3 text-sm text-red-700">
             <span>{loadError}</span>
@@ -530,7 +530,7 @@ function TradeViewContent() {
         {/* Search & Filter Bar */}
         <div className="tjfx-card p-4 space-y-3">
           <div className="flex gap-3 items-center flex-wrap">
-            <div className="relative flex-1 min-w-[250px]">
+            <div className="relative flex-1 min-w-[180px] sm:min-w-[250px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#A1A1AA]"/>
               <input 
                 data-testid="search-input" 
@@ -867,13 +867,13 @@ function PremiumTradeCard({ trade, onOpen, onDelete, mistakePresets, onToggleMis
     >
       <div className="absolute inset-0 bg-gradient-to-r from-[#7C3AED]/0 to-[#7C3AED]/0 group-hover:from-[#7C3AED]/5 group-hover:to-[#F3E8FF]/30 transition pointer-events-none"/>
       
-      <div className="relative flex gap-4 items-start">
+      <div className="relative flex gap-2 sm:gap-4 items-start">
         {/* Star & Chart Section */}
-        <div className="relative">
+        <div className="relative shrink-0">
           <button onClick={(e)=>e.stopPropagation()} className="absolute -top-2 -left-2 w-6 h-6 rounded-full hover:bg-yellow-100 flex items-center justify-center transition z-10">
             <Star className="w-4 h-4 text-yellow-400 hover:fill-yellow-400"/>
           </button>
-          <div className="w-44 h-44 rounded-lg bg-gradient-to-br from-[#1a1a2e] via-[#16213e] to-[#0f3460] border border-[#E8E8F1] flex flex-col items-center justify-center relative overflow-hidden">
+          <div className="w-16 h-16 sm:w-44 sm:h-44 rounded-lg bg-gradient-to-br from-[#1a1a2e] via-[#16213e] to-[#0f3460] border border-[#E8E8F1] flex flex-col items-center justify-center relative overflow-hidden">
             {thumb ? (
               // Show the actual screenshot uploaded in Add Trade instead of a fake chart
               <img src={thumb} alt="" className="w-full h-full object-cover"/>
@@ -927,11 +927,11 @@ function PremiumTradeCard({ trade, onOpen, onDelete, mistakePresets, onToggleMis
         </div>
 
         {/* Result badge — compact instead of oversized */}
-        <div className={`w-28 rounded-xl p-3 flex flex-col items-center justify-center text-center flex-shrink-0 border ${isWin ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200"}`}>
-          <div className={`text-[10px] font-bold tracking-wide mb-1 ${isWin ? "text-emerald-600" : "text-red-600"}`}>
+        <div className={`w-20 sm:w-28 rounded-xl p-2 sm:p-3 flex flex-col items-center justify-center text-center flex-shrink-0 border ${isWin ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200"}`}>
+          <div className={`text-[9px] sm:text-[10px] font-bold tracking-wide mb-1 ${isWin ? "text-emerald-600" : "text-red-600"}`}>
             {isWin ? "WIN" : "LOSS"}
           </div>
-          <div className={`text-xl font-bold leading-none tjfx-mono ${isWin ? "text-emerald-700" : "text-red-600"}`}>
+          <div className={`text-base sm:text-xl font-bold leading-none tjfx-mono ${isWin ? "text-emerald-700" : "text-red-600"}`}>
             {isWin ? "+" : "-"}${Math.abs(pnl).toFixed(2)}
           </div>
           <div className={`text-xs font-semibold mt-1 ${isWin ? "text-emerald-600" : "text-red-500"}`}>

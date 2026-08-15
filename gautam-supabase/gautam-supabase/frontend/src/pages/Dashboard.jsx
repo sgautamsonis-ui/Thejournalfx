@@ -388,12 +388,12 @@ export default function Dashboard() {
     // Performance Overview
     performance: (
       <Card data-testid="performance-overview">
-        <div className="flex items-center justify-between mb-1">
+        <div className="flex items-center justify-between flex-wrap gap-2 mb-1">
           <h3 className="font-display text-lg font-bold">Performance Overview</h3>
           <select 
             value={timeframe}
             onChange={(e) => setTimeframe(e.target.value)}
-            className="h-9 px-3 rounded-lg border border-[#E8E8F1] text-sm font-medium bg-white w-[150px] shrink-0"
+            className="h-9 px-3 rounded-lg border border-[#E8E8F1] text-sm font-medium bg-white w-full sm:w-[150px] max-w-[200px] shrink-0"
           >
             <option value="hourly">Hourly (best hour)</option>
             <option value="daily">Daily</option>
@@ -692,12 +692,12 @@ export default function Dashboard() {
     // Performance Bar Chart
     "performance-bar": (
       <Card data-testid="performance-chart">
-        <h3 className="font-display text-lg font-bold mb-4 flex items-center justify-between">
+        <h3 className="font-display text-lg font-bold mb-4 flex items-center justify-between flex-wrap gap-2">
           <span>Monthly Performance</span>
           <select 
             value={timeframe}
             onChange={(e) => setTimeframe(e.target.value)}
-            className="h-8 px-2 rounded-lg border border-[#E8E8F1] text-xs font-medium bg-white w-[110px] shrink-0"
+            className="h-8 px-2 rounded-lg border border-[#E8E8F1] text-xs font-medium bg-white w-full sm:w-[110px] max-w-[160px] shrink-0"
           >
             <option value="daily">Daily</option>
             <option value="weekly">Weekly</option>
@@ -1110,7 +1110,7 @@ export default function Dashboard() {
   const visibleLayout = layout.filter(x => x.visible);
 
   return (
-    <div className="p-5 max-w-[1800px] mx-auto" data-testid="dashboard-page">
+    <div className="p-3 sm:p-4 lg:p-5 max-w-[1800px] mx-auto" data-testid="dashboard-page">
       <ThoughtOfTheDay />
       <AccountOverview />
 
