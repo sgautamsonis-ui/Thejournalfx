@@ -134,18 +134,33 @@ function BestTime({ analytics, compact = false, onDrill, timeFormat = "12h" }) {
   const maxAbs = Math.max(...hours.map((h) => Math.abs(h.pnl)), 1);
   const best = [...hours].sort((a, b) => b.pnl - a.pnl)[0];
   const mostActive = [...hours].sort((a, b) => b.total - a.total)[0];
-  return <Card title="Best Trading Time">
-    <div className="grid gap-0.5 mt-1" style={{ gridTemplateColumns: 'repeat(24, minmax(0, 1fr))' }}>
-      {hours.map((hour) => <button
-        key={hour.label}
-        title={`${formatTradeTime(hour.label, timeFormat)} · ${money(hour.pnl)} · ${hour.total} trade${hour.total === 1 ? "" : "s"}`}
-        onClick={() => hour.total && onDrill({ title: `${formatTradeTime(hour.label, timeFormat)} trades`, trades: hour.trades })}
-        className="aspect-square rounded-sm hover:ring-2 hover:ring-[#7C3AED] transition-transform hover:scale-110"
-        style={{ background: hour.total ? (hour.pnl >= 0 ? `rgba(22,163,74,${Math.min(.88, .18 + Math.abs(hour.pnl) / maxAbs * .7)})` : `rgba(220,38,38,${Math.min(.88, .18 + Math.abs(hour.pnl) / maxAbs * .7)})`) : "#F1F1F5" }}
-      />)}
+  
+  // Split into two 12-hour periods
+  const morningHours = hours.slice(0, 12);
+  const eveningHours = hours.slice(12, 24);
+  
+  const TimeGrid = ({ title, hoursList }) => (
+    <div>
+      <div className="text-xs font-semibold text-[#6D6D82] mb-1">{title}</div>
+      <div className="grid gap-0.5" style={{ gridTemplateColumns: 'repeat(12, minmax(0, 1fr))' }}>
+        {hoursList.map((hour) => <button
+          key={hour.label}
+          title={`${formatTradeTime(hour.label, timeFormat)} · ${money(hour.pnl)} · ${hour.total} trade${hour.total === 1 ? "" : "s"}`}
+          onClick={() => hour.total && onDrill({ title: `${formatTradeTime(hour.label, timeFormat)} trades`, trades: hour.trades })}
+          className="aspect-square rounded-sm hover:ring-2 hover:ring-[#7C3AED] transition-transform hover:scale-110"
+          style={{ background: hour.total ? (hour.pnl >= 0 ? `rgba(22,163,74,${Math.min(.88, .18 + Math.abs(hour.pnl) / maxAbs * .7)})` : `rgba(220,38,38,${Math.min(.88, .18 + Math.abs(hour.pnl) / maxAbs * .7)})`) : "#F1F1F5" }}
+        />)}
+      </div>
+      <div className="text-[9px] text-[#6D6D82] mt-1 px-0.5" style={{ display: 'grid', gridTemplateColumns: 'repeat(12, minmax(0, 1fr))', gap: '0' }}>
+        {hoursList.map((hour) => <span key={hour.label} className="text-center">{formatTradeTime(hour.label, timeFormat)}</span>)}
+      </div>
     </div>
-    <div className="flex text-[10px] text-[#6D6D82] mt-2 px-0.5" style={{ display: 'grid', gridTemplateColumns: 'repeat(24, minmax(0, 1fr))', gap: '0' }}>
-      {hours.map((hour) => <span key={hour.label} className="text-center">{formatTradeTime(hour.label, timeFormat)}</span>)}
+  );
+  
+  return <Card title="Best Trading Time">
+    <div className="space-y-3 mt-2">
+      <TimeGrid title="Morning (12 AM - 11 AM)" hoursList={morningHours} />
+      <TimeGrid title="Afternoon/Evening (12 PM - 11 PM)" hoursList={eveningHours} />
     </div>
     <div className="grid grid-cols-2 gap-2 mt-3">
       <MiniResult label="Best Time" item={best && { ...best, label: formatTradeTime(best.label, timeFormat) }} onDrill={onDrill} />
