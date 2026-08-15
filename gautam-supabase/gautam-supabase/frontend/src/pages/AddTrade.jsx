@@ -242,7 +242,7 @@ export default function AddTrade() {
     htfDraft={htfDraft} setHtfDraft={setHtfDraft} entryDraft={entryDraft} setEntryDraft={setEntryDraft}
     moodDraft={moodDraft} setMoodDraft={setMoodDraft} strategyDraft={strategyDraft} setStrategyDraft={setStrategyDraft} addStrategy={addStrategy}
     addPairedPreset={addPairedPreset} removePairedPreset={removePairedPreset} toggle={toggle}
-    saving={saving} save={save} onFile={onFile} uploadingCount={uploadingCount} tradeLocked={dailyDrawdownLocked} drawdownInfo={dailyDrawdownInfo} />;
+    saving={saving} save={save} onFile={onFile} uploadingCount={uploadingCount} tradeLocked={dailyDrawdownLocked} drawdownInfo={dailyDrawdownInfo} timeFormat={timeFormat} />;
 
   return (
     <div className="p-4 sm:p-5 lg:p-6 max-w-[1400px] mx-auto space-y-4" data-testid="add-trade-page">
@@ -535,7 +535,7 @@ function ChipRow({ label, items, selected, onToggle }) {
   );
 }
 
-function AddTradePremium({ t, setT, presets, accounts, computed, recommendedLot, htfDraft, setHtfDraft, entryDraft, setEntryDraft, moodDraft, setMoodDraft, strategyDraft, setStrategyDraft, addStrategy, addPairedPreset, removePairedPreset, toggle, saving, save, onFile, uploadingCount, tradeLocked, drawdownInfo }) {
+function AddTradePremium({ t, setT, presets, accounts, computed, recommendedLot, htfDraft, setHtfDraft, entryDraft, setEntryDraft, moodDraft, setMoodDraft, strategyDraft, setStrategyDraft, addStrategy, addPairedPreset, removePairedPreset, toggle, saving, save, onFile, uploadingCount, tradeLocked, drawdownInfo, timeFormat }) {
   const draftSubOptions = (presets.sub_strategy || []).filter(v => v.split("::")[0] === strategyDraft.timeframe).map(v => v.split("::").slice(1).join("::")).filter(Boolean);
   const input = (label, key, type = "number") => <Field label={label}><input value={t[key]} onChange={e=>setT({...t,[key]:e.target.value})} type={type} step={type === "number" ? "any" : undefined} className={inp}/></Field>;
   return (
