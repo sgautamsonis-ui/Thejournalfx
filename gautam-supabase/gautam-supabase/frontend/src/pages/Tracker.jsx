@@ -98,14 +98,22 @@ function makeAnalytics(trades) {
   const symbols = groupBy(trades, (trade) => trade.symbol || "Unknown symbol");
   const strategies = groupBy(trades, (trade) => trade.strategy || "No strategy");
   const moods = groupBy(trades.flatMap((trade) => [...new Set([...(trade.mood_before || []), ...(trade.mood_during || []), ...(trade.mood_after || [])])].map((mood) => ({ ...trade, _mood: mood }))), (trade) => trade._mood);
-  const days = DAYS.map((day) => buildGroup(trades.filter((trade) => dayFrom(trade) === day), day));
+  const sessions = groupBy(trades, (trade) => trade.session || "Unknown session");
+  const days = DAYS.map((day) => buildGroup(trades.filter((trade) => dayFrom(trade) === day), day)).filter((day) => day.total > 0);
   const hours = Array.from({ length: 24 }, (_, hour) => buildGroup(trades.filter((trade) => hourFrom(trade) === hour), `${String(hour).padStart(2, "0")}:00`));
   const dates = [...new Set(trades.map((trade) => trade.date).filter(Boolean))].sort().map((date) => ({ date, label: dateLabel(date), pnl: trades.filter((trade) => trade.date === date).reduce((total, trade) => total + safeNumber(trade.net_pnl), 0) })).map((point, index, array) => ({ ...point, equity: array.slice(0, index + 1).reduce((total, item) => total + item.pnl, 0) }));
   const grossWin = trades.filter((trade) => safeNumber(trade.net_pnl) > 0).reduce((total, trade) => total + safeNumber(trade.net_pnl), 0);
   const grossLoss = Math.abs(trades.filter((trade) => safeNumber(trade.net_pnl) < 0).reduce((total, trade) => total + safeNumber(trade.net_pnl), 0));
   const bestDay = [...days].sort((a, b) => b.pnl - a.pnl)[0];
   const bestMonth = groupBy(trades, (trade) => String(trade.date || "").slice(0, 7)).map((item) => ({ ...item, display: item.label ? new Date(`${item.label}-01T00:00:00`).toLocaleDateString("en-IN", { month: "short", year: "numeric" }) : "Unknown" }))[0];
-  return { summary, symbols, strategies, moods, days, hours, dates, bestDay, bestMonth, profitFactor: grossLoss ? grossWin / grossLoss : grossWin ? Infinity : 0 };
+  
+  // Long/Short win rates
+  const longTrades = trades.filter((trade) => trade.direction === "long");
+  const shortTrades = trades.filter((trade) => trade.direction === "short");
+  const longWinRate = longTrades.length ? (longTrades.filter((t) => safeNumber(t.net_pnl) > 0).length / longTrades.length) * 100 : 0;
+  const shortWinRate = shortTrades.length ? (shortTrades.filter((t) => safeNumber(t.net_pnl) > 0).length / shortTrades.length) * 100 : 0;
+  
+  return { summary, symbols, strategies, moods, sessions, days, hours, dates, bestDay, bestMonth, profitFactor: grossLoss ? grossWin / grossLoss : grossWin ? Infinity : 0, longWinRate, shortWinRate, longTrades, shortTrades };
 }
 
 function TopDeck({ analytics }) {
@@ -117,7 +125,7 @@ function TopDeck({ analytics }) {
   </section>;
 }
 
-function Overview({ analytics, onDrill, timeFormat }) { const { summary } = analytics; return <section className="grid lg:grid-cols-2 gap-4"><Card title="Equity Curve" subtitle={money(summary.pnl)} subtitleTone={summary.pnl >= 0}><Chart data={analytics.dates} dataKey="equity" /></Card><Card title="Performance Summary"><div className="grid sm:grid-cols-[170px_1fr] gap-3 items-center"><button className="h-44" onClick={() => onDrill({ title: "All closed trades", trades: summary.trades })}><ResponsiveContainer><PieChart><Pie data={[{ name: "Win", value: summary.wins }, { name: "Loss", value: summary.losses }, { name: "Breakeven", value: Math.max(0, summary.total - summary.wins - summary.losses) }]} dataKey="value" innerRadius={45} outerRadius={68} paddingAngle={3}>{[GREEN, RED, "#C4C4D0"].map((fill) => <Cell key={fill} fill={fill} />)}</Pie><Tooltip /></PieChart></ResponsiveContainer></button><div className="space-y-2 text-sm"><StatLine label="Win" value={`${summary.wins} (${pct(summary.winRate)})`} dot={GREEN} onClick={() => onDrill({ title: "Winning trades", trades: summary.trades.filter(t => safeNumber(t.net_pnl) > 0) })} /><StatLine label="Loss" value={`${summary.losses}`} dot={RED} onClick={() => onDrill({ title: "Losing trades", trades: summary.trades.filter(t => safeNumber(t.net_pnl) < 0) })} /><StatLine label="Profit factor" value={Number.isFinite(analytics.profitFactor) ? analytics.profitFactor.toFixed(2) : "∞"} /><StatLine label="Expectancy" value={money(summary.total ? summary.pnl / summary.total : 0)} /><StatLine label="Average R" value={`${summary.avgRR.toFixed(2)}R`} /></div></div></Card><Mood analytics={analytics} compact onDrill={onDrill} /><Strategy analytics={analytics} compact onDrill={onDrill} /><Symbols analytics={analytics} compact onDrill={onDrill} /><BestTime analytics={analytics} compact onDrill={onDrill} timeFormat={timeFormat} /><BestDays analytics={analytics} compact onDrill={onDrill} /><Insights analytics={analytics} /></section>; }
+function Overview({ analytics, onDrill, timeFormat }) { const { summary } = analytics; return <section className="grid lg:grid-cols-2 gap-4"><Card title="Equity Curve" subtitle={money(summary.pnl)} subtitleTone={summary.pnl >= 0}><Chart data={analytics.dates} dataKey="equity" /></Card><Card title="Performance Summary"><div className="grid sm:grid-cols-[170px_1fr] gap-3 items-center"><button className="h-44" onClick={() => onDrill({ title: "All closed trades", trades: summary.trades })}><ResponsiveContainer><PieChart><Pie data={[{ name: "Win", value: summary.wins }, { name: "Loss", value: summary.losses }, { name: "Breakeven", value: Math.max(0, summary.total - summary.wins - summary.losses) }]} dataKey="value" innerRadius={45} outerRadius={68} paddingAngle={3}>{[GREEN, RED, "#C4C4D0"].map((fill) => <Cell key={fill} fill={fill} />)}</Pie><Tooltip /></PieChart></ResponsiveContainer></button><div className="space-y-2 text-sm"><StatLine label="Win" value={`${summary.wins} (${pct(summary.winRate)})`} dot={GREEN} onClick={() => onDrill({ title: "Winning trades", trades: summary.trades.filter(t => safeNumber(t.net_pnl) > 0) })} /><StatLine label="Loss" value={`${summary.losses}`} dot={RED} onClick={() => onDrill({ title: "Losing trades", trades: summary.trades.filter(t => safeNumber(t.net_pnl) < 0) })} /><StatLine label="Long Win" value={`${pct(analytics.longWinRate)}`} dot={GREEN} onClick={() => onDrill({ title: "Long trades", trades: analytics.longTrades })} /><StatLine label="Short Win" value={`${pct(analytics.shortWinRate)}`} dot={RED} onClick={() => onDrill({ title: "Short trades", trades: analytics.shortTrades })} /><StatLine label="Profit factor" value={Number.isFinite(analytics.profitFactor) ? analytics.profitFactor.toFixed(2) : "∞"} /><StatLine label="Expectancy" value={money(summary.total ? summary.pnl / summary.total : 0)} /><StatLine label="Average R" value={`${summary.avgRR.toFixed(2)}R`} /></div></div></Card><Mood analytics={analytics} compact onDrill={onDrill} /><Strategy analytics={analytics} compact onDrill={onDrill} /><Symbols analytics={analytics} compact onDrill={onDrill} /><Sessions analytics={analytics} compact onDrill={onDrill} /><BestTime analytics={analytics} compact onDrill={onDrill} timeFormat={timeFormat} /><BestDays analytics={analytics} compact onDrill={onDrill} /><Insights analytics={analytics} /></section>; }
 function Mood({ analytics, compact = false, onDrill }) { const rows = analytics.moods.slice(0, compact ? 4 : 8); return <Card title="Mood Analytics"><RankRows rows={rows} empty="No mood tags added yet." onDrill={onDrill} /><div className="grid grid-cols-2 gap-2 mt-3"><MiniResult label="Best Mood" item={analytics.moods[0]} onDrill={onDrill} /><MiniResult label="Needs care" item={[...analytics.moods].sort((a,b)=>a.pnl-b.pnl)[0]} bad onDrill={onDrill} /></div></Card>; }
 function Strategy({ analytics, compact = false, onDrill }) { return <Card title="Strategy Performance"><RankRows rows={analytics.strategies.slice(0, compact ? 4 : 8)} empty="No strategy data added yet." onDrill={onDrill} /><div className="mt-3"><MiniResult label="Best Strategy" item={analytics.strategies[0]} onDrill={onDrill} /></div></Card>; }
 function Symbols({ analytics, compact = false, onDrill }) { return <Card title="Best Symbols"><div className="space-y-1">{analytics.symbols.slice(0, compact ? 4 : 10).map((item, index) => <button key={item.label} className="w-full rounded-lg px-2 py-2 hover:bg-[#F8F7FB] flex items-center justify-between text-left" onClick={() => onDrill({ title: `${item.label} trades`, trades: item.trades })}><span className="flex gap-2 items-center"><span className="w-5 text-xs text-[#7C3AED] font-bold">#{index + 1}</span><b className="text-sm">{item.label}</b><small className="text-[#6D6D82]">{item.total} trades</small></span><b className={`tjfx-mono text-sm ${tone(item.pnl)}`}>{money(item.pnl)}</b></button>)}</div><div className="mt-3"><MiniResult label="Most Profitable" item={analytics.symbols[0]} onDrill={onDrill} /></div></Card>; }
@@ -126,19 +134,18 @@ function BestTime({ analytics, compact = false, onDrill, timeFormat = "12h" }) {
   const maxAbs = Math.max(...hours.map((h) => Math.abs(h.pnl)), 1);
   const best = [...hours].sort((a, b) => b.pnl - a.pnl)[0];
   const mostActive = [...hours].sort((a, b) => b.total - a.total)[0];
-  const markerHours = [0, 6, 12, 18, 23];
   return <Card title="Best Trading Time">
-    <div className="grid grid-cols-12 gap-1.5 mt-1">
+    <div className="grid gap-0.5 mt-1" style={{ gridTemplateColumns: 'repeat(24, minmax(0, 1fr))' }}>
       {hours.map((hour) => <button
         key={hour.label}
         title={`${formatTradeTime(hour.label, timeFormat)} · ${money(hour.pnl)} · ${hour.total} trade${hour.total === 1 ? "" : "s"}`}
         onClick={() => hour.total && onDrill({ title: `${formatTradeTime(hour.label, timeFormat)} trades`, trades: hour.trades })}
-        className="aspect-square rounded-md hover:ring-2 hover:ring-[#7C3AED] transition-transform hover:scale-110"
+        className="aspect-square rounded-sm hover:ring-2 hover:ring-[#7C3AED] transition-transform hover:scale-110"
         style={{ background: hour.total ? (hour.pnl >= 0 ? `rgba(22,163,74,${Math.min(.88, .18 + Math.abs(hour.pnl) / maxAbs * .7)})` : `rgba(220,38,38,${Math.min(.88, .18 + Math.abs(hour.pnl) / maxAbs * .7)})`) : "#F1F1F5" }}
       />)}
     </div>
-    <div className="flex justify-between text-[10px] text-[#6D6D82] mt-1.5 px-0.5">
-      {markerHours.map((h) => <span key={h}>{formatTradeTime(`${String(h).padStart(2, "0")}:00`, timeFormat)}</span>)}
+    <div className="flex text-[10px] text-[#6D6D82] mt-2 px-0.5" style={{ display: 'grid', gridTemplateColumns: 'repeat(24, minmax(0, 1fr))', gap: '0' }}>
+      {hours.map((hour) => <span key={hour.label} className="text-center">{formatTradeTime(hour.label, timeFormat)}</span>)}
     </div>
     <div className="grid grid-cols-2 gap-2 mt-3">
       <MiniResult label="Best Time" item={best && { ...best, label: formatTradeTime(best.label, timeFormat) }} onDrill={onDrill} />
@@ -152,7 +159,7 @@ function BestDays({ analytics, compact = false, onDrill }) {
   // Days above the line (winRate > 50%) render green, days below render red.
   const chartData = days.map((day) => ({ ...day, deviation: Number((day.winRate - 50).toFixed(1)) }));
   return <Card title="Best Days">
-    <div className="h-40">
+    <div className="h-40 py-2">
       <ResponsiveContainer>
         <BarChart data={chartData} barCategoryGap="35%" onClick={(event) => { const item = event?.activePayload?.[0]?.payload; if (item?.total) onDrill({ title: `${item.label} trades`, trades: item.trades }); }}>
           <XAxis dataKey="label" tick={{ fontSize: 10 }} interval={0} axisLine={false} tickLine={false} />
@@ -170,6 +177,10 @@ function BestDays({ analytics, compact = false, onDrill }) {
       <MiniResult label="Worst Day" item={[...days].sort((a, b) => a.pnl - b.pnl)[0]} bad onDrill={onDrill} />
     </div>
   </Card>;
+}
+function Sessions({ analytics, compact = false, onDrill }) {
+  const rows = analytics.sessions.slice(0, compact ? 3 : 6);
+  return <Card title="Sessions Performance"><RankRows rows={rows} empty="No session data added yet." onDrill={onDrill} /><div className="mt-3"><MiniResult label="Best Session" item={analytics.sessions[0]} onDrill={onDrill} /></div></Card>;
 }
 function Insights({ analytics }) {
   const { days, hours, moods, strategies, symbols, summary } = analytics;
