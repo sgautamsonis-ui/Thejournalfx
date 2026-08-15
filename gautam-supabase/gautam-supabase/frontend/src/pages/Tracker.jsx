@@ -4,7 +4,7 @@ import { useAccount } from "@/context/AccountContext";
 import { useAuth } from "@/context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Area, AreaChart, Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Area, AreaChart, Bar, BarChart, Cell, Pie, PieChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { BarChart3, CalendarDays, ChevronDown, Clock3, Crosshair, Filter, Gem, LineChart, Smile, Sparkles, Target, Trophy, TrendingDown, TrendingUp } from "lucide-react";
 import { formatTradeTime } from "@/lib/time";
 
@@ -74,7 +74,7 @@ export default function Tracker() {
   }, [allTrades, range]);
 
   const analytics = useMemo(() => makeAnalytics(trades), [trades]);
-  const selectedSection = { overview: <Overview analytics={analytics} onDrill={setDrill} />, mood: <Mood analytics={analytics} onDrill={setDrill} />, strategy: <Strategy analytics={analytics} onDrill={setDrill} />, symbol: <Symbols analytics={analytics} onDrill={setDrill} />, time: <BestTime analytics={analytics} onDrill={setDrill} />, day: <BestDays analytics={analytics} onDrill={setDrill} /> }[tab];
+  const selectedSection = { overview: <Overview analytics={analytics} onDrill={setDrill} timeFormat={timeFormat} />, mood: <Mood analytics={analytics} onDrill={setDrill} />, strategy: <Strategy analytics={analytics} onDrill={setDrill} />, symbol: <Symbols analytics={analytics} onDrill={setDrill} />, time: <BestTime analytics={analytics} onDrill={setDrill} timeFormat={timeFormat} />, day: <BestDays analytics={analytics} onDrill={setDrill} /> }[tab];
 
   return <div className="p-4 md:p-6 max-w-[1500px] mx-auto space-y-4" data-testid="tracker-page">
     <header className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
@@ -117,13 +117,107 @@ function TopDeck({ analytics }) {
   </section>;
 }
 
-function Overview({ analytics, onDrill }) { const { summary } = analytics; return <section className="grid lg:grid-cols-2 gap-4"><Card title="Equity Curve" subtitle={money(summary.pnl)} subtitleTone={summary.pnl >= 0}><Chart data={analytics.dates} dataKey="equity" /></Card><Card title="Performance Summary"><div className="grid sm:grid-cols-[170px_1fr] gap-3 items-center"><button className="h-44" onClick={() => onDrill({ title: "All closed trades", trades: summary.trades })}><ResponsiveContainer><PieChart><Pie data={[{ name: "Win", value: summary.wins }, { name: "Loss", value: summary.losses }, { name: "Breakeven", value: Math.max(0, summary.total - summary.wins - summary.losses) }]} dataKey="value" innerRadius={45} outerRadius={68} paddingAngle={3}>{[GREEN, RED, "#C4C4D0"].map((fill) => <Cell key={fill} fill={fill} />)}</Pie><Tooltip /></PieChart></ResponsiveContainer></button><div className="space-y-2 text-sm"><StatLine label="Win" value={`${summary.wins} (${pct(summary.winRate)})`} dot={GREEN} onClick={() => onDrill({ title: "Winning trades", trades: summary.trades.filter(t => safeNumber(t.net_pnl) > 0) })} /><StatLine label="Loss" value={`${summary.losses}`} dot={RED} onClick={() => onDrill({ title: "Losing trades", trades: summary.trades.filter(t => safeNumber(t.net_pnl) < 0) })} /><StatLine label="Profit factor" value={Number.isFinite(analytics.profitFactor) ? analytics.profitFactor.toFixed(2) : "∞"} /><StatLine label="Expectancy" value={money(summary.total ? summary.pnl / summary.total : 0)} /><StatLine label="Average R" value={`${summary.avgRR.toFixed(2)}R`} /></div></div></Card><Mood analytics={analytics} compact onDrill={onDrill} /><Strategy analytics={analytics} compact onDrill={onDrill} /><Symbols analytics={analytics} compact onDrill={onDrill} /><BestTime analytics={analytics} compact onDrill={onDrill} /><BestDays analytics={analytics} compact onDrill={onDrill} /><Insights analytics={analytics} /></section>; }
+function Overview({ analytics, onDrill, timeFormat }) { const { summary } = analytics; return <section className="grid lg:grid-cols-2 gap-4"><Card title="Equity Curve" subtitle={money(summary.pnl)} subtitleTone={summary.pnl >= 0}><Chart data={analytics.dates} dataKey="equity" /></Card><Card title="Performance Summary"><div className="grid sm:grid-cols-[170px_1fr] gap-3 items-center"><button className="h-44" onClick={() => onDrill({ title: "All closed trades", trades: summary.trades })}><ResponsiveContainer><PieChart><Pie data={[{ name: "Win", value: summary.wins }, { name: "Loss", value: summary.losses }, { name: "Breakeven", value: Math.max(0, summary.total - summary.wins - summary.losses) }]} dataKey="value" innerRadius={45} outerRadius={68} paddingAngle={3}>{[GREEN, RED, "#C4C4D0"].map((fill) => <Cell key={fill} fill={fill} />)}</Pie><Tooltip /></PieChart></ResponsiveContainer></button><div className="space-y-2 text-sm"><StatLine label="Win" value={`${summary.wins} (${pct(summary.winRate)})`} dot={GREEN} onClick={() => onDrill({ title: "Winning trades", trades: summary.trades.filter(t => safeNumber(t.net_pnl) > 0) })} /><StatLine label="Loss" value={`${summary.losses}`} dot={RED} onClick={() => onDrill({ title: "Losing trades", trades: summary.trades.filter(t => safeNumber(t.net_pnl) < 0) })} /><StatLine label="Profit factor" value={Number.isFinite(analytics.profitFactor) ? analytics.profitFactor.toFixed(2) : "∞"} /><StatLine label="Expectancy" value={money(summary.total ? summary.pnl / summary.total : 0)} /><StatLine label="Average R" value={`${summary.avgRR.toFixed(2)}R`} /></div></div></Card><Mood analytics={analytics} compact onDrill={onDrill} /><Strategy analytics={analytics} compact onDrill={onDrill} /><Symbols analytics={analytics} compact onDrill={onDrill} /><BestTime analytics={analytics} compact onDrill={onDrill} timeFormat={timeFormat} /><BestDays analytics={analytics} compact onDrill={onDrill} /><Insights analytics={analytics} /></section>; }
 function Mood({ analytics, compact = false, onDrill }) { const rows = analytics.moods.slice(0, compact ? 4 : 8); return <Card title="Mood Analytics"><RankRows rows={rows} empty="No mood tags added yet." onDrill={onDrill} /><div className="grid grid-cols-2 gap-2 mt-3"><MiniResult label="Best Mood" item={analytics.moods[0]} onDrill={onDrill} /><MiniResult label="Needs care" item={[...analytics.moods].sort((a,b)=>a.pnl-b.pnl)[0]} bad onDrill={onDrill} /></div></Card>; }
 function Strategy({ analytics, compact = false, onDrill }) { return <Card title="Strategy Performance"><RankRows rows={analytics.strategies.slice(0, compact ? 4 : 8)} empty="No strategy data added yet." onDrill={onDrill} /><div className="mt-3"><MiniResult label="Best Strategy" item={analytics.strategies[0]} onDrill={onDrill} /></div></Card>; }
 function Symbols({ analytics, compact = false, onDrill }) { return <Card title="Best Symbols"><div className="space-y-1">{analytics.symbols.slice(0, compact ? 4 : 10).map((item, index) => <button key={item.label} className="w-full rounded-lg px-2 py-2 hover:bg-[#F8F7FB] flex items-center justify-between text-left" onClick={() => onDrill({ title: `${item.label} trades`, trades: item.trades })}><span className="flex gap-2 items-center"><span className="w-5 text-xs text-[#7C3AED] font-bold">#{index + 1}</span><b className="text-sm">{item.label}</b><small className="text-[#6D6D82]">{item.total} trades</small></span><b className={`tjfx-mono text-sm ${tone(item.pnl)}`}>{money(item.pnl)}</b></button>)}</div><div className="mt-3"><MiniResult label="Most Profitable" item={analytics.symbols[0]} onDrill={onDrill} /></div></Card>; }
-function BestTime({ analytics, compact = false, onDrill }) { const hours = analytics.hours; const best = [...hours].sort((a,b)=>b.pnl-a.pnl)[0]; return <Card title="Best Trading Time"><div className="grid grid-cols-12 gap-1 mt-1">{hours.map((hour) => <button key={hour.label} title={`${hour.label}: ${money(hour.pnl)}`} onClick={() => hour.total && onDrill({ title: `${hour.label} trades`, trades: hour.trades })} className="aspect-square rounded-sm hover:ring-2 hover:ring-[#7C3AED]" style={{ background: hour.total ? hour.pnl >= 0 ? `rgba(22,163,74,${Math.min(.88,.18 + Math.abs(hour.pnl)/(Math.max(...hours.map(h=>Math.abs(h.pnl)),1))*.7)})` : `rgba(220,38,38,${Math.min(.88,.18 + Math.abs(hour.pnl)/(Math.max(...hours.map(h=>Math.abs(h.pnl)),1))*.7)})` : "#F1F1F5" }} />)}</div><div className="flex justify-between text-[10px] text-[#6D6D82] mt-1"><span>00:00</span><span>12:00</span><span>23:00</span></div><div className="grid grid-cols-2 gap-2 mt-3"><MiniResult label="Best Time" item={best} onDrill={onDrill} /><MiniResult label="Most Active" item={[...hours].sort((a,b)=>b.total-a.total)[0]} onDrill={onDrill} /></div></Card>; }
-function BestDays({ analytics, compact = false, onDrill }) { const days = analytics.days; return <Card title="Best Days"><div className="h-32"><ResponsiveContainer><BarChart data={days} onClick={(event) => { const item = event?.activePayload?.[0]?.payload; if (item?.total) onDrill({ title: `${item.label} trades`, trades: item.trades }); }}><XAxis dataKey="label" tick={{ fontSize: 10 }} interval={0} axisLine={false} tickLine={false}/><YAxis hide/><Tooltip formatter={(value) => money(value)} /><Bar dataKey="pnl" radius={[5,5,0,0]}>{days.map((day) => <Cell key={day.label} fill={day.pnl >= 0 ? GREEN : RED} />)}</Bar></BarChart></ResponsiveContainer></div><div className="grid grid-cols-2 gap-2 mt-2"><MiniResult label="Best Day" item={analytics.bestDay} onDrill={onDrill} /><MiniResult label="Worst Day" item={[...days].sort((a,b)=>a.pnl-b.pnl)[0]} bad onDrill={onDrill} /></div></Card>; }
-function Insights({ analytics }) { const bestSymbol = analytics.symbols[0]; const bestStrategy = analytics.strategies[0]; return <Card className="lg:col-span-2 bg-gradient-to-r from-[#FBF8FF] to-white" title="AI Insights"><div className="grid md:grid-cols-[auto_1fr_1fr] gap-3 items-start"><div className="w-11 h-11 rounded-2xl bg-[#7C3AED] text-white grid place-items-center"><Sparkles className="w-5 h-5" /></div><div><b className="text-sm">You perform best when:</b><ul className="mt-1 text-sm text-[#535368] space-y-1"><li>✓ Trading {bestStrategy?.label || "your tagged strategy"}</li><li>✓ Focusing on {bestSymbol?.label || "your strongest symbols"}</li><li>✓ Keeping risk-reward above {analytics.summary.avgRR.toFixed(2)}R</li></ul></div><div><b className="text-sm">Next focus:</b><p className="mt-1 text-sm text-[#535368]">Review losing trades and tag mood, strategy and session consistently. Your Tracker becomes sharper after every closed trade.</p></div></div></Card>; }
+function BestTime({ analytics, compact = false, onDrill, timeFormat = "12h" }) {
+  const hours = analytics.hours;
+  const maxAbs = Math.max(...hours.map((h) => Math.abs(h.pnl)), 1);
+  const best = [...hours].sort((a, b) => b.pnl - a.pnl)[0];
+  const mostActive = [...hours].sort((a, b) => b.total - a.total)[0];
+  const markerHours = [0, 6, 12, 18, 23];
+  return <Card title="Best Trading Time">
+    <div className="grid grid-cols-12 gap-1.5 mt-1">
+      {hours.map((hour) => <button
+        key={hour.label}
+        title={`${formatTradeTime(hour.label, timeFormat)} · ${money(hour.pnl)} · ${hour.total} trade${hour.total === 1 ? "" : "s"}`}
+        onClick={() => hour.total && onDrill({ title: `${formatTradeTime(hour.label, timeFormat)} trades`, trades: hour.trades })}
+        className="aspect-square rounded-md hover:ring-2 hover:ring-[#7C3AED] transition-transform hover:scale-110"
+        style={{ background: hour.total ? (hour.pnl >= 0 ? `rgba(22,163,74,${Math.min(.88, .18 + Math.abs(hour.pnl) / maxAbs * .7)})` : `rgba(220,38,38,${Math.min(.88, .18 + Math.abs(hour.pnl) / maxAbs * .7)})`) : "#F1F1F5" }}
+      />)}
+    </div>
+    <div className="flex justify-between text-[10px] text-[#6D6D82] mt-1.5 px-0.5">
+      {markerHours.map((h) => <span key={h}>{formatTradeTime(`${String(h).padStart(2, "0")}:00`, timeFormat)}</span>)}
+    </div>
+    <div className="grid grid-cols-2 gap-2 mt-3">
+      <MiniResult label="Best Time" item={best && { ...best, label: formatTradeTime(best.label, timeFormat) }} onDrill={onDrill} />
+      <MiniResult label="Most Active" item={mostActive && { ...mostActive, label: formatTradeTime(mostActive.label, timeFormat) }} onDrill={onDrill} />
+    </div>
+  </Card>;
+}
+function BestDays({ analytics, compact = false, onDrill }) {
+  const days = analytics.days;
+  // Chart is win-rate based: value = winRate - 50, so 0 on the axis = 50% win rate.
+  // Days above the line (winRate > 50%) render green, days below render red.
+  const chartData = days.map((day) => ({ ...day, deviation: Number((day.winRate - 50).toFixed(1)) }));
+  return <Card title="Best Days">
+    <div className="h-40">
+      <ResponsiveContainer>
+        <BarChart data={chartData} barCategoryGap="35%" onClick={(event) => { const item = event?.activePayload?.[0]?.payload; if (item?.total) onDrill({ title: `${item.label} trades`, trades: item.trades }); }}>
+          <XAxis dataKey="label" tick={{ fontSize: 10 }} interval={0} axisLine={false} tickLine={false} />
+          <YAxis tick={{ fontSize: 10 }} width={34} axisLine={false} tickLine={false} domain={[-50, 50]} ticks={[-50, -25, 0, 25, 50]} tickFormatter={(v) => `${v > 0 ? "+" : ""}${v}%`} />
+          <ReferenceLine y={0} stroke="#D8D8E3" />
+          <Tooltip formatter={(_value, _name, props) => [`${props.payload.winRate.toFixed(0)}% win rate`, `${props.payload.total} trade${props.payload.total === 1 ? "" : "s"}`]} labelFormatter={(label) => label} />
+          <Bar dataKey="deviation" radius={[4, 4, 4, 4]} maxBarSize={18}>
+            {chartData.map((day) => <Cell key={day.label} fill={day.deviation >= 0 ? GREEN : RED} />)}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+    <div className="grid grid-cols-2 gap-2 mt-2">
+      <MiniResult label="Best Day" item={analytics.bestDay} onDrill={onDrill} />
+      <MiniResult label="Worst Day" item={[...days].sort((a, b) => a.pnl - b.pnl)[0]} bad onDrill={onDrill} />
+    </div>
+  </Card>;
+}
+function Insights({ analytics }) {
+  const { days, hours, moods, strategies, symbols, summary } = analytics;
+  const bestSymbol = symbols[0];
+  const bestStrategy = strategies[0];
+
+  // Everything below is computed live from the user's own closed trades —
+  // nothing here is a fixed/static string.
+  const weakest = (list) => [...list].filter((item) => item.total >= 2 && item.pnl < 0).sort((a, b) => a.pnl - b.pnl)[0];
+  const worstDay = weakest(days);
+  const worstHour = weakest(hours);
+  const worstMood = weakest(moods);
+  const worstStrategy = weakest(strategies);
+  const worstSymbol = weakest(symbols);
+
+  const weakSpots = [
+    worstDay && { text: `Trading on ${worstDay.label}s — ${money(worstDay.pnl)} across ${worstDay.total} trades (${pct(worstDay.winRate)} win rate).`, weight: Math.abs(worstDay.pnl) },
+    worstMood && { text: `Entries tagged "${worstMood.label}" — averaging ${money(worstMood.pnl / worstMood.total)} per trade.`, weight: Math.abs(worstMood.pnl) },
+    worstStrategy && { text: `The "${worstStrategy.label}" setup — ${money(worstStrategy.pnl)} net, ${pct(worstStrategy.winRate)} win rate.`, weight: Math.abs(worstStrategy.pnl) },
+    worstSymbol && { text: `Trading ${worstSymbol.label} — ${money(worstSymbol.pnl)} net so far.`, weight: Math.abs(worstSymbol.pnl) },
+    worstHour && { text: `Entries opened around ${worstHour.label} — ${money(worstHour.pnl)} net.`, weight: Math.abs(worstHour.pnl) },
+  ].filter(Boolean).sort((a, b) => b.weight - a.weight);
+
+  const nextFocus = weakSpots.length
+    ? `Your biggest leak right now: ${weakSpots[0].text} Review those specific trades and tighten entry rules there before adding size elsewhere.`
+    : summary.total >= 5
+      ? "No major red flag in your recent trades — stay consistent and keep tagging mood, strategy and session on every entry."
+      : "Log a few more closed trades with mood, strategy and session tags — insights get sharper the more data you add.";
+
+  return <Card className="lg:col-span-2 bg-gradient-to-r from-[#FBF8FF] to-white" title="AI Insights">
+    <div className="grid md:grid-cols-[auto_1fr_1fr] gap-3 items-start">
+      <div className="w-11 h-11 rounded-2xl bg-[#7C3AED] text-white grid place-items-center"><Sparkles className="w-5 h-5" /></div>
+      <div>
+        <b className="text-sm">You perform best when:</b>
+        <ul className="mt-1 text-sm text-[#535368] space-y-1">
+          <li>✓ Trading {bestStrategy?.label || "your tagged strategy"}</li>
+          <li>✓ Focusing on {bestSymbol?.label || "your strongest symbols"}</li>
+          <li>✓ Keeping risk-reward above {summary.avgRR.toFixed(2)}R</li>
+        </ul>
+      </div>
+      <div>
+        <b className="text-sm">Next focus:</b>
+        <p className="mt-1 text-sm text-[#535368]">{nextFocus}</p>
+        {weakSpots.length > 1 && <ul className="mt-2 text-xs text-[#8B8B9A] space-y-0.5">{weakSpots.slice(1, 3).map((w) => <li key={w.text}>• {w.text}</li>)}</ul>}
+      </div>
+    </div>
+  </Card>;
+}
 
 function Card({ title, subtitle, subtitleTone, children, className = "" }) { return <section className={`tjfx-card p-4 ${className}`}><div className="flex items-start justify-between gap-2 mb-3">{title && <div><h2 className="font-display font-bold text-sm uppercase tracking-wide">{title}</h2>{subtitle && <b className={`tjfx-mono text-xl ${subtitleTone ? "text-emerald-600" : "text-red-600"}`}>{subtitle}</b>}</div>}</div>{children}</section>; }
 function Metric({ label, value, good, icon: Icon, spark, ring }) { return <Card className="min-h-[132px]"><div className="flex justify-between"><span className="text-sm text-[#6D6D82]">{label}</span><Icon className="w-4 h-4 text-[#7C3AED]" /></div><div className={`tjfx-mono text-2xl font-bold mt-1 ${good ? "text-emerald-600" : "text-red-600"}`}>{value}</div>{ring !== undefined ? <div className="w-12 h-12 mt-1 rounded-full grid place-items-center text-[10px] font-bold" style={{ background: `conic-gradient(${GREEN} ${ring}%, #ECECF2 0)`, boxShadow:"inset 0 0 0 7px white" }}>{pct(ring)}</div> : <div className="h-9 mt-2"><ResponsiveContainer><AreaChart data={spark.map((value,index)=>({index,value}))}><Area type="monotone" dataKey="value" stroke={good ? GREEN : RED} fill={good ? "#DCFCE7" : "#FEE2E2"} strokeWidth={2}/></AreaChart></ResponsiveContainer></div>}</Card>; }
